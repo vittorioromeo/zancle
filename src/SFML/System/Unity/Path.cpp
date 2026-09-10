@@ -267,7 +267,12 @@ base::Optional<base::I64> Path::getLastWriteTimeSecondsSinceEpoch() const
     if (ec)
         return base::nullOpt;
 
-    const auto sysTime = std::chrono::file_clock::to_sys(ftime);
+    // `file_clock` is only required to provide EITHER to_sys()/from_sys()
+    // OR to_utc()/from_utc(), vendor's choice -- libstdc++/libc++ (GCC/Clang)
+    // chose the former, MSVC's STL chose the latter. `clock_cast` is the
+    // portable conversion API the standard provides specifically to avoid
+    // depending on which pair a given vendor implemented.
+    const auto sysTime = std::chrono::clock_cast<std::chrono::system_clock>(ftime);
     const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(sysTime.time_since_epoch()).count();
     return base::makeOptional(static_cast<base::I64>(seconds));
 }
