@@ -55,6 +55,7 @@ if(ZA_OS_LINUX OR ZA_OS_FREEBSD OR ZA_OS_OPENBSD OR ZA_OS_NETBSD)
 endif()
 
 
+target_link_libraries(zancle-glutils PUBLIC Zancle::System)
 target_link_libraries(zancle-glutils PRIVATE $<BUILD_INTERFACE:zancle-glad-headers>)
 
 # When static linking on macOS, we need to add this flag for objective C to work
