@@ -44,7 +44,7 @@ struct [[nodiscard]] ZA_WINDOW_API VideoMode
     /// \return `true` if modes are equal
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] ZA_WINDOW_API bool operator==(const VideoMode& rhs) const = default;
+    [[nodiscard]] bool operator==(const VideoMode& rhs) const = default;
 
 
     ////////////////////////////////////////////////////////////

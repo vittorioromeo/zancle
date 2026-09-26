@@ -129,7 +129,7 @@ public:
     /// \return `true` if both addresses are equal
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] ZA_NETWORK_API bool operator==(const IpAddress& rhs) const = default;
+    [[nodiscard]] bool operator==(const IpAddress& rhs) const = default;
 
 
     ////////////////////////////////////////////////////////////

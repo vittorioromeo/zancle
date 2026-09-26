@@ -80,7 +80,7 @@ struct [[nodiscard]] ZA_GRAPHICS_API StencilValue
     /// \return `true` if stencil values are equal, `false` if they are different
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] ZA_GRAPHICS_API constexpr bool operator==(const StencilValue& rhs) const = default;
+    [[nodiscard]] constexpr bool operator==(const StencilValue& rhs) const = default;
 
     unsigned int value{}; //!< The stored stencil value
 };
@@ -111,7 +111,7 @@ struct [[nodiscard]] ZA_GRAPHICS_API StencilMode
     /// \return `true` if stencil modes are equal, `false` if they are different
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] ZA_GRAPHICS_API constexpr bool operator==(const StencilMode& rhs) const = default;
+    [[nodiscard]] constexpr bool operator==(const StencilMode& rhs) const = default;
 };
 
 } // namespace za

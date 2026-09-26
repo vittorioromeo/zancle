@@ -88,7 +88,7 @@ struct [[nodiscard]] ZA_GRAPHICS_API BlendMode
     /// \return `true` if blending modes are equal, `false` if they are different
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] ZA_GRAPHICS_API constexpr bool operator==(const BlendMode& rhs) const = default;
+    [[nodiscard]] constexpr bool operator==(const BlendMode& rhs) const = default;
 
     ////////////////////////////////////////////////////////////
     // Member data

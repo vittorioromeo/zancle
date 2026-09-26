@@ -6,8 +6,6 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
-#include "Zancle/Graphics/Export.hpp"
-
 #include "Zancle/Math/ClampMacro.hpp"
 #include "Zancle/Math/Fabs.hpp"
 #include "Zancle/Math/MinMaxMacros.hpp"
@@ -25,7 +23,7 @@ namespace za
 /// \brief Utility class for manipulating RGBA colors
 ///
 ////////////////////////////////////////////////////////////
-struct [[nodiscard]] ZA_GRAPHICS_API Color
+struct [[nodiscard]] Color
 {
     ////////////////////////////////////////////////////////////
     /// \brief Construct a fully white color with a given alpha

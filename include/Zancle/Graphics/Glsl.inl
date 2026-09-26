@@ -38,7 +38,7 @@ ZA_GRAPHICS_API void copyMatrix(const Transform& source, Matrix<4, 4>& dest);
 /// \brief Copy array-based matrix with given number of elements
 ///
 ////////////////////////////////////////////////////////////
-[[gnu::always_inline]] ZA_GRAPHICS_API inline void copyMatrix(const float* source, za::SizeT elements, float* dest)
+[[gnu::always_inline]] inline void copyMatrix(const float* source, za::SizeT elements, float* dest)
 {
     ZA_MEMCPY(dest, source, elements * sizeof(float));
 }

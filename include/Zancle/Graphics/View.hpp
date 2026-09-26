@@ -339,7 +339,7 @@ struct [[nodiscard]] ZA_GRAPHICS_API View
     /// \brief Compare strict equality between two `View` objects
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] ZA_GRAPHICS_API constexpr bool operator==(const View& rhs) const = default;
+    [[nodiscard]] constexpr bool operator==(const View& rhs) const = default;
 
 
     ////////////////////////////////////////////////////////////
