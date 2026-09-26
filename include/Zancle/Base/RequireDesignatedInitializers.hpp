@@ -3,6 +3,12 @@
 // https://github.com/vittorioromeo/Zancle/blob/master/license.md
 
 
+////////////////////////////////////////////////////////////
+// Headers
+////////////////////////////////////////////////////////////
+#include "Zancle/Base/NoUniqueAddress.hpp" // IWYU pragma: export (used by `ZA_REQUIRE_DESIGNATED_INITIALIZERS`)
+
+
 namespace za::priv
 {
 ////////////////////////////////////////////////////////////
@@ -30,7 +36,7 @@ struct ReqDInit
 /// \brief Force callers of an aggregate to use designated initializers
 ///
 /// Place at the very top of an aggregate's member list. Adds a
-/// zero-sized sentinel (via `[[no_unique_address]]`) that can only
+/// zero-sized sentinel (via `ZA_NO_UNIQUE_ADDRESS`) that can only
 /// be initialized by its in-class default -- the explicit default
 /// constructor rejects the copy-list-initialization that aggregate
 /// init performs for each positional brace element.
@@ -44,7 +50,7 @@ struct ReqDInit
 /// \see `za::priv::ReqDInit`
 ///
 ////////////////////////////////////////////////////////////
-#define ZA_REQUIRE_DESIGNATED_INITIALIZERS                 \
-    [[no_unique_address]] ::za::priv::ReqDInit _zaReqDInit \
-    {                                                      \
+#define ZA_REQUIRE_DESIGNATED_INITIALIZERS                \
+    ZA_NO_UNIQUE_ADDRESS ::za::priv::ReqDInit _zaReqDInit \
+    {                                                     \
     }

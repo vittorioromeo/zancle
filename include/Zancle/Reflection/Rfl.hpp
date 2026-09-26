@@ -44,6 +44,7 @@ SOFTWARE.
 #include "Zancle/Base/IndexSequence.hpp"
 #include "Zancle/Base/Macros.hpp"
 #include "Zancle/Base/MakeIndexSequence.hpp"
+#include "Zancle/Base/NoUniqueAddress.hpp"
 #include "Zancle/Base/SizeT.hpp"
 #include "Zancle/Base/TypePackElement.hpp"
 
@@ -59,7 +60,7 @@ template <SizeT N, typename T>
 struct TupleMember
 {
     ////////////////////////////////////////////////////////////
-    [[no_unique_address]] T value;
+    ZA_NO_UNIQUE_ADDRESS T value;
 };
 
 

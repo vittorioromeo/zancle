@@ -5,6 +5,8 @@
 
 #include "Zancle/Reflection/RflNames.hpp"
 
+#include "Zancle/Base/NoUniqueAddress.hpp"
+
 #include "Zancle/Trait/IsSame.hpp"
 
 
@@ -58,8 +60,8 @@ struct SEmpty1
 ////////////////////////////////////////////////////////////
 struct SWithEmpty
 {
-    [[no_unique_address]] SEmpty1 e;
-    int                           x;
+    ZA_NO_UNIQUE_ADDRESS SEmpty1 e;
+    int                          x;
 };
 
 ////////////////////////////////////////////////////////////
