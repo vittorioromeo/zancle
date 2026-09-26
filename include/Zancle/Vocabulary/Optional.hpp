@@ -105,6 +105,10 @@ inline constexpr struct FromFunc { } fromFunc;
 /// `Optional<T>` propagates trivial relocatability from `T` so that it
 /// can be moved with `memcpy` inside Zancle containers when applicable.
 ///
+/// `Optional` is intentionally not exception-safe: `T`'s constructors
+/// and assignments must not throw (`value()` on an empty optional is
+/// the only operation that may throw).
+///
 ////////////////////////////////////////////////////////////
 template <typename T>
 class [[nodiscard]] Optional

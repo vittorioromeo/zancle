@@ -106,7 +106,9 @@ inline constexpr priv::InPlaceIndex<N> inPlaceIndex{};
 ///
 /// Compared to `std::variant`, `za::Variant`:
 /// - avoids the heavy `<variant>` standard header
-/// - never enters the "valueless by exception" state
+/// - has no "valueless by exception" state: it is intentionally not
+///   exception-safe, so alternatives must not throw from their special
+///   members (construction, assignment, destruction)
 /// - exposes both a recursive and a linear visit strategy, so callers
 ///   can pick the one with the best codegen for their alternative count
 /// - propagates trivial relocatability when all alternatives are
