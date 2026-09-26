@@ -6,7 +6,9 @@
 ////////////////////////////////////////////////////////////
 // Clang detection
 #ifdef __is_identifier
-    #if !__is_identifier(_Float16)
+    // `_Float16` is always a keyword in Clang, but only usable on targets
+    // that support it (e.g. not on WebAssembly/Emscripten)
+    #ifdef __FLT16_MAX__
         #define ZA_FLOAT16_DETECTED
     #endif
 
