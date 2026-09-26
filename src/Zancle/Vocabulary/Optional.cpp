@@ -25,7 +25,7 @@
 namespace za::priv
 {
 ////////////////////////////////////////////////////////////
-void throwIfNotEngaged()
+void onBadOptionalAccess()
 {
     std::fflush(stdout);
     std::fputs("\n[[ZANCLE OPTIONAL FAILURE]]: not engaged!\n", stderr);

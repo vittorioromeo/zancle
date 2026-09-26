@@ -30,7 +30,7 @@ namespace za::priv
 /// \brief Throws (or aborts) when an empty `Optional` is accessed via `value()`
 ///
 ////////////////////////////////////////////////////////////
-[[gnu::cold]] void throwIfNotEngaged();
+[[noreturn, gnu::cold]] void onBadOptionalAccess();
 
 } // namespace za::priv
 
@@ -430,7 +430,7 @@ public:
     [[nodiscard, gnu::always_inline]] constexpr T& value() &
     {
         if (!m_engaged) [[unlikely]]
-            priv::throwIfNotEngaged();
+            priv::onBadOptionalAccess();
 
         return m_buffer.obj;
     }
@@ -443,7 +443,7 @@ public:
     [[nodiscard, gnu::always_inline]] constexpr const T& value() const&
     {
         if (!m_engaged) [[unlikely]]
-            priv::throwIfNotEngaged();
+            priv::onBadOptionalAccess();
 
         return m_buffer.obj;
     }
@@ -456,7 +456,7 @@ public:
     [[nodiscard, gnu::always_inline]] constexpr T&& value() &&
     {
         if (!m_engaged) [[unlikely]]
-            priv::throwIfNotEngaged();
+            priv::onBadOptionalAccess();
 
         return ZA_MOVE(m_buffer.obj);
     }
