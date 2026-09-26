@@ -6,6 +6,7 @@
 
 #include "Zancle/Trait/IsAggregate.hpp"
 #include "Zancle/Trait/IsConstructible.hpp"
+#include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/IsStandardLayout.hpp"
 #include "Zancle/Trait/IsTrivial.hpp"
 #include "Zancle/Trait/IsTriviallyAssignable.hpp"
@@ -111,6 +112,18 @@ TEST_CASE("[Base] Base/Span.hpp")
 
         // Types lacking .data()/.size() must not match the range constructor.
         STATIC_CHECK(!ZA_IS_CONSTRUCTIBLE(za::Span<int>, int));
+    }
+
+    SECTION("data() preserves the element type's constness")
+    {
+        STATIC_CHECK(ZA_IS_SAME(decltype(za::Span<int>{}.data()), int*));
+        STATIC_CHECK(ZA_IS_SAME(decltype(za::Span<const int>{}.data()), const int*));
+
+        int           array[]{1, 2, 3};
+        za::Span<int> span{array};
+
+        *span.data() = 10;
+        CHECK(array[0] == 10);
     }
 
     SECTION("Element types must match exactly (up to added cv-qualifiers)")

@@ -145,7 +145,7 @@ struct Span
     /// \brief Pointer to the first element (may be `nullptr` if empty)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T* data() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T* data() const noexcept
     {
         return theData;
     }
