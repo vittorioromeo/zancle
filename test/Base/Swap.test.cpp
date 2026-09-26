@@ -4,6 +4,8 @@
 
 #include "Zancle/Container/Vector.hpp"
 
+#include "Zancle/Base/DeclVal.hpp"
+
 
 namespace
 {
@@ -91,6 +93,45 @@ void swap(T& lhs, T& rhs) noexcept
 }
 
 } // namespace TestAmbiguity
+
+struct ThrowingMemberSwap
+{
+    void swap(ThrowingMemberSwap&)
+    {
+        throw 42;
+    }
+};
+
+struct ThrowingMove
+{
+    ThrowingMove() = default;
+
+    ThrowingMove(ThrowingMove&&)
+    {
+        throw 42;
+    }
+
+    ThrowingMove& operator=(ThrowingMove&&)
+    {
+        return *this;
+    }
+};
+
+template <typename T>
+inline constexpr bool isGenericSwapNoexcept = noexcept(za::genericSwap(za::declVal<T&>(), za::declVal<T&>()));
+
+// `genericSwap` is `noexcept` exactly when the selected operation is
+static_assert(isGenericSwapNoexcept<int>);
+static_assert(isGenericSwapNoexcept<int[2][2]>);
+static_assert(isGenericSwapNoexcept<za::Vector<int>>);
+static_assert(isGenericSwapNoexcept<TestMemberSwap>);
+static_assert(isGenericSwapNoexcept<TestHiddenFriend>);
+static_assert(isGenericSwapNoexcept<TestADL::TestADLStruct>);
+static_assert(isGenericSwapNoexcept<TestAmbiguity::AmbiguousStruct>);
+static_assert(isGenericSwapNoexcept<MoveOnlySwappable>);
+static_assert(!isGenericSwapNoexcept<ThrowingMemberSwap>);
+static_assert(!isGenericSwapNoexcept<ThrowingMove>);
+static_assert(!isGenericSwapNoexcept<ThrowingMove[2][2]>);
 
 
 TEST_CASE("[Base] Base/Swap.hpp")
@@ -268,6 +309,32 @@ TEST_CASE("[Base] Base/Swap.hpp")
         CHECK(arr2[1][0] == 3);
         CHECK(arr2[1][1] == 4);
     }
+
+#ifdef __cpp_exceptions
+    SECTION("Exceptions propagate instead of terminating")
+    {
+        const auto throwsInt = [](auto& a, auto& b)
+        {
+            try
+            {
+                za::genericSwap(a, b);
+            } catch (const int e)
+            {
+                return e == 42;
+            }
+
+            return false;
+        };
+
+        ThrowingMemberSwap tms0;
+        ThrowingMemberSwap tms1;
+        CHECK(throwsInt(tms0, tms1));
+
+        ThrowingMove tm0;
+        ThrowingMove tm1;
+        CHECK(throwsInt(tm0, tm1));
+    }
+#endif
 }
 
 } // namespace
