@@ -6,6 +6,9 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/Trait/IsSame.hpp"
+#include "Zancle/Trait/RemoveCVRef.hpp"
+
 #include "Zancle/Base/Launder.hpp"
 #include "Zancle/Base/MaxAlignT.hpp"
 #include "Zancle/Base/PlacementNew.hpp"
@@ -78,10 +81,12 @@ public:
     /// \brief Construct the implementation in-place from `args...`
     ///
     /// Statically asserts that the buffer is large enough and aligned
-    /// suitably for `T`.
+    /// suitably for `T`. Disabled for a single `InPlacePImpl` argument, so
+    /// that it does not hijack copy construction from a non-const lvalue.
     ///
     ////////////////////////////////////////////////////////////
     template <typename... Args>
+        requires(!(sizeof...(Args) == 1 && (... && isSame<RemoveCVRefIndirect<Args>, InPlacePImpl>)))
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     [[nodiscard, gnu::always_inline]] explicit InPlacePImpl(Args&&... args)
     {
