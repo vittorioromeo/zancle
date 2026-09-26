@@ -31,14 +31,10 @@
 
 
 ////////////////////////////////////////////////////////////
-#define ZA_PRIV_EXPAND_CHECK_BUILTIN(a, b) __##a(b)
-
-////////////////////////////////////////////////////////////
-#define ZA_PRIV_CHECK_BUILTIN(x) ZA_PRIV_EXPAND_CHECK_BUILTIN(has_builtin, x)
-
-////////////////////////////////////////////////////////////
+// Checks the `__builtin_`-prefixed names (the ones actually used), not the plain library names:
+// the latter are not builtins under `-fno-builtin`/`-ffreestanding`, while the former still are.
 #define ZA_PRIV_HAS_MATH_BUILTIN(name) \
-    ZA_PRIV_CHECK_BUILTIN(name) && ZA_PRIV_CHECK_BUILTIN(name##f) && ZA_PRIV_CHECK_BUILTIN(name##l)
+    (__has_builtin(__builtin_##name) && __has_builtin(__builtin_##name##f) && __has_builtin(__builtin_##name##l))
 
 
 ////////////////////////////////////////////////////////////
