@@ -7,6 +7,8 @@
 ////////////////////////////////////////////////////////////
 #include "Zancle/Math/SinCosLookup.hpp"
 
+#include "Zancle/Base/IntTypes.hpp"
+
 
 namespace za::priv
 {
