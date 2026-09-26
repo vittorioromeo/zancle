@@ -5,6 +5,7 @@
 #include "Zancle/Trait/IsAggregate.hpp"
 #include "Zancle/Trait/IsAssignable.hpp"
 #include "Zancle/Trait/IsConstructible.hpp"
+#include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/IsStandardLayout.hpp"
 #include "Zancle/Trait/IsTrivial.hpp"
 #include "Zancle/Trait/IsTriviallyAssignable.hpp"
@@ -15,6 +16,7 @@
 #include "Zancle/Trait/IsTriviallyMoveAssignable.hpp"
 #include "Zancle/Trait/IsTriviallyMoveConstructible.hpp"
 #include "Zancle/Trait/IsTriviallyRelocatable.hpp"
+#include "Zancle/Trait/RemoveCVRef.hpp"
 
 #include "Zancle/Base/IndexSequence.hpp"
 #include "Zancle/Base/MakeIndexSequence.hpp"
@@ -117,6 +119,20 @@ struct Tracker
 struct OtherAlt
 {
     int x = 0;
+};
+
+
+////////////////////////////////////////////////////////////
+struct MoveOnlyResult
+{
+    explicit MoveOnlyResult(int v) : value(v)
+    {
+    }
+
+    MoveOnlyResult(const MoveOnlyResult&) = delete;
+    MoveOnlyResult(MoveOnlyResult&&)      = default;
+
+    int value;
 };
 
 
@@ -341,6 +357,61 @@ TEST_CASE("[Base] Base/Variant.hpp")
 
         CHECK(a.is<int>());
         CHECK(DtorCounter::dtorCount == 1);
+    }
+
+    SECTION("linearVisit returning const and rvalue references")
+    {
+        using namespace VariantTest;
+
+        static constexpr int fallback = 0;
+
+        const za::Variant<int, float> cv{5};
+
+        const int& r = cv.linearVisit([](const auto& x) -> const int&
+        {
+            if constexpr (ZA_IS_SAME(ZA_REMOVE_CVREF(decltype(x)), int))
+                return x;
+            else
+                return fallback;
+        });
+
+        CHECK(&r == &cv.as<int>());
+
+        za::Variant<int> v{7};
+        int&& rr = static_cast<za::Variant<int>&&>(v).linearVisit([](int&& x) -> int&& { return static_cast<int&&>(x); });
+
+        CHECK(&rr == &v.as<int>());
+    }
+
+    SECTION("linearVisit moves (never copies) a by-value result")
+    {
+        using namespace VariantTest;
+
+        za::Variant<int, OtherAlt> v{5};
+
+        Tracker::reset();
+        const Tracker t = v.linearVisit([](const auto&) { return Tracker{3}; });
+
+        CHECK(t.tag == 3);
+        CHECK(Tracker::copyCtor == 0);
+        CHECK(Tracker::moveCtor == 1);
+    }
+
+    SECTION("linearVisit supports move-only results")
+    {
+        using namespace VariantTest;
+
+        za::Variant<int, OtherAlt> v{OtherAlt{4}};
+
+        const MoveOnlyResult result = v.linearVisit([](const auto& x)
+        {
+            if constexpr (ZA_IS_SAME(ZA_REMOVE_CVREF(decltype(x)), int))
+                return MoveOnlyResult{x};
+            else
+                return MoveOnlyResult{x.x};
+        });
+
+        CHECK(result.value == 4);
     }
 
     SECTION("Construction and assignment only accept exact alternatives")

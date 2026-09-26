@@ -212,6 +212,15 @@ private:
 
 
     ////////////////////////////////////////////////////////////
+    // Unlike the built-in `&`, also accepts xvalues (e.g. a visitor returning `T&&`)
+    template <typename T>
+    [[nodiscard, gnu::always_inline, gnu::const]] static auto* addressOf(T&& x) noexcept
+    {
+        return &x;
+    }
+
+
+    ////////////////////////////////////////////////////////////
     template <SizeT I>
     [[gnu::always_inline]] void destroyAt() noexcept
     {
@@ -617,10 +626,11 @@ public:
     {
         if constexpr (ZA_IS_REFERENCE(R))
         {
-            ZA_REMOVE_CVREF(R) * ret; // NOLINT(cppcoreguidelines-init-variables)
+            ZA_REMOVE_REFERENCE(R) * ret; // NOLINT(cppcoreguidelines-init-variables)
             ZA_VARIANT_DO_WITH_CURRENT_INDEX_OBJ(self,
                                                  I,
-                                                 ret = &(visitor(static_cast<Self&&>(self).template getByIndex<I>())));
+                                                 ret = addressOf(
+                                                     visitor(static_cast<Self&&>(self).template getByIndex<I>())));
             return static_cast<R>(*ret);
         }
         else if constexpr (ZA_IS_SAME(R, void))
@@ -640,7 +650,7 @@ public:
                                                  I,
                                                  ZA_PLACEMENT_NEW(retBuffer)
                                                      R(visitor(static_cast<Self&&>(self).template getByIndex<I>())));
-            return *(ZA_LAUNDER_CAST(R*, retBuffer));
+            return static_cast<R&&>(*ZA_LAUNDER_CAST(R*, retBuffer));
         }
     }
 
