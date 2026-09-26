@@ -91,6 +91,21 @@ template <typename T>
 #endif
 
 
+namespace za
+{
+////////////////////////////////////////////////////////////
+/// \brief Alias for `std::initializer_list`
+///
+/// Being the same type, a constructor taking a `za::InitializerList<T>`
+/// is still an initializer-list constructor.
+///
+////////////////////////////////////////////////////////////
+template <typename T>
+using InitializerList = std::initializer_list<T>;
+
+} // namespace za
+
+
 ////////////////////////////////////////////////////////////
 /// \file
 ///
