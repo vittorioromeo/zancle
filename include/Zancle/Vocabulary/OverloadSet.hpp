@@ -24,11 +24,7 @@ namespace za
 template <typename... Fs>
 struct [[nodiscard]] OverloadSet : Fs...
 {
-    template <typename... FFwds>
-    [[nodiscard, gnu::always_inline]] explicit OverloadSet(FFwds&&... fs) noexcept : Fs{static_cast<FFwds&&>(fs)}...
-    {
-    }
-
+    // Intentionally an aggregate: no constructor to compile, nor to call in debug mode
     using Fs::operator()...;
 };
 
