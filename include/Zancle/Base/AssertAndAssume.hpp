@@ -10,6 +10,15 @@
 
 
 ////////////////////////////////////////////////////////////
+/// \brief Assert a condition in debug mode and let the optimizer assume it
+///
+/// Expands to a single statement so that the assumption can never escape
+/// an enclosing unbraced `if`/`for`/`while` body.
+///
+////////////////////////////////////////////////////////////
 #define ZA_ASSERT_AND_ASSUME(...) \
-    ZA_ASSERT(__VA_ARGS__);       \
-    [[assume(__VA_ARGS__)]]
+    do                            \
+    {                             \
+        ZA_ASSERT(__VA_ARGS__);   \
+        [[assume(__VA_ARGS__)]];  \
+    } while (false)
