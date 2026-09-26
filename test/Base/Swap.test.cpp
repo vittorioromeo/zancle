@@ -94,11 +94,14 @@ void swap(T& lhs, T& rhs) noexcept
 
 } // namespace TestAmbiguity
 
+// Only the `throw`s are gated: the types stay potentially-throwing for the `noexcept` checks below
 struct ThrowingMemberSwap
 {
     void swap(ThrowingMemberSwap&)
     {
+#ifdef __cpp_exceptions
         throw 42;
+#endif
     }
 };
 
@@ -108,7 +111,9 @@ struct ThrowingMove
 
     ThrowingMove(ThrowingMove&&)
     {
+#ifdef __cpp_exceptions
         throw 42;
+#endif
     }
 
     ThrowingMove& operator=(ThrowingMove&&)
