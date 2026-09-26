@@ -56,7 +56,7 @@ inline constexpr bool enableTrivialRelocation = requires {
 ////////////////////////////////////////////////////////////
 #define ZA_IS_TRIVIALLY_RELOCATABLE(...)                                                             \
     (ZA_IS_TRIVIALLY_RELOCATABLE_BY_BUILTIN(__VA_ARGS__) || ZA_IS_TRIVIALLY_COPYABLE(__VA_ARGS__) || \
-     ::za::enableTrivialRelocation<__VA_ARGS__>)
+     ::za::enableTrivialRelocation<ZA_REMOVE_CV(__VA_ARGS__)>) // cv-stripped, so explicit specializations apply to `const T`
 
 
 namespace za
