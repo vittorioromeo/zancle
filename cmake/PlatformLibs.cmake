@@ -69,3 +69,9 @@ add_library(zancle-glad-headers INTERFACE)
 
 target_include_directories(zancle-glad-headers SYSTEM INTERFACE
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/extlibs/headers/glad/include>)
+
+# In shared builds, the GLAD entities are defined in (and exported from) `zancle-glutils`,
+# which additionally defines `GLAD_API_CALL_EXPORT_BUILD`
+if(BUILD_SHARED_LIBS)
+    target_compile_definitions(zancle-glad-headers INTERFACE GLAD_API_CALL_EXPORT)
+endif()

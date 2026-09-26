@@ -56,6 +56,11 @@ endif()
 target_link_libraries(zancle-glutils PUBLIC Zancle::System)
 target_link_libraries(zancle-glutils PRIVATE $<BUILD_INTERFACE:zancle-glad-headers>)
 
+# `zancle-glutils` defines the GLAD entities (see `Glad.cpp`), so it exports them in shared builds
+if(BUILD_SHARED_LIBS)
+    target_compile_definitions(zancle-glutils PRIVATE GLAD_API_CALL_EXPORT_BUILD)
+endif()
+
 # When static linking on macOS, we need to add this flag for objective C to work
 # https://developer.apple.com/library/archive/qa/qa1490/_index.html
 if((NOT BUILD_SHARED_LIBS) AND ZA_OS_MACOS)

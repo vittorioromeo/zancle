@@ -6,6 +6,8 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/GLUtils/Export.hpp"
+
 #include "Zancle/Geometry/Priv/Vec2Base.hpp"
 #include "Zancle/Geometry/Rect2.hpp"
 
@@ -31,7 +33,7 @@ namespace za::priv
 ///       destination framebuffers before calling.
 ///
 ////////////////////////////////////////////////////////////
-void blitFramebuffer(bool invertYAxis, Rect2u src, Rect2u dst);
+ZA_GLUTILS_API void blitFramebuffer(bool invertYAxis, Rect2u src, Rect2u dst);
 
 ////////////////////////////////////////////////////////////
 /// \brief Blit equal-sized regions between framebuffers with optional Y-axis inversion
@@ -50,6 +52,6 @@ void blitFramebuffer(bool invertYAxis, Rect2u src, Rect2u dst);
 ///       destination framebuffers before calling.
 ///
 ////////////////////////////////////////////////////////////
-void blitFramebuffer(bool invertYAxis, Vec2u size, Vec2u srcPos, Vec2u dstPos);
+ZA_GLUTILS_API void blitFramebuffer(bool invertYAxis, Vec2u size, Vec2u srcPos, Vec2u dstPos);
 
 } // namespace za::priv

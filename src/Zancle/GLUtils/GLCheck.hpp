@@ -8,6 +8,8 @@
 ////////////////////////////////////////////////////////////
 #include "Zancle/Config.hpp"
 
+#include "Zancle/GLUtils/Export.hpp"
+
 #include "Zancle/GLUtils/Glad.hpp" // not expensive, included everwhere `GLCheck.hpp` is included
 
 #include "Zancle/Base/Assert.hpp"
@@ -32,7 +34,7 @@ namespace za::priv
 /// \param expression  The evaluated expression as a string
 ///
 ////////////////////////////////////////////////////////////
-[[gnu::cold]] void glCheckError(unsigned int openGlError, const char* file, unsigned int line, const char* expression);
+[[gnu::cold]] ZA_GLUTILS_API void glCheckError(unsigned int openGlError, const char* file, unsigned int line, const char* expression);
 
 ////////////////////////////////////////////////////////////
 /// \brief Log a notice that an unchecked OpenGL error existed prior to the current call
@@ -42,7 +44,7 @@ namespace za::priv
 /// helps locate code that fails to drain errors via `glCheck`.
 ///
 ////////////////////////////////////////////////////////////
-[[gnu::cold]] void printUncheckedPriorGlError();
+[[gnu::cold]] ZA_GLUTILS_API void printUncheckedPriorGlError();
 
 ////////////////////////////////////////////////////////////
 /// \brief Helper class to check for OpenGL errors in debug mode

@@ -6,6 +6,8 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/GLUtils/Export.hpp"
+
 #include "Zancle/Geometry/Priv/Vec2Base.hpp"
 
 
@@ -24,7 +26,7 @@ namespace za::priv
 /// \return The integer value reported by OpenGL
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard]] int getGLInteger(unsigned int parameterName);
+[[nodiscard]] ZA_GLUTILS_API int getGLInteger(unsigned int parameterName);
 
 ////////////////////////////////////////////////////////////
 /// \brief Generate and bind a new framebuffer object
@@ -36,7 +38,7 @@ namespace za::priv
 /// \return The new framebuffer ID, or `0` if framebuffer creation failed
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard]] unsigned int generateAndBindFramebuffer();
+[[nodiscard]] ZA_GLUTILS_API unsigned int generateAndBindFramebuffer();
 
 ////////////////////////////////////////////////////////////
 /// \brief RAII guard that temporarily disables `GL_SCISSOR_TEST`
@@ -49,7 +51,7 @@ namespace za::priv
 /// an existing scissor rectangle would otherwise constrain the result.
 ///
 ////////////////////////////////////////////////////////////
-class ScissorDisableGuard
+class ZA_GLUTILS_API ScissorDisableGuard
 {
 public:
     ////////////////////////////////////////////////////////////
@@ -91,6 +93,6 @@ private:
 ///                         `GL_TEXTURE_WRAP_T` (e.g. `GL_CLAMP_TO_EDGE`)
 ///
 ////////////////////////////////////////////////////////////
-void bindAndInitializeTexture(unsigned int textureId, bool sRgb, Vec2u size, unsigned int textureWrapParam);
+ZA_GLUTILS_API void bindAndInitializeTexture(unsigned int textureId, bool sRgb, Vec2u size, unsigned int textureWrapParam);
 
 } // namespace za::priv

@@ -6,6 +6,8 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/GLUtils/Export.hpp"
+
 #include "Zancle/GLUtils/GLFenceSync.hpp"
 
 
@@ -27,7 +29,7 @@ namespace za::priv
 /// \return A non-null owning fence object. Aborts on failure.
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard]] GLFenceSync makeFence(); // NOLINT(readability-redundant-declaration)
+[[nodiscard]] ZA_GLUTILS_API GLFenceSync makeFence(); // NOLINT(readability-redundant-declaration)
 
 ////////////////////////////////////////////////////////////
 /// \brief Destroy a fence and null out the caller's handle
@@ -41,7 +43,7 @@ namespace za::priv
 /// \param fence Handle to destroy; nulled on return.
 ///
 ////////////////////////////////////////////////////////////
-void deleteFenceIfNeeded(GLFenceSync& fence) noexcept;
+ZA_GLUTILS_API void deleteFenceIfNeeded(GLFenceSync& fence) noexcept;
 
 ////////////////////////////////////////////////////////////
 /// \brief Non-blocking poll of a GPU fence
@@ -68,7 +70,7 @@ void deleteFenceIfNeeded(GLFenceSync& fence) noexcept;
 /// \return `true` if the fence is signaled (or was null), `false` if still pending.
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard]] bool tryWaitOnFence(GLFenceSync& fenceToWaitOn);
+[[nodiscard]] ZA_GLUTILS_API bool tryWaitOnFence(GLFenceSync& fenceToWaitOn);
 
 ////////////////////////////////////////////////////////////
 /// \brief Blocking wait on a GPU fence
@@ -90,6 +92,6 @@ void deleteFenceIfNeeded(GLFenceSync& fence) noexcept;
 ///                      if it was non-null on entry.
 ///
 ////////////////////////////////////////////////////////////
-void waitOnFence(GLFenceSync& fenceToWaitOn);
+ZA_GLUTILS_API void waitOnFence(GLFenceSync& fenceToWaitOn);
 
 } // namespace za::priv

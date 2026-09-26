@@ -6,6 +6,8 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/GLUtils/Export.hpp"
+
 #include "Zancle/Geometry/Priv/Vec2Base.hpp"
 
 
@@ -32,11 +34,12 @@ namespace za::priv
 ///       the surrounding state.
 ///
 ////////////////////////////////////////////////////////////
-void copyFramebuffer(bool         invertYAxis,
-                     Vec2u        size,
-                     unsigned int srcFBO,
-                     unsigned int dstFBO,
-                     Vec2u        srcPos = {0u, 0u},
-                     Vec2u        dstPos = {0u, 0u});
+ZA_GLUTILS_API void copyFramebuffer(
+    bool         invertYAxis,
+    Vec2u        size,
+    unsigned int srcFBO,
+    unsigned int dstFBO,
+    Vec2u        srcPos = {0u, 0u},
+    Vec2u        dstPos = {0u, 0u});
 
 } // namespace za::priv
