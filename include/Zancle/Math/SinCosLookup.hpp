@@ -122,6 +122,12 @@ struct alignas(64) SinTable
 
 
 ////////////////////////////////////////////////////////////
+// In static builds, the table always ends up in the same binary as its users. Hidden visibility lets
+// the compiler address it directly, instead of first loading its address on every lookup (through the
+// GOT for ELF PIC/PIE code, or a `.refptr` stub on MinGW). GCC does not support visibility on Windows.
+#if defined(ZA_STATIC) && (defined(__clang__) || (defined(__GNUC__) && !defined(_WIN32)))
+[[gnu::visibility("hidden")]]
+#endif
 extern const SinTable sinTable;
 
 } // namespace za::priv
