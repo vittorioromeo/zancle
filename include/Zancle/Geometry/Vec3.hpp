@@ -6,8 +6,6 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
-#include "Zancle/Config.hpp"
-
 #include "Zancle/Math/Sqrt.hpp"
 
 #include "Zancle/Trait/IsFloatingPoint.hpp"
@@ -30,7 +28,7 @@ struct [[nodiscard]] Vec3
     /// \brief Length of the vec3 (floating-point); prefer `lengthSquared()` for comparisons
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] ZA_SYSTEM_API constexpr T length() const
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr T length() const
     {
         static_assert(ZA_IS_FLOATING_POINT(T), "only supported for floating point types");
 
@@ -43,7 +41,7 @@ struct [[nodiscard]] Vec3
     /// \brief Squared length; cheaper than `length()` and suitable for comparisons
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] ZA_API_EXPORT constexpr T lengthSquared() const
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr T lengthSquared() const
     {
         return dot(*this);
     }
@@ -55,7 +53,7 @@ struct [[nodiscard]] Vec3
     /// \pre `*this` is not the zero vec3.
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] ZA_SYSTEM_API constexpr Vec3 normalized() const
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr Vec3 normalized() const
     {
         static_assert(ZA_IS_FLOATING_POINT(T), "only supported for floating point types");
 
@@ -68,7 +66,7 @@ struct [[nodiscard]] Vec3
     /// \brief Dot product
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] ZA_API_EXPORT constexpr T dot(const Vec3& rhs) const
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr T dot(const Vec3& rhs) const
     {
         return x * rhs.x + y * rhs.y + z * rhs.z;
     }
@@ -78,7 +76,7 @@ struct [[nodiscard]] Vec3
     /// \brief Cross product
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] ZA_API_EXPORT constexpr Vec3 cross(const Vec3& rhs) const
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr Vec3 cross(const Vec3& rhs) const
     {
         return Vec3<T>((y * rhs.z) - (z * rhs.y), (z * rhs.x) - (x * rhs.z), (x * rhs.y) - (y * rhs.x));
     }
@@ -90,7 +88,7 @@ struct [[nodiscard]] Vec3
     /// Most useful for non-uniform scaling.
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] ZA_API_EXPORT constexpr Vec3 componentWiseMul(const Vec3& rhs) const
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr Vec3 componentWiseMul(const Vec3& rhs) const
     {
         return Vec3<T>(x * rhs.x, y * rhs.y, z * rhs.z);
     }
@@ -102,7 +100,7 @@ struct [[nodiscard]] Vec3
     /// \pre No component of `rhs` is zero.
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] ZA_API_EXPORT constexpr Vec3 componentWiseDiv(const Vec3& rhs) const
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr Vec3 componentWiseDiv(const Vec3& rhs) const
     {
         ZA_ASSERT(rhs.x != 0 && "cannot divide by 0 (x coordinate)");
         ZA_ASSERT(rhs.y != 0 && "cannot divide by 0 (y coordinate)");
