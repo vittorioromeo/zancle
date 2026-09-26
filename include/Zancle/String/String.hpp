@@ -6,6 +6,8 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/Config.hpp" // IWYU pragma: keep
+
 #include "Zancle/Fmt/FmtAppendMixinFwd.hpp"
 
 #include "Zancle/String/StringView.hpp"
@@ -34,7 +36,7 @@ namespace za
 /// at the call site to bring in the template body.
 ///
 ////////////////////////////////////////////////////////////
-class [[nodiscard]] ZA_GSL_OWNER(char) String : public FmtAppendMixin
+class [[nodiscard]] ZA_GSL_OWNER(char) ZA_SYSTEM_API String : public FmtAppendMixin
 {
 public:
     ////////////////////////////////////////////////////////////
@@ -450,7 +452,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    friend void swap(String& lhs, String& rhs) noexcept;
+    friend ZA_SYSTEM_API void swap(String& lhs, String& rhs) noexcept;
 
 
 ////////////////////////////////////////////////////////////
@@ -483,21 +485,21 @@ public:
 
 
 ////////////////////////////////////////////////////////////
-[[nodiscard]] String operator+(char lhs, const String& rhs);
-[[nodiscard]] String operator+(const String& lhs, char rhs);
-[[nodiscard]] String operator+(const char* lhs, const String& rhs);
-[[nodiscard]] String operator+(const String& lhs, const char* rhs);
-[[nodiscard]] String operator+(StringView lhs, const String& rhs);
-[[nodiscard]] String operator+(const String& lhs, StringView rhs);
-[[nodiscard]] String operator+(const String& lhs, const String& rhs);
+[[nodiscard]] ZA_SYSTEM_API String operator+(char lhs, const String& rhs);
+[[nodiscard]] ZA_SYSTEM_API String operator+(const String& lhs, char rhs);
+[[nodiscard]] ZA_SYSTEM_API String operator+(const char* lhs, const String& rhs);
+[[nodiscard]] ZA_SYSTEM_API String operator+(const String& lhs, const char* rhs);
+[[nodiscard]] ZA_SYSTEM_API String operator+(StringView lhs, const String& rhs);
+[[nodiscard]] ZA_SYSTEM_API String operator+(const String& lhs, StringView rhs);
+[[nodiscard]] ZA_SYSTEM_API String operator+(const String& lhs, const String& rhs);
 
 
 ////////////////////////////////////////////////////////////
 // Rvalue overloads: reuse the lhs's buffer via `+=` instead of allocating
-[[nodiscard]] String operator+(String&& lhs, const String& rhs);
-[[nodiscard]] String operator+(String&& lhs, char rhs);
-[[nodiscard]] String operator+(String&& lhs, const char* rhs);
-[[nodiscard]] String operator+(String&& lhs, StringView rhs);
+[[nodiscard]] ZA_SYSTEM_API String operator+(String&& lhs, const String& rhs);
+[[nodiscard]] ZA_SYSTEM_API String operator+(String&& lhs, char rhs);
+[[nodiscard]] ZA_SYSTEM_API String operator+(String&& lhs, const char* rhs);
+[[nodiscard]] ZA_SYSTEM_API String operator+(String&& lhs, StringView rhs);
 
 
 ////////////////////////////////////////////////////////////

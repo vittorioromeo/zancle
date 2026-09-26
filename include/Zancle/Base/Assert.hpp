@@ -14,7 +14,7 @@
 namespace za::priv
 {
 ////////////////////////////////////////////////////////////
-[[noreturn, gnu::cold, gnu::noinline]] void assertFailure(const char* code, const char* file, int line);
+[[noreturn, gnu::cold, gnu::noinline]] ZA_SYSTEM_API void assertFailure(const char* code, const char* file, int line);
 
 } // namespace za::priv
 

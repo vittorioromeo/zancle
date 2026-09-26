@@ -2,6 +2,12 @@
 // LICENSE AND COPYRIGHT (C) INFORMATION
 // https://github.com/vittorioromeo/Zancle/blob/master/license.md
 
+
+////////////////////////////////////////////////////////////
+// Headers
+////////////////////////////////////////////////////////////
+#include "Zancle/Config.hpp" // IWYU pragma: keep
+
 namespace za::priv
 {
 ////////////////////////////////////////////////////////////
@@ -10,6 +16,6 @@ namespace za::priv
 /// Only has effect if `ZA_ENABLE_STACK_TRACES` is defined
 ///
 ////////////////////////////////////////////////////////////
-[[gnu::cold, gnu::noinline]] void printStackTrace();
+[[gnu::cold, gnu::noinline]] ZA_SYSTEM_API void printStackTrace();
 
 } // namespace za::priv

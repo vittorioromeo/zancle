@@ -109,7 +109,7 @@ private:
     /// \brief Deleter that closes the wrapped stdio file
     ///
     ////////////////////////////////////////////////////////////
-    struct FileCloser
+    struct ZA_SYSTEM_API FileCloser
     {
         void operator()(std::FILE* file);
     };

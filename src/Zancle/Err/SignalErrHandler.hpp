@@ -3,9 +3,15 @@
 // https://github.com/vittorioromeo/Zancle/blob/master/license.md
 
 
+////////////////////////////////////////////////////////////
+// Headers
+////////////////////////////////////////////////////////////
+#include "Zancle/Config.hpp" // IWYU pragma: keep
+
+
 namespace za::priv
 {
 ////////////////////////////////////////////////////////////
-void installSignalErrHandler() noexcept;
+ZA_SYSTEM_API void installSignalErrHandler() noexcept;
 
 } // namespace za::priv

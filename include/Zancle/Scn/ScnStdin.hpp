@@ -103,7 +103,7 @@ ZA_SYSTEM_API void scnStdinIgnoreLine();
 /// Returns `false` only if stdin was already at EOF on entry.
 ///
 ////////////////////////////////////////////////////////////
-ZA_SYSTEM_API [[nodiscard]] bool scnStdinReadLine(String& out);
+[[nodiscard]] ZA_SYSTEM_API bool scnStdinReadLine(String& out);
 
 } // namespace za
 

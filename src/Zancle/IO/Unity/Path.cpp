@@ -130,11 +130,11 @@ Path::Path(const T& source) : m_impl(source)
 {
 }
 
-template Path::Path(const za::String&);
-template Path::Path(const std::string&);
-template Path::Path(const std::basic_string<wchar_t>&);
-template Path::Path(const std::u32string&);
-template Path::Path(const std::filesystem::path&);
+template ZA_SYSTEM_API Path::Path(const za::String&);
+template ZA_SYSTEM_API Path::Path(const std::string&);
+template ZA_SYSTEM_API Path::Path(const std::basic_string<wchar_t>&);
+template ZA_SYSTEM_API Path::Path(const std::u32string&);
+template ZA_SYSTEM_API Path::Path(const std::filesystem::path&);
 
 ////////////////////////////////////////////////////////////
 template <typename T>
@@ -142,9 +142,9 @@ Path::Path(const T* source) : m_impl(source)
 {
 }
 
-template Path::Path(const char*);
-template Path::Path(const wchar_t*);
-template Path::Path(const char32_t*);
+template ZA_SYSTEM_API Path::Path(const char*);
+template ZA_SYSTEM_API Path::Path(const wchar_t*);
+template ZA_SYSTEM_API Path::Path(const char32_t*);
 
 ////////////////////////////////////////////////////////////
 Path::Path(int, const void* fsPath) : m_impl(*static_cast<const std::filesystem::path*>(fsPath))
@@ -465,12 +465,12 @@ bool Path::operator==(const T* str) const
 
 
 ////////////////////////////////////////////////////////////
-template std::filesystem::path Path::to<std::filesystem::path>() const;
-template std::string           Path::to<std::string>() const;
-template za::String            Path::to<za::String>() const;
-template std::u8string         Path::to<std::u8string>() const;
-template std::u32string        Path::to<std::u32string>() const;
-template std::wstring          Path::to<std::wstring>() const;
+template ZA_SYSTEM_API std::filesystem::path Path::to<std::filesystem::path>() const;
+template ZA_SYSTEM_API std::string Path::to<std::string>() const;
+template ZA_SYSTEM_API za::String Path::to<za::String>() const;
+template ZA_SYSTEM_API std::u8string Path::to<std::u8string>() const;
+template ZA_SYSTEM_API std::u32string Path::to<std::u32string>() const;
+template ZA_SYSTEM_API std::wstring Path::to<std::wstring>() const;
 
 
 // `operator<<(std::ostream&, const Path&)` lives in `PathStreamOp.cpp`
@@ -517,8 +517,8 @@ namespace za
 
 
 ////////////////////////////////////////////////////////////
-template bool Path::operator== <char>(const char*) const;
-template bool Path::operator== <wchar_t>(const wchar_t*) const;
-template bool Path::operator== <char32_t>(const char32_t*) const;
+template ZA_SYSTEM_API bool Path::operator== <char>(const char*) const;
+template ZA_SYSTEM_API bool Path::operator== <wchar_t>(const wchar_t*) const;
+template ZA_SYSTEM_API bool Path::operator== <char32_t>(const char32_t*) const;
 
 } // namespace za

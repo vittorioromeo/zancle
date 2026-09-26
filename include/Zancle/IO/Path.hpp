@@ -319,13 +319,13 @@ public:
     /// \brief Join two paths with a directory separator into a new `Path`
     ///
     ////////////////////////////////////////////////////////////
-    friend Path operator/(const Path& lhs, const Path& rhs);
+    friend ZA_SYSTEM_API Path operator/(const Path& lhs, const Path& rhs);
 
     ////////////////////////////////////////////////////////////
     /// \brief Join two paths with a directory separator into a new `Path` (rvalue)
     ///
     ////////////////////////////////////////////////////////////
-    friend Path operator/(Path&& lhs, const Path& rhs);
+    friend ZA_SYSTEM_API Path operator/(Path&& lhs, const Path& rhs);
 
     ////////////////////////////////////////////////////////////
     /// \brief Concatenate `rhs` to this path *without* inserting a separator
@@ -340,7 +340,7 @@ public:
     /// \brief Concatenate two paths *without* inserting a separator
     ///
     ////////////////////////////////////////////////////////////
-    friend Path operator+(const Path& lhs, const Path& rhs);
+    friend ZA_SYSTEM_API Path operator+(const Path& lhs, const Path& rhs);
 
     ////////////////////////////////////////////////////////////
     /// \brief Compare two paths for equality (`!=` is synthesized by the compiler)

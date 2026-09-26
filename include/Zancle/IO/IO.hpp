@@ -6,6 +6,7 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/Config.hpp" // IWYU pragma: keep
 
 #include "Zancle/Vocabulary/EnumClassBitwiseOps.hpp"
 #include "Zancle/Vocabulary/InPlacePImpl.hpp"
@@ -41,20 +42,20 @@ namespace za
 /// \brief Helper function to write to a file.
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard]] bool writeToFile(za::StringView filename, za::StringView contents);
-[[nodiscard]] bool writeToFile(const Path& filename, za::StringView contents);
+[[nodiscard]] ZA_SYSTEM_API bool writeToFile(za::StringView filename, za::StringView contents);
+[[nodiscard]] ZA_SYSTEM_API bool writeToFile(const Path& filename, za::StringView contents);
 
 
 ////////////////////////////////////////////////////////////
 /// \brief Helper function to read the contents of a file
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard]] bool readFromFile(za::StringView filename, std::string& target);
-[[nodiscard]] bool readFromFile(za::StringView filename, za::String& target);
-[[nodiscard]] bool readFromFile(za::StringView filename, za::Vector<char>& target);
-[[nodiscard]] bool readFromFile(const Path& filename, std::string& target);
-[[nodiscard]] bool readFromFile(const Path& filename, za::String& target);
-[[nodiscard]] bool readFromFile(const Path& filename, za::Vector<char>& target);
+[[nodiscard]] ZA_SYSTEM_API bool readFromFile(za::StringView filename, std::string& target);
+[[nodiscard]] ZA_SYSTEM_API bool readFromFile(za::StringView filename, za::String& target);
+[[nodiscard]] ZA_SYSTEM_API bool readFromFile(za::StringView filename, za::Vector<char>& target);
+[[nodiscard]] ZA_SYSTEM_API bool readFromFile(const Path& filename, std::string& target);
+[[nodiscard]] ZA_SYSTEM_API bool readFromFile(const Path& filename, za::String& target);
+[[nodiscard]] ZA_SYSTEM_API bool readFromFile(const Path& filename, za::Vector<char>& target);
 
 
 ////////////////////////////////////////////////////////////
@@ -67,8 +68,8 @@ namespace za
 /// partially-grown state; existing content up to `oldSize` is unchanged.
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard]] bool appendFromFile(za::StringView filename, za::Vector<char>& target);
-[[nodiscard]] bool appendFromFile(const Path& filename, za::Vector<char>& target);
+[[nodiscard]] ZA_SYSTEM_API bool appendFromFile(za::StringView filename, za::Vector<char>& target);
+[[nodiscard]] ZA_SYSTEM_API bool appendFromFile(const Path& filename, za::Vector<char>& target);
 
 
 ////////////////////////////////////////////////////////////
@@ -91,7 +92,7 @@ namespace za
 ///          that themselves call `readFromFile` are not.
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard]] za::Vector<char>& getThreadLocalScratchCharBuffer();
+[[nodiscard]] ZA_SYSTEM_API za::Vector<char>& getThreadLocalScratchCharBuffer();
 
 
 ////////////////////////////////////////////////////////////
@@ -152,7 +153,7 @@ enum class SeekDir
 /// directly when strict error propagation is required.
 ///
 ////////////////////////////////////////////////////////////
-class OutFile
+class ZA_SYSTEM_API OutFile
 {
 public:
     ////////////////////////////////////////////////////////////
@@ -222,7 +223,7 @@ private:
 /// `za::scnInto` / friends without an external adapter.
 ///
 ////////////////////////////////////////////////////////////
-class InFile
+class ZA_SYSTEM_API InFile
 {
 public:
     ////////////////////////////////////////////////////////////

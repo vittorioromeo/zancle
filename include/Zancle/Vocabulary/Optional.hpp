@@ -6,6 +6,8 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/Config.hpp" // IWYU pragma: keep
+
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/Macros.hpp"
@@ -31,7 +33,7 @@ namespace za::priv
 /// \brief Throws (or aborts) when an empty `Optional` is accessed via `value()`
 ///
 ////////////////////////////////////////////////////////////
-[[noreturn, gnu::cold]] void onBadOptionalAccess();
+[[noreturn, gnu::cold]] ZA_SYSTEM_API void onBadOptionalAccess();
 
 } // namespace za::priv
 

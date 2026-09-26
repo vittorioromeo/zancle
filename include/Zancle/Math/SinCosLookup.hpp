@@ -6,6 +6,8 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/Config.hpp" // IWYU pragma: keep
+
 #include "Zancle/Math/Constants.hpp"
 #include "Zancle/Math/Fabs.hpp"
 
@@ -126,10 +128,14 @@ struct alignas(64) SinTable
 // In static builds, the table always ends up in the same binary as its users. Hidden visibility lets
 // the compiler address it directly, instead of first loading its address on every lookup (through the
 // GOT for ELF PIC/PIE code, or a `.refptr` stub on MinGW). GCC does not support visibility on Windows.
-#if defined(ZA_STATIC) && (defined(__clang__) || (defined(__GNUC__) && !defined(_WIN32)))
-[[gnu::visibility("hidden")]]
-#endif
+// In shared builds, it is exported from (and imported into users of) the `zancle-system` library.
+#if !defined(ZA_STATIC)
+extern ZA_SYSTEM_API const SinTable sinTable;
+#elif defined(__clang__) || (defined(__GNUC__) && !defined(_WIN32))
+[[gnu::visibility("hidden")]] extern const SinTable sinTable;
+#else
 extern const SinTable sinTable;
+#endif
 
 } // namespace za::priv
 
