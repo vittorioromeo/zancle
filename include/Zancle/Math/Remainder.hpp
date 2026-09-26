@@ -28,7 +28,7 @@ namespace za
 
 
 ////////////////////////////////////////////////////////////
-/// \brief Like `remainder` but always returns a non-negative value
+/// \brief Like `remainder` but always returns a value in `[0, b)`
 ///
 /// Equivalent to `((a % b) + b) % b` for floats. `b` must be strictly
 /// positive. Useful for wrapping angles or texture coordinates.
@@ -38,8 +38,11 @@ namespace za
 {
     ZA_ASSERT_AND_ASSUME(b > 0.f);
 
-    const auto val = a - static_cast<float>(static_cast<int>(a / b)) * b;
-    return val >= 0.f ? val : val + b;
+    const auto val     = a - static_cast<float>(static_cast<int>(a / b)) * b;
+    const auto wrapped = val >= 0.f ? val : val + b;
+
+    // `val + b` rounds to exactly `b` when `val` is a tiny negative number (e.g. `-1e-8f`)
+    return wrapped < b ? wrapped : 0.f;
 }
 
 } // namespace za

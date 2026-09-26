@@ -228,6 +228,12 @@ TEST_CASE("[Graphics] za::Color")
 
     SECTION("HSLtoColor handles edge cases correctly")
     {
+        SECTION("Tiny negative hue wraps to red")
+        {
+            // Used to wrap to hue `360`, producing an out-of-range hue segment
+            CHECK(za::Color::fromHSLA({-1e-6f, 1.f, 0.5f}) == za::Color(255, 0, 0));
+        }
+
         SECTION("Grayscale (Saturation = 0)")
         {
             // Black

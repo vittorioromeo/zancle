@@ -67,6 +67,10 @@ TEST_CASE("[System] za::Angle")
         CHECK(za::degrees(-360).wrapUnsigned() == Approx(za::degrees(0)));
         CHECK(za::degrees(720).wrapUnsigned() == Approx(za::degrees(0)));
         CHECK(za::degrees(-720).wrapUnsigned() == Approx(za::degrees(0)));
+
+        // Tiny negative angles must wrap into `[0, 2pi)`, not to exactly `2pi`
+        CHECK(za::radians(-1e-8f).wrapUnsigned().asRadians() < za::tau);
+        CHECK(za::radians(-1e-8f).wrapUnsigned().asRadians() >= 0.f);
     }
 
     SECTION("rotatedTowards()")
