@@ -162,6 +162,15 @@ TEST_CASE("[System] za::Angle")
             za::Angle result  = current.rotatedTowards(target, 0.3f);
             REQUIRE(result.asRadians() == Approx(0.7f));
         }
+
+        SECTION("Snapping to an out-of-range target is normalized")
+        {
+            const za::Angle negative = za::radians(0.f).rotatedTowards(za::radians(-0.1f), 1.f);
+            CHECK(negative.asRadians() == Approx(tau - 0.1f));
+
+            const za::Angle large = za::radians(0.f).rotatedTowards(za::radians(tau + 0.1f), 1.f);
+            CHECK(large.asRadians() == Approx(0.1f));
+        }
     }
 
     SECTION("degrees()")

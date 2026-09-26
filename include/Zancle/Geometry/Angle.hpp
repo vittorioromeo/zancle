@@ -7,7 +7,6 @@
 // Headers
 ////////////////////////////////////////////////////////////
 #include "Zancle/Math/Constants.hpp"
-#include "Zancle/Math/Fabs.hpp"
 #include "Zancle/Math/Remainder.hpp"
 
 #include "Zancle/Base/Assert.hpp"
@@ -137,7 +136,7 @@ public:
     ///
     /// Calculates the shortest difference between `*this` and `other` (handling wrapping)
     /// and returns a new angle by rotating `*this` towards `other` by at most `speed` radians.
-    /// If the shortest difference is less than or equal to `speed`, `other` is returned.
+    /// If the shortest difference is less than or equal to `speed`, `other` (wrapped) is returned.
     /// The result is normalized to the range `[0, 2*Pi)`.
     ///
     /// \param speed Maximum rotation step in radians. Must be non-negative.
@@ -146,6 +145,8 @@ public:
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr Angle rotatedTowards(const Angle other,
                                                                                                      const float speed) const
     {
+        ZA_ASSERT(speed >= 0.f && "Angle::rotatedTowards requires a non-negative speed");
+
         float diff = za::remainder(other.radians - radians, za::tau);
 
         if (diff > za::pi)
@@ -153,23 +154,10 @@ public:
         else if (diff < -za::pi)
             diff += za::tau;
 
-        if (ZA_MATH_FABSF(diff) <= speed)
-            return Angle{other.radians};
+        if (diff <= speed && -diff <= speed)
+            return other.wrapUnsigned();
 
-        float result = radians;
-
-        if (diff > 0.f)
-            result += speed;
-        else
-            result -= speed;
-
-        // Normalize to [0, za::tau)
-        result = za::remainder(result, za::tau);
-
-        if (result < 0.f)
-            result += za::tau;
-
-        return Angle{result};
+        return Angle{diff > 0.f ? radians + speed : radians - speed}.wrapUnsigned();
     }
 
 
