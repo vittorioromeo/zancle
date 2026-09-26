@@ -175,12 +175,13 @@ function(_zancle_create_module_target target module)
     set_target_warnings(${target})
     set_public_symbols_hidden(${target})
 
-    # DEFINE_SYMBOL is what CMake uses for the dllexport macro when building shared.
-    string(REPLACE "-" "_" NAME_UPPER "${target}")
-    string(TOUPPER "${NAME_UPPER}" NAME_UPPER)
+    # DEFINE_SYMBOL is what CMake defines while building the shared library itself: it must match the
+    # `ZA_<MODULE>_EXPORTS` checks in `Config.hpp` and the modules' `Export.hpp` (e.g. `ZA_SYSTEM_EXPORTS`),
+    # or the library's own `ZA_<MODULE>_API` symbols would be declared as imports and never exported.
+    string(TOUPPER "${module}" MODULE_UPPER)
 
     set_target_properties(${target} PROPERTIES
-        DEFINE_SYMBOL ${NAME_UPPER}_EXPORTS
+        DEFINE_SYMBOL ZA_${MODULE_UPPER}_EXPORTS
         EXPORT_NAME   Zancle::${module}
     )
 endfunction()

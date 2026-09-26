@@ -123,8 +123,10 @@
 
     #else // Linux, FreeBSD, macOS
 
-        #define ZA_API_EXPORT [[gnu::visibility("default")]]
-        #define ZA_API_IMPORT [[gnu::visibility("default")]]
+        // GNU attribute syntax rather than `[[gnu::visibility]]`: like `__declspec`, it may appear among
+        // the decl-specifiers (e.g. `static ZA_SYSTEM_API void f();`), where GCC rejects standard attributes
+        #define ZA_API_EXPORT __attribute__((visibility("default")))
+        #define ZA_API_IMPORT __attribute__((visibility("default")))
 
     #endif
 
@@ -157,9 +159,9 @@
 extern "C"
 {
 #ifdef ZA_ENABLE_LIFETIME_TRACKING
-    extern void zancleInternalAbiCheckLifetimeTrackingEnabled();
+    extern ZA_SYSTEM_API void zancleInternalAbiCheckLifetimeTrackingEnabled();
 #else
-    extern void zancleInternalAbiCheckLifetimeTrackingDisabled();
+    extern ZA_SYSTEM_API void zancleInternalAbiCheckLifetimeTrackingDisabled();
 #endif
 }
 
