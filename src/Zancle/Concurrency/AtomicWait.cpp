@@ -9,6 +9,14 @@
 
 #include "Zancle/Concurrency/Atomic.hpp"
 
+#if !defined(ZA_SYSTEM_LINUX) && !defined(ZA_SYSTEM_ANDROID) && !defined(ZA_SYSTEM_WINDOWS) && \
+    !defined(ZA_SYSTEM_EMSCRIPTEN)
+
+    #include "Zancle/Base/CpuRelax.hpp"
+
+#endif
+
+
 #include "Zancle/Base/IntTypes.hpp"
 #include "Zancle/Base/InterferenceSize.hpp"
 #include "Zancle/Base/SizeT.hpp"
@@ -112,19 +120,6 @@ constinit ContentionSlot slots[slotCount];
     !defined(ZA_SYSTEM_EMSCRIPTEN)
 
 ////////////////////////////////////////////////////////////
-[[gnu::always_inline]] inline void cpuRelax() noexcept
-{
-    #if defined(__x86_64__) || defined(__i386__)
-    __builtin_ia32_pause();
-    #elif defined(__aarch64__) || defined(__arm__)
-    __asm__ __volatile__("yield" ::: "memory");
-    #else
-    // No-op on other ISAs.
-    #endif
-}
-
-
-////////////////////////////////////////////////////////////
 template <typename T>
 inline void spinWait(const T* const addr, const T expected) noexcept
 {
@@ -140,7 +135,7 @@ inline void spinWait(const T* const addr, const T expected) noexcept
         if (__atomic_load_n(addr, __ATOMIC_ACQUIRE) != expected)
             return;
 
-        cpuRelax();
+        ZA_CPU_RELAX();
     }
 
     while (__atomic_load_n(addr, __ATOMIC_ACQUIRE) == expected)

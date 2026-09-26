@@ -7,6 +7,8 @@
 
 #include "Zancle/Container/Vector.hpp"
 
+#include "Zancle/Base/CpuRelax.hpp"
+
 #include "Zancle/Trait/IsAssignable.hpp"
 #include "Zancle/Trait/IsConstructible.hpp"
 
@@ -157,7 +159,7 @@ TEST_CASE("[System] za::AtomicMutex - producers wake on unlock (wait/notify path
     // but exercises the parked branch deliberately.
     for (int spin = 0; spin < 1'000'000; ++spin)
     {
-        asm volatile("" ::: "memory");
+        ZA_CPU_RELAX(); // Also keeps the loop from being optimized away (on x86 and ARM)
     }
 
     m.unlock(); // wake one; chain of notifyOne unwinds the rest as each unlocks

@@ -11,6 +11,7 @@
 
 #include "Zancle/Base/AssertAndAssume.hpp"
 #include "Zancle/Base/IntTypes.hpp"
+#include "Zancle/Base/IsConstantEvaluated.hpp"
 
 
 namespace za::priv
@@ -149,7 +150,7 @@ extern const SinTable sinTable;
     const ::za::U32 cosIndex        = (sinIndex + ::za::priv::sinTableQuarter) & ::za::priv::sinTableMask
 
 #define ZA_PRIV_SIN_TABLE_AT(i) \
-    (__builtin_is_constant_evaluated() ? ::za::priv::sinTableEntry(i) : ::za::priv::sinTable.data[i])
+    (ZA_IS_CONSTANT_EVALUATED() ? ::za::priv::sinTableEntry(i) : ::za::priv::sinTable.data[i])
 
 
 namespace za
