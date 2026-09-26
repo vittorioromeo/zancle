@@ -7,10 +7,12 @@
 // Headers
 ////////////////////////////////////////////////////////////
 #include "Zancle/Math/ClampMacro.hpp"
+#include "Zancle/Math/Fabs.hpp"
 
 #include "Zancle/Base/AssertAndAssume.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
+#include "Zancle/Trait/IsFloatingPoint.hpp"
 #include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/IsUnsigned.hpp"
 
@@ -445,7 +447,11 @@ struct [[nodiscard]] Vec2
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr Vec2 abs() const
     {
-        return {x < T{0} ? -x : x, y < T{0} ? -y : y};
+        // `fabs` is a single bitwise `and` (and maps `-0` to `+0`), unlike a compare-and-negate
+        if constexpr (ZA_IS_FLOATING_POINT(T))
+            return {za::fabs(x), za::fabs(y)};
+        else
+            return {x < T{0} ? -x : x, y < T{0} ? -y : y};
     }
 
 
@@ -519,7 +525,7 @@ struct [[nodiscard]] Vec2
     /// \return `true` if `lhs` is equal to `rhs`
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] constexpr bool operator==(const Vec2& rhs) const = default;
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr bool operator==(const Vec2& rhs) const = default;
 
 
     ////////////////////////////////////////////////////////////

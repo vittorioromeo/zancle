@@ -99,8 +99,8 @@ public:
     /// \brief Equality of the wrapped angle values
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr bool operator==(const AutoWrapAngle lhs,
-                                                                                                const AutoWrapAngle rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr bool operator==(const AutoWrapAngle lhs,
+                                                                                                 const AutoWrapAngle rhs)
     {
         return lhs.m_radians == rhs.m_radians;
     }
@@ -112,8 +112,8 @@ public:
     /// are implicitly convertible to each other.
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr bool operator==(const AutoWrapAngle lhs,
-                                                                                                const Angle         rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr bool operator==(const AutoWrapAngle lhs,
+                                                                                                 const Angle rhs)
     {
         return lhs.m_radians == rhs.wrapUnsigned().radians;
     }

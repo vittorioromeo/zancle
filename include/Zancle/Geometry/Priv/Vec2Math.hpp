@@ -16,6 +16,7 @@
 #include "Zancle/Math/Sqrt.hpp"
 
 #include "Zancle/Base/AssertAndAssume.hpp"
+#include "Zancle/Base/IsInf.hpp"
 
 #include "Zancle/Trait/IsFloatingPoint.hpp"
 
@@ -49,9 +50,11 @@ constexpr Vec2<T> Vec2<T>::normalized() const
 {
     static_assert(ZA_IS_FLOATING_POINT(T));
 
-    ZA_ASSERT_AND_ASSUME((x != T{0} || y != T{0}) && "Vec2::normalized() cannot normalize a zero vec2");
+    // Checks the actual divisor: non-zero components can still underflow (e.g. `{1e-30f, 0}`)
+    // or overflow (e.g. `{1e20f, 1e20f}`) when computing the length
+    const T len = length();
+    ZA_ASSERT_AND_ASSUME(len > T{0} && !ZA_ISINF(len) && "Vec2::normalized() requires a non-zero, finite length");
 
-    const T len    = length();
     const T invLen = T{1} / len;
 
     return {x * invLen, y * invLen};
@@ -114,9 +117,12 @@ constexpr Vec2<T> Vec2<T>::projectedOnto(const Vec2 axis) const
 {
     static_assert(ZA_IS_FLOATING_POINT(T));
 
-    ZA_ASSERT_AND_ASSUME((axis.x != T{0} || axis.y != T{0}) && "cannot project onto a zero vec2");
+    // Checks the actual divisor: non-zero components can still underflow or overflow when squared
+    const T axisLengthSquared = axis.lengthSquared();
+    ZA_ASSERT_AND_ASSUME(axisLengthSquared > T{0} && !ZA_ISINF(axisLengthSquared) &&
+                         "Vec2::projectedOnto() requires an axis with non-zero, finite length");
 
-    return dot(axis) / axis.lengthSquared() * axis;
+    return dot(axis) / axisLengthSquared * axis;
 }
 
 

@@ -20,6 +20,8 @@
 #include "Zancle/Trait/IsTriviallyMoveAssignable.hpp"
 #include "Zancle/Trait/IsTriviallyMoveConstructible.hpp"
 
+#include <cmath>
+
 
 ////////////////////////////////////////////////////////////
 // Explicit instantiations: compile-check every member function
@@ -421,5 +423,92 @@ TEMPLATE_TEST_CASE("[System] za::Vec2", "", int, float)
         const auto result = vec.clampY(0, 50);
         CHECK(result.x == 2);
         CHECK(result.y == 50);
+    }
+}
+
+
+TEST_CASE("[System] za::Vec2 (floating-point only)")
+{
+    SECTION("clampMaxLength")
+    {
+        const za::Vec2f vec{3.f, 4.f}; // length 5
+
+        CHECK(vec.clampMaxLength(10.f) == vec);
+        CHECK(vec.clampMaxLength(5.f) == vec);
+        CHECK(vec.clampMaxLength(2.5f) == Approx(za::Vec2f{1.5f, 2.f}));
+        CHECK(vec.clampMaxLengthSquared(6.25f) == Approx(za::Vec2f{1.5f, 2.f}));
+        CHECK(vec.clampMaxLength(0.f) == Approx(za::Vec2f{0.f, 0.f}));
+        CHECK(za::Vec2f{}.clampMaxLength(1.f) == za::Vec2f{});
+    }
+
+    SECTION("clampMinLength")
+    {
+        const za::Vec2f vec{3.f, 4.f}; // length 5
+
+        CHECK(vec.clampMinLength(1.f) == vec);
+        CHECK(vec.clampMinLength(10.f) == Approx(za::Vec2f{6.f, 8.f}));
+        CHECK(vec.clampMinLengthSquared(100.f) == Approx(za::Vec2f{6.f, 8.f}));
+        CHECK(za::Vec2f{}.clampMinLength(0.f) == za::Vec2f{}); // zero vec2 is fine with a zero minimum
+    }
+
+    SECTION("clampLength")
+    {
+        CHECK(za::Vec2f{3.f, 4.f}.clampLength(4.f, 6.f) == za::Vec2f{3.f, 4.f});
+        CHECK(za::Vec2f{3.f, 4.f}.clampLength(10.f, 20.f) == Approx(za::Vec2f{6.f, 8.f}));
+        CHECK(za::Vec2f{30.f, 40.f}.clampLength(1.f, 10.f) == Approx(za::Vec2f{6.f, 8.f}));
+
+        CHECK(za::Vec2f{3.f, 4.f}.clampLengthSquared(100.f, 400.f) == Approx(za::Vec2f{6.f, 8.f}));
+        CHECK(za::Vec2f{30.f, 40.f}.clampLengthSquared(1.f, 100.f) == Approx(za::Vec2f{6.f, 8.f}));
+        CHECK(za::Vec2f{}.clampLengthSquared(0.f, 1.f) == za::Vec2f{});
+    }
+
+    SECTION("componentWiseFloor")
+    {
+        CHECK(za::Vec2f{-1.5f, 2.5f}.componentWiseFloor() == za::Vec2f{-2.f, 2.f});
+        CHECK(za::Vec2f{3.f, -0.25f}.componentWiseFloor() == za::Vec2f{3.f, -1.f});
+    }
+
+    SECTION("abs")
+    {
+        CHECK(za::Vec2f{-1.5f, 2.5f}.abs() == za::Vec2f{1.5f, 2.5f});
+
+        // Negative zero becomes positive zero, like `fabs`
+        const za::Vec2f absNegZero = za::Vec2f{-0.f, -0.f}.abs();
+        CHECK(!std::signbit(absNegZero.x));
+        CHECK(!std::signbit(absNegZero.y));
+    }
+
+    SECTION("Conversions")
+    {
+        const za::Vec2f vec{1.75f, -2.75f};
+
+        CHECK(vec.to<za::Vec2i>() == za::Vec2i{1, -2}); // truncation towards zero
+        CHECK(vec.toVec2i() == za::Vec2i{1, -2});
+        CHECK(za::Vec2f{1.75f, 2.75f}.toVec2u() == za::Vec2u{1u, 2u});
+        CHECK(za::Vec2i{3, -4}.to<za::Vec2f>() == za::Vec2f{3.f, -4.f});
+        STATIC_CHECK(ZA_IS_SAME(decltype(vec.to<za::Vec2<double>>()), za::Vec2<double>));
+    }
+}
+
+
+TEMPLATE_TEST_CASE("[System] za::Vec2 component-wise helpers", "", int, float)
+{
+    using V = za::Vec2<TestType>;
+
+    SECTION("componentWiseClamp")
+    {
+        const V mins{0, 10};
+        const V maxs{5, 20};
+
+        CHECK(V{-1, 30}.componentWiseClamp(mins, maxs) == V{0, 20});
+        CHECK(V{3, 15}.componentWiseClamp(mins, maxs) == V{3, 15});
+        CHECK(V{9, 0}.componentWiseClamp(mins, maxs) == V{5, 10});
+    }
+
+    SECTION("abs")
+    {
+        CHECK(V{-3, 4}.abs() == V{3, 4});
+        CHECK(V{3, -4}.abs() == V{3, 4});
+        CHECK(V{0, 0}.abs() == V{0, 0});
     }
 }

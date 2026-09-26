@@ -166,7 +166,7 @@ public:
     /// \note Does not automatically wrap the angle value
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr bool operator==(Angle lhs, Angle rhs) = default;
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr bool operator==(Angle lhs, Angle rhs) = default;
 
 
     ////////////////////////////////////////////////////////////
@@ -174,7 +174,7 @@ public:
     /// \note Does not automatically wrap the angle value
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr bool operator<(const Angle lhs, const Angle rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr bool operator<(const Angle lhs, const Angle rhs)
     {
         return lhs.radians < rhs.radians;
     }
@@ -185,7 +185,7 @@ public:
     /// \note Does not automatically wrap the angle value
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr bool operator>(const Angle lhs, const Angle rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr bool operator>(const Angle lhs, const Angle rhs)
     {
         return lhs.radians > rhs.radians;
     }
@@ -196,7 +196,7 @@ public:
     /// \note Does not automatically wrap the angle value
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr bool operator<=(const Angle lhs, const Angle rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr bool operator<=(const Angle lhs, const Angle rhs)
     {
         return lhs.radians <= rhs.radians;
     }
@@ -207,7 +207,7 @@ public:
     /// \note Does not automatically wrap the angle value
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr bool operator>=(const Angle lhs, const Angle rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr bool operator>=(const Angle lhs, const Angle rhs)
     {
         return lhs.radians >= rhs.radians;
     }
@@ -217,7 +217,7 @@ public:
     /// \brief Negation of an angle (rotation in the opposite direction)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr Angle operator-(const Angle rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr Angle operator-(const Angle rhs)
     {
         return Angle(-rhs.radians);
     }
@@ -227,7 +227,7 @@ public:
     /// \brief Sum of two angles
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr Angle operator+(const Angle lhs, const Angle rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr Angle operator+(const Angle lhs, const Angle rhs)
     {
         return Angle(lhs.radians + rhs.radians);
     }
@@ -248,7 +248,7 @@ public:
     /// \brief Difference of two angles
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr Angle operator-(const Angle lhs, const Angle rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr Angle operator-(const Angle lhs, const Angle rhs)
     {
         return Angle(lhs.radians - rhs.radians);
     }
@@ -269,7 +269,7 @@ public:
     /// \brief Scale an angle by a scalar
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr Angle operator*(const Angle lhs, const float rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr Angle operator*(const Angle lhs, const float rhs)
     {
         return Angle(lhs.radians * rhs);
     }
@@ -279,7 +279,7 @@ public:
     /// \brief Scale an angle by a scalar
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr Angle operator*(const float lhs, const Angle rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr Angle operator*(const float lhs, const Angle rhs)
     {
         return rhs * lhs;
     }
@@ -300,7 +300,7 @@ public:
     /// \brief Divide an angle by a scalar
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr Angle operator/(const Angle lhs, const float rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr Angle operator/(const Angle lhs, const float rhs)
     {
         ZA_ASSERT(rhs != 0.f && "Angle::operator/ cannot divide by 0");
         return Angle(lhs.radians / rhs);
@@ -323,7 +323,7 @@ public:
     /// \brief Ratio of two angles
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr float operator/(const Angle lhs, const Angle rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr float operator/(const Angle lhs, const Angle rhs)
     {
         ZA_ASSERT(rhs.radians != 0.f && "Angle::operator/ cannot divide by 0");
         return lhs.radians / rhs.radians;
@@ -342,7 +342,7 @@ public:
     /// \endcode
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr Angle operator%(const Angle lhs, const Angle rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr Angle operator%(const Angle lhs, const Angle rhs)
     {
         ZA_ASSERT(rhs.radians != 0.f && "Angle::operator% cannot modulus by 0");
         return Angle(za::positiveRemainder(lhs.radians, rhs.radians));

@@ -142,7 +142,7 @@ public:
     /// \brief Strict member-wise equality
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr bool operator==(const Rect2<T>& rhs) const = default;
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr bool operator==(const Rect2<T>& rhs) const = default;
 
 
     ////////////////////////////////////////////////////////////

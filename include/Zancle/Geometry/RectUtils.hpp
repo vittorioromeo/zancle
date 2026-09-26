@@ -25,7 +25,9 @@ namespace za
 ///
 ////////////////////////////////////////////////////////////
 template <typename T>
-[[nodiscard, gnu::pure]] constexpr za::Optional<Rect2<T>> findIntersection(const Rect2<T>& rect0, const Rect2<T>& rect1)
+[[nodiscard, gnu::always_inline, gnu::pure]] inline constexpr za::Optional<Rect2<T>> findIntersection(
+    const Rect2<T>& rect0,
+    const Rect2<T>& rect1)
 {
     // Rectangles with negative dimensions are allowed, `getRectBounds` normalizes them
     const auto r0 = priv::getRectBounds(rect0.position, rect0.size);
