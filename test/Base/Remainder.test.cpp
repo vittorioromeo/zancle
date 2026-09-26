@@ -47,4 +47,37 @@ TEST_CASE("[Base] Base/Remainder.hpp")
 
         CHECK(outOfRangeCount == 0);
     }
+
+    SECTION("positiveRemainder stays in [0, b) for large magnitudes")
+    {
+        // Regression: when `a / b` rounds towards zero across an integer, the truncated remainder
+        // ends up slightly below `-b`, and a single `+ b` correction left the result negative
+        STATIC_CHECK(za::positiveRemainder(-2224.24756f, za::tau) >= 0.f);
+
+        volatile float input = -2224.24756f; // defeat constant folding
+        CHECK(za::positiveRemainder(input, za::tau) >= 0.f);
+        CHECK(za::positiveRemainder(input, za::tau) < za::tau);
+
+        // The problematic inputs are the floats closest to multiples of `b` (247 of them failed here)
+        const float divisors[] = {za::tau, 360.f, 0.1f};
+
+        int outOfRangeCount = 0;
+
+        for (const float b : divisors)
+            for (int k = -20'000; k <= 20'000; ++k)
+            {
+                float a = static_cast<float>(k) * b;
+
+                for (int j = 0; j < 4; ++j)
+                    a = __builtin_nextafterf(a, -1e30f);
+
+                for (int j = 0; j < 9; ++j, a = __builtin_nextafterf(a, 1e30f))
+                {
+                    const float r = za::positiveRemainder(a, b);
+                    outOfRangeCount += (r < 0.f || r >= b);
+                }
+            }
+
+        CHECK(outOfRangeCount == 0);
+    }
 }

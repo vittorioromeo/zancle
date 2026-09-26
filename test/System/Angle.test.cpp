@@ -71,6 +71,13 @@ TEST_CASE("[System] za::Angle")
         // Tiny negative angles must wrap into `[0, 2pi)`, not to exactly `2pi`
         CHECK(za::radians(-1e-8f).wrapUnsigned().asRadians() < za::tau);
         CHECK(za::radians(-1e-8f).wrapUnsigned().asRadians() >= 0.f);
+
+        // Large angles right next to a multiple of `2pi` must not wrap to a negative value
+        volatile float largeAngle = -2224.24756f; // defeat constant folding
+        CHECK(za::radians(largeAngle).wrapUnsigned().asRadians() >= 0.f);
+        CHECK(za::radians(largeAngle).wrapUnsigned().asRadians() < za::tau);
+        CHECK(za::radians(largeAngle - za::pi).wrapSigned().asRadians() >= -za::pi);
+        CHECK(za::radians(largeAngle - za::pi).wrapSigned().asRadians() < za::pi);
     }
 
     SECTION("rotatedTowards()")
