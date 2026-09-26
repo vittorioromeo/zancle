@@ -175,6 +175,7 @@ template za::SizeT stringifyValue(char*, za::SizeT, const za::Vec3<unsigned int>
 template za::SizeT stringifyValue(char*, za::SizeT, const za::Vec3<float>&) noexcept;
 
 template za::SizeT stringifyValue(char*, za::SizeT, const za::Rect2<int>&) noexcept;
+template za::SizeT stringifyValue(char*, za::SizeT, const za::Rect2<unsigned int>&) noexcept;
 template za::SizeT stringifyValue(char*, za::SizeT, const za::Rect2<float>&) noexcept;
 
 } // namespace tst::detail

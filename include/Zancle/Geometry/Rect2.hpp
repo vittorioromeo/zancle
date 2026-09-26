@@ -12,8 +12,45 @@
 
 #include "Zancle/Trait/IsFloatingPoint.hpp"
 #include "Zancle/Trait/IsSame.hpp"
+#include "Zancle/Trait/IsUnsigned.hpp"
 
 #include "Zancle/Base/SizeT.hpp"
+
+
+namespace za::priv
+{
+////////////////////////////////////////////////////////////
+/// \brief Normalized extents of a rectangle: `min` is inclusive, `max` is exclusive
+///
+////////////////////////////////////////////////////////////
+template <typename T>
+struct RectBounds
+{
+    T minX, minY, maxX, maxY;
+};
+
+
+////////////////////////////////////////////////////////////
+/// \brief Compute the normalized extents of the rectangle defined by `position` and `size`
+///
+/// Rectangles with negative dimensions are allowed, so the extents are sorted
+/// per axis. Unsigned sizes cannot be negative, so that step is skipped.
+///
+////////////////////////////////////////////////////////////
+template <typename T>
+[[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] constexpr RectBounds<T> getRectBounds(const Vec2<T> position,
+                                                                                                  const Vec2<T> size)
+{
+    const T right  = position.x + size.x;
+    const T bottom = position.y + size.y;
+
+    if constexpr (ZA_IS_UNSIGNED(T))
+        return {position.x, position.y, right, bottom};
+    else
+        return {ZA_MIN(position.x, right), ZA_MIN(position.y, bottom), ZA_MAX(position.x, right), ZA_MAX(position.y, bottom)};
+}
+
+} // namespace za::priv
 
 
 namespace za
@@ -33,23 +70,31 @@ public:
     /// This check is non-inclusive: points on the right or bottom
     /// edge are considered outside the rectangle.
     ///
-    /// \see `findIntersection`
+    /// \see `intersects`, `findIntersection`
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] constexpr bool contains(const Vec2<T> point) const
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr bool contains(const Vec2<T> point) const
     {
-        // Rectangles with negative dimensions are allowed, so we must handle them correctly
-
-        const T right  = position.x + size.x;
-        const T bottom = position.y + size.y;
-
-        // Compute the real min and max of the rectangle on both axes
-        const T minX = ZA_MIN(position.x, right);
-        const T maxX = ZA_MAX(position.x, right);
-        const T minY = ZA_MIN(position.y, bottom);
-        const T maxY = ZA_MAX(position.y, bottom);
-
+        const auto [minX, minY, maxX, maxY] = priv::getRectBounds(position, size);
         return (point.x >= minX) && (point.x < maxX) && (point.y >= minY) && (point.y < maxY);
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Check if the rectangle's area overlaps `other`'s area
+    ///
+    /// Cheaper than `findIntersection` when the intersection itself is not needed.
+    /// Rectangles that only touch along an edge do not intersect.
+    ///
+    /// \see `contains`, `findIntersection`
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr bool intersects(const Rect2& other) const
+    {
+        const auto r0 = priv::getRectBounds(position, size);
+        const auto r1 = priv::getRectBounds(other.position, other.size);
+
+        return ZA_MAX(r0.minX, r1.minX) < ZA_MIN(r0.maxX, r1.maxX) && ZA_MAX(r0.minY, r1.minY) < ZA_MIN(r0.maxY, r1.maxY);
     }
 
 
@@ -416,7 +461,8 @@ extern template class za::Rect2<za::SizeT>;
 /// Convenience accessors are provided for the four edges (`getLeft()`,
 /// `getTop()`, `getRight()`, `getBottom()` and their setters) and for
 /// anchor points (`getCenter()`, `getTopLeft()`, `setBottomRight()`, etc.).
-/// Intersection testing is provided by `za::findIntersection`.
+/// Intersection testing is provided by `intersects()`, and the
+/// intersection rectangle itself by `za::findIntersection`.
 ///
 /// Boundary rules:
 /// \li The left and top edges are included in the rectangle's area

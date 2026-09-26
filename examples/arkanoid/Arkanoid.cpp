@@ -17,7 +17,7 @@
 #include "Zancle/Container/Vector.hpp"
 
 #include "Zancle/Geometry/Priv/Vec2Base.hpp"
-#include "Zancle/Geometry/RectUtils.hpp"
+#include "Zancle/Geometry/Rect2.hpp"
 
 #include "Zancle/Vocabulary/Optional.hpp"
 
@@ -83,7 +83,7 @@ private:
         const auto ballBounds  = m_ball.getGlobalBounds();
         const auto brickBounds = brick.getGlobalBounds();
 
-        if (!za::findIntersection(brickBounds, ballBounds).hasValue())
+        if (!brickBounds.intersects(ballBounds))
             return false;
 
         const float overlapLeft{ballBounds.getRight() - brickBounds.getLeft()};
@@ -140,7 +140,7 @@ private:
 
     void updateBallCollisionsAgainstPlayer()
     {
-        if (!za::findIntersection(m_player.getGlobalBounds(), m_ball.getGlobalBounds()).hasValue())
+        if (!m_player.getGlobalBounds().intersects(m_ball.getGlobalBounds()))
             return;
 
         m_ballVelocity.y = -ballSpeed;

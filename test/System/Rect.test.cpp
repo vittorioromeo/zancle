@@ -91,6 +91,38 @@ TEMPLATE_TEST_CASE("[System] za::Rect2", "", int, float)
         CHECK_FALSE(za::findIntersection(rectangle, nonIntersectingRectangle).hasValue());
     }
 
+    SECTION("intersects()")
+    {
+        constexpr za::Rect2<TestType> rectangle({0, 0}, {10, 10});
+
+        STATIC_CHECK(rectangle.intersects(za::Rect2<TestType>({5, 5}, {10, 10})));
+        STATIC_CHECK(rectangle.intersects(za::Rect2<TestType>({2, 2}, {1, 1})));     // fully inside
+        STATIC_CHECK(rectangle.intersects(za::Rect2<TestType>({-5, -5}, {20, 20}))); // fully around
+        STATIC_CHECK(!rectangle.intersects(za::Rect2<TestType>({-5, -5}, {5, 5})));  // touching corner
+        STATIC_CHECK(!rectangle.intersects(za::Rect2<TestType>({10, 0}, {5, 10})));  // touching edge
+        STATIC_CHECK(!rectangle.intersects(za::Rect2<TestType>({0, 20}, {10, 10}))); // disjoint on Y only
+
+        // Negative sizes are normalized, like in `findIntersection`
+        STATIC_CHECK(rectangle.intersects(za::Rect2<TestType>({15, 15}, {-10, -10})));
+        STATIC_CHECK(za::Rect2<TestType>({10, 10}, {-10, -10}).intersects(za::Rect2<TestType>({5, 5}, {10, 10})));
+        STATIC_CHECK(!rectangle.intersects(za::Rect2<TestType>({20, 20}, {-10, -10})));
+
+        // Agrees with `findIntersection`
+        const za::Rect2<TestType> others[] = {
+            {{5, 5}, {10, 10}},
+            {{-5, -5}, {5, 5}},
+            {{15, 15}, {-10, -10}},
+            {{10, 0}, {5, 10}},
+            {{9, 9}, {1, 1}},
+        };
+
+        for (const auto& other : others)
+        {
+            CHECK(rectangle.intersects(other) == za::findIntersection(rectangle, other).hasValue());
+            CHECK(other.intersects(rectangle) == rectangle.intersects(other));
+        }
+    }
+
     SECTION("getCenter()")
     {
         STATIC_CHECK(za::Rect2<TestType>({}, {}).getCenter() == za::Vec2<TestType>());
@@ -224,6 +256,25 @@ TEMPLATE_TEST_CASE("[System] za::Rect2", "", int, float)
 
 #undef ZA_PRIV_CHECK_ANCHOR_ROUNDTRIP
     }
+}
+
+
+TEST_CASE("[System] za::Rect2 with unsigned coordinates")
+{
+    constexpr za::Rect2u rectangle({10u, 10u}, {10u, 10u});
+
+    STATIC_CHECK(rectangle.contains({10u, 10u}));
+    STATIC_CHECK(rectangle.contains({19u, 19u}));
+    STATIC_CHECK(!rectangle.contains({20u, 10u}));
+    STATIC_CHECK(!rectangle.contains({9u, 10u}));
+
+    STATIC_CHECK(rectangle.intersects(za::Rect2u({15u, 15u}, {10u, 10u})));
+    STATIC_CHECK(!rectangle.intersects(za::Rect2u({20u, 10u}, {10u, 10u})));
+    STATIC_CHECK(!rectangle.intersects(za::Rect2u({0u, 0u}, {10u, 10u})));
+
+    const auto intersection = za::findIntersection(rectangle, za::Rect2u({15u, 5u}, {10u, 10u}));
+    REQUIRE(intersection.hasValue());
+    CHECK(*intersection == za::Rect2u({15u, 10u}, {5u, 5u}));
 }
 
 
