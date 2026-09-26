@@ -234,20 +234,15 @@ private:
 
 
     ////////////////////////////////////////////////////////////
+    // The chunked helpers below only unroll a chunk when at least one
+    // alternative remains after it, as the recursive call in the chunk's
+    // last branch is always instantiated. Otherwise, they fall back to the
+    // next smaller helper.
+    ////////////////////////////////////////////////////////////
     template <SizeT I, typename R, typename Self, typename Visitor>
     [[nodiscard, gnu::always_inline]] static R recursiveVisitImplOpt5(Self&& self, Visitor&& visitor)
     {
-        if constexpr (I == 0 && sizeof...(Alternatives) == 5)
-        {
-            // clang-format off
-            return (self.m_index == I + 0) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 0>()) :
-                   (self.m_index == I + 1) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 1>()) :
-                   (self.m_index == I + 2) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 2>()) :
-                   (self.m_index == I + 3) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 3>()) :
-                                             visitor(static_cast<Self&&>(self).template getByIndex<I + 4>()) ;
-            // clang-format on
-        }
-        else if constexpr (I + 4 < sizeof...(Alternatives))
+        if constexpr (I + 5 < sizeof...(Alternatives))
         {
             // clang-format off
             return (self.m_index == I + 0) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 0>()) :
@@ -269,7 +264,7 @@ private:
     template <SizeT I, typename R, typename Self, typename Visitor>
     [[nodiscard, gnu::always_inline]] static R recursiveVisitImplOpt10(Self&& self, Visitor&& visitor)
     {
-        if constexpr (I + 9 < sizeof...(Alternatives))
+        if constexpr (I + 10 < sizeof...(Alternatives))
         {
             // clang-format off
             return (self.m_index == I + 0) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 0>()) :

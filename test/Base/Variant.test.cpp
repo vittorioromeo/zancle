@@ -14,6 +14,10 @@
 #include "Zancle/Trait/IsTriviallyMoveConstructible.hpp"
 #include "Zancle/Trait/IsTriviallyRelocatable.hpp"
 
+#include "Zancle/Base/IndexSequence.hpp"
+#include "Zancle/Base/MakeIndexSequence.hpp"
+#include "Zancle/Base/SizeT.hpp"
+
 
 namespace
 {
@@ -112,6 +116,40 @@ struct OtherAlt
 {
     int x = 0;
 };
+
+
+////////////////////////////////////////////////////////////
+template <za::SizeT I>
+struct IndexedAlt
+{
+    za::SizeT value = I;
+};
+
+
+////////////////////////////////////////////////////////////
+template <typename>
+struct IndexedVariantImpl;
+
+template <za::SizeT... Is>
+struct IndexedVariantImpl<za::IndexSequence<Is...>>
+{
+    using type = za::Variant<IndexedAlt<Is>...>;
+};
+
+template <za::SizeT N>
+using IndexedVariant = typename IndexedVariantImpl<za::MakeIndexSequence<N>>::type;
+
+
+////////////////////////////////////////////////////////////
+template <za::SizeT N>
+[[nodiscard]] bool recursiveVisitHitsEveryAlternative()
+{
+    return []<za::SizeT... Is>(za::IndexSequence<Is...>)
+    {
+        return (... &&
+                (IndexedVariant<N>{za::inPlaceIndex<Is>}.recursiveVisit([](const auto& alt) { return alt.value; }) == Is));
+    }(za::MakeIndexSequence<N>{});
+}
 
 } // namespace VariantTest
 } // namespace
@@ -253,5 +291,23 @@ TEST_CASE("[Base] Base/Variant.hpp")
         CHECK(Tracker::dtor == 1);
         CHECK(v.is<OtherAlt>());
         CHECK(v.as<OtherAlt>().x == 7);
+    }
+
+    SECTION("recursiveVisit dispatches correctly for any alternative count")
+    {
+        using namespace VariantTest;
+
+        // Counts around the boundaries of the 5-way and 10-way unrolled chunks
+        CHECK(recursiveVisitHitsEveryAlternative<1>());
+        CHECK(recursiveVisitHitsEveryAlternative<4>());
+        CHECK(recursiveVisitHitsEveryAlternative<5>());
+        CHECK(recursiveVisitHitsEveryAlternative<6>());
+        CHECK(recursiveVisitHitsEveryAlternative<9>());
+        CHECK(recursiveVisitHitsEveryAlternative<10>());
+        CHECK(recursiveVisitHitsEveryAlternative<11>());
+        CHECK(recursiveVisitHitsEveryAlternative<15>());
+        CHECK(recursiveVisitHitsEveryAlternative<16>());
+        CHECK(recursiveVisitHitsEveryAlternative<20>());
+        CHECK(recursiveVisitHitsEveryAlternative<21>());
     }
 }
