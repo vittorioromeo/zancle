@@ -99,10 +99,43 @@ public:
     /// \brief Equality of the wrapped angle values
     ///
     ////////////////////////////////////////////////////////////
-    friend constexpr bool operator==(AutoWrapAngle lhs, AutoWrapAngle rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr bool operator==(
+        const AutoWrapAngle lhs,
+        const AutoWrapAngle rhs)
     {
         return lhs.m_radians == rhs.m_radians;
     }
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Equality of the wrapped angle values (`rhs` is wrapped before comparing)
+    ///
+    /// Also needed to disambiguate mixed comparisons, as both types
+    /// are implicitly convertible to each other.
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr bool operator==(const AutoWrapAngle lhs,
+                                                                                                const Angle         rhs)
+    {
+        return lhs.m_radians == rhs.wrapUnsigned().radians;
+    }
+
+    ////////////////////////////////////////////////////////////
+    // Make the non-mutating `za::Angle` operators (hidden friends of `za::Angle`)
+    // findable via ADL when all operands are `AutoWrapAngle`, e.g. `a < b` or
+    // `a + b`. The operands are converted to their wrapped `za::Angle` values.
+    ////////////////////////////////////////////////////////////
+    friend constexpr bool  operator<(Angle lhs, Angle rhs);
+    friend constexpr bool  operator>(Angle lhs, Angle rhs);
+    friend constexpr bool  operator<=(Angle lhs, Angle rhs);
+    friend constexpr bool  operator>=(Angle lhs, Angle rhs);
+    friend constexpr Angle operator-(Angle rhs);
+    friend constexpr Angle operator+(Angle lhs, Angle rhs);
+    friend constexpr Angle operator-(Angle lhs, Angle rhs);
+    friend constexpr Angle operator*(Angle lhs, float rhs);
+    friend constexpr Angle operator*(float lhs, Angle rhs);
+    friend constexpr Angle operator/(Angle lhs, float rhs);
+    friend constexpr float operator/(Angle lhs, Angle rhs);
+    friend constexpr Angle operator%(Angle lhs, Angle rhs);
 
     ////////////////////////////////////////////////////////////
     /// \brief Add `rhs` to the angle value, then wrap

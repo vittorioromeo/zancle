@@ -46,6 +46,50 @@ TEST_CASE("[System] za::AutoWrapAngle")
         CHECK(za::AutoWrapAngle{za::degrees(360.f + 180.f)}.asDegrees() == Approx(180.f));
     }
 
+    SECTION("Operators")
+    {
+        constexpr za::AutoWrapAngle a{za::radians(1.f)};
+        constexpr za::AutoWrapAngle b{za::radians(2.f)};
+
+        SECTION("Equality")
+        {
+            STATIC_CHECK(a == a);
+            STATIC_CHECK(a != b);
+
+            // Mixed comparisons are unambiguous, in both orders
+            STATIC_CHECK(a == za::radians(1.f));
+            STATIC_CHECK(za::radians(1.f) == a);
+            STATIC_CHECK(a != za::radians(2.f));
+            STATIC_CHECK(za::radians(2.f) != a);
+
+            // The `za::Angle` operand is wrapped before comparing
+            STATIC_CHECK(za::AutoWrapAngle{} == za::degrees(360.f));
+            STATIC_CHECK(za::degrees(-360.f) == za::AutoWrapAngle{});
+        }
+
+        SECTION("Relational")
+        {
+            STATIC_CHECK(a < b);
+            STATIC_CHECK(b > a);
+            STATIC_CHECK(a <= a);
+            STATIC_CHECK(b >= a);
+            STATIC_CHECK(a < za::radians(2.f));
+            STATIC_CHECK(za::radians(0.5f) < a);
+        }
+
+        SECTION("Arithmetic")
+        {
+            STATIC_CHECK(a + b == za::radians(3.f));
+            STATIC_CHECK(b - a == za::radians(1.f));
+            STATIC_CHECK(-a == za::radians(-1.f));
+            STATIC_CHECK(a * 2.f == za::radians(2.f));
+            STATIC_CHECK(2.f * a == za::radians(2.f));
+            STATIC_CHECK(b / 2.f == za::radians(1.f));
+            STATIC_CHECK(b / a == 2.f);
+            STATIC_CHECK(za::AutoWrapAngle{za::radians(3.f)} % b == za::radians(1.f));
+        }
+    }
+
     SECTION("Wrapping on modification")
     {
         za::AutoWrapAngle angle{za::degrees(350.f)};
