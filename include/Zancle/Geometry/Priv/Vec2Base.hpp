@@ -8,11 +8,11 @@
 ////////////////////////////////////////////////////////////
 #include "Zancle/Math/ClampMacro.hpp"
 
-#include "Zancle/Trait/IsSame.hpp"
-#include "Zancle/Trait/IsUnsigned.hpp"
-
 #include "Zancle/Base/AssertAndAssume.hpp"
 #include "Zancle/Base/SizeT.hpp"
+
+#include "Zancle/Trait/IsSame.hpp"
+#include "Zancle/Trait/IsUnsigned.hpp"
 
 
 ////////////////////////////////////////////////////////////

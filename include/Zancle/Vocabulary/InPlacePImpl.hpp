@@ -6,12 +6,12 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
-#include "Zancle/Trait/IsSame.hpp"
-#include "Zancle/Trait/RemoveCVRef.hpp"
-
 #include "Zancle/Base/Launder.hpp"
 #include "Zancle/Base/MaxAlignT.hpp"
 #include "Zancle/Base/PlacementNew.hpp"
+
+#include "Zancle/Trait/IsSame.hpp"
+#include "Zancle/Trait/RemoveCVRef.hpp"
 
 
 namespace za

@@ -4,9 +4,9 @@
 
 #include "Zancle/Vocabulary/UniquePtr.hpp"
 
-#include "Zancle/Trait/IsConvertible.hpp"
-
 #include "Zancle/Base/Macros.hpp"
+
+#include "Zancle/Trait/IsConvertible.hpp"
 
 
 namespace

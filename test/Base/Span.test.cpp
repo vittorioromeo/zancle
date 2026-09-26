@@ -4,6 +4,8 @@
 
 #include "Zancle/Container/Vector.hpp"
 
+#include "Zancle/Base/Swap.hpp"
+
 #include "Zancle/Trait/IsAggregate.hpp"
 #include "Zancle/Trait/IsConstructible.hpp"
 #include "Zancle/Trait/IsConvertible.hpp"
@@ -18,8 +20,6 @@
 #include "Zancle/Trait/IsTriviallyMoveAssignable.hpp"
 #include "Zancle/Trait/IsTriviallyMoveConstructible.hpp"
 #include "Zancle/Trait/IsTriviallyRelocatable.hpp"
-
-#include "Zancle/Base/Swap.hpp"
 
 
 namespace
