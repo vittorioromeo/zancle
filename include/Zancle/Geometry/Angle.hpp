@@ -12,31 +12,18 @@
 #include "Zancle/Base/Assert.hpp"
 
 
-////////////////////////////////////////////////////////////
-// Forward declarations
-////////////////////////////////////////////////////////////
-namespace za
-{
-class AutoWrapAngle;
-} // namespace za
-
-
 namespace za
 {
 ////////////////////////////////////////////////////////////
 /// \brief Represents an angle value.
 ///
+/// Prefer constructing angles via `za::radians` or `za::degrees`
+/// (or the `_rad` and `_deg` literals) for readability.
+///
 ////////////////////////////////////////////////////////////
 class [[nodiscard]] Angle
 {
 public:
-    ////////////////////////////////////////////////////////////
-    /// \brief Default constructor, sets the angle value to zero.
-    ///
-    ////////////////////////////////////////////////////////////
-    [[nodiscard]] constexpr Angle() = default;
-
-
     ////////////////////////////////////////////////////////////
     /// \brief Return the angle's value in degrees
     ///
@@ -378,25 +365,6 @@ public:
     // Member data
     ////////////////////////////////////////////////////////////
     float radians{0.f}; //!< Angle value stored as radians
-
-
-private:
-    ////////////////////////////////////////////////////////////
-    friend constexpr Angle degrees(float angle);
-    friend constexpr Angle radians(float angle);
-
-
-    ////////////////////////////////////////////////////////////
-    /// \brief Construct from a number of radians
-    ///
-    /// This constructor is for internal use. To construct angle values,
-    /// use the `za::radians` or `za::degrees` free functions instead.
-    ///
-    ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten]] constexpr explicit Angle(const float theRadians) :
-        radians{theRadians}
-    {
-    }
 };
 
 

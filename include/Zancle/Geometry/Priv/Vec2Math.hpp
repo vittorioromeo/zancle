@@ -210,17 +210,13 @@ constexpr Vec2<T> Vec2<T>::clampLength(const T minLength, const T maxLength) con
     const T minLengthSquared = minLength * minLength;
     const T maxLengthSquared = maxLength * maxLength;
 
+    // A zero vec2 is always in range here: either `minLength == 0`, or the precondition was violated
     if (currentLengthSquared >= minLengthSquared && currentLengthSquared <= maxLengthSquared)
-        return *this;
-
-    // If length is zero we cannot scale, but previous check/assert handles this unless minLength is 0.
-    // If minLength is 0 and currentLength is 0, we fall through. Clamping 0 to [0, max] should result in 0.
-    if (currentLengthSquared == T{0})
         return *this;
 
     const T currentLength = za::sqrt(currentLengthSquared);
 
-    if (currentLength < minLength) // We know currentLength > 0 here
+    if (currentLength < minLength)
         return *this * (minLength / currentLength);
 
     // Must be currentLength > maxLength
@@ -242,15 +238,11 @@ constexpr Vec2<T> Vec2<T>::clampLengthSquared(const T minLengthSquared, const T 
     ZA_ASSERT_AND_ASSUME((currentLengthSquared != T{0} || minLengthSquared == T{0}) &&
                          "cannot clamp zero vec2 to a positive minimum squared length");
 
+    // A zero vec2 is always in range here: either `minLengthSquared == 0`, or the precondition was violated
     if (currentLengthSquared >= minLengthSquared && currentLengthSquared <= maxLengthSquared)
         return *this;
 
-    // If length is zero we cannot scale, but previous check/assert handles this unless minLengthSquared is 0.
-    // If minLengthSquared is 0 and currentLengthSquared is 0, we fall through. Clamping 0 to [0, max^2] results in 0.
-    if (currentLengthSquared == T{0})
-        return *this;
-
-    if (currentLengthSquared < minLengthSquared) // We know currentLengthSquared > 0 here
+    if (currentLengthSquared < minLengthSquared)
         return *this * za::sqrt(minLengthSquared / currentLengthSquared);
 
     // Must be currentLengthSquared > maxLengthSquared

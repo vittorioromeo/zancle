@@ -40,8 +40,8 @@ public:
     {
         // Rectangles with negative dimensions are allowed, so we must handle them correctly
 
-        const auto right  = static_cast<T>(position.x + size.x);
-        const auto bottom = static_cast<T>(position.y + size.y);
+        const T right  = position.x + size.x;
+        const T bottom = position.y + size.y;
 
         // Compute the real min and max of the rectangle on both axes
         const T minX = ZA_MIN(position.x, right);
@@ -50,18 +50,6 @@ public:
         const T maxY = ZA_MAX(position.y, bottom);
 
         return (point.x >= minX) && (point.x < maxX) && (point.y >= minY) && (point.y < maxY);
-    }
-
-
-    ////////////////////////////////////////////////////////////
-    /// \brief Convert to another `Rect2` of type `U` (must be a `Rect2<...>`)
-    ///
-    ////////////////////////////////////////////////////////////
-    template <typename U>
-    [[nodiscard, gnu::always_inline, gnu::pure]] inline constexpr U to() const
-    {
-        using ValueType = decltype(U{}.position.x);
-        return Rect2<ValueType>{position.template to<Vec2<ValueType>>(), size.template to<Vec2<ValueType>>()};
     }
 
 

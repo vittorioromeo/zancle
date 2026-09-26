@@ -10,7 +10,7 @@
 
 #include "Zancle/Trait/IsFloatingPoint.hpp"
 
-#include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/AssertAndAssume.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
 
@@ -43,7 +43,7 @@ struct [[nodiscard]] Vec3
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr T lengthSquared() const
     {
-        return dot(*this);
+        return x * x + y * y + z * z;
     }
 
 
@@ -57,8 +57,10 @@ struct [[nodiscard]] Vec3
     {
         static_assert(ZA_IS_FLOATING_POINT(T), "only supported for floating point types");
 
-        ZA_ASSERT(*this != Vec3<T>() && "cannot normalize a zero vec3");
-        return (*this) / length();
+        ZA_ASSERT_AND_ASSUME((x != T{0} || y != T{0} || z != T{0}) && "cannot normalize a zero vec3");
+
+        const T invLen = T{1} / length();
+        return Vec3<T>(x * invLen, y * invLen, z * invLen);
     }
 
 
@@ -66,7 +68,7 @@ struct [[nodiscard]] Vec3
     /// \brief Dot product
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr T dot(const Vec3& rhs) const
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr T dot(const Vec3 rhs) const
     {
         return x * rhs.x + y * rhs.y + z * rhs.z;
     }
@@ -76,7 +78,7 @@ struct [[nodiscard]] Vec3
     /// \brief Cross product
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr Vec3 cross(const Vec3& rhs) const
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr Vec3 cross(const Vec3 rhs) const
     {
         return Vec3<T>((y * rhs.z) - (z * rhs.y), (z * rhs.x) - (x * rhs.z), (x * rhs.y) - (y * rhs.x));
     }
@@ -88,7 +90,7 @@ struct [[nodiscard]] Vec3
     /// Most useful for non-uniform scaling.
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr Vec3 componentWiseMul(const Vec3& rhs) const
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr Vec3 componentWiseMul(const Vec3 rhs) const
     {
         return Vec3<T>(x * rhs.x, y * rhs.y, z * rhs.z);
     }
@@ -100,11 +102,11 @@ struct [[nodiscard]] Vec3
     /// \pre No component of `rhs` is zero.
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr Vec3 componentWiseDiv(const Vec3& rhs) const
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr Vec3 componentWiseDiv(const Vec3 rhs) const
     {
-        ZA_ASSERT(rhs.x != 0 && "cannot divide by 0 (x coordinate)");
-        ZA_ASSERT(rhs.y != 0 && "cannot divide by 0 (y coordinate)");
-        ZA_ASSERT(rhs.z != 0 && "cannot divide by 0 (z coordinate)");
+        ZA_ASSERT_AND_ASSUME(rhs.x != 0 && "cannot divide by 0 (x coordinate)");
+        ZA_ASSERT_AND_ASSUME(rhs.y != 0 && "cannot divide by 0 (y coordinate)");
+        ZA_ASSERT_AND_ASSUME(rhs.z != 0 && "cannot divide by 0 (z coordinate)");
 
         return Vec3<T>(x / rhs.x, y / rhs.y, z / rhs.z);
     }
@@ -133,7 +135,7 @@ struct [[nodiscard]] Vec3
     /// \brief Member-wise negation
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr Vec3 operator-(const Vec3& rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr Vec3 operator-(const Vec3 rhs)
     {
         return Vec3(-rhs.x, -rhs.y, -rhs.z);
     }
@@ -143,7 +145,7 @@ struct [[nodiscard]] Vec3
     /// \brief Member-wise addition assignment
     ///
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline, gnu::flatten]] friend constexpr Vec3& operator+=(Vec3& lhs, const Vec3& rhs)
+    [[gnu::always_inline, gnu::flatten]] friend constexpr Vec3& operator+=(Vec3& lhs, const Vec3 rhs)
     {
         lhs.x += rhs.x;
         lhs.y += rhs.y;
@@ -157,7 +159,7 @@ struct [[nodiscard]] Vec3
     /// \brief Member-wise subtraction assignment
     ///
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline, gnu::flatten]] friend constexpr Vec3& operator-=(Vec3& lhs, const Vec3& rhs)
+    [[gnu::always_inline, gnu::flatten]] friend constexpr Vec3& operator-=(Vec3& lhs, const Vec3 rhs)
     {
         lhs.x -= rhs.x;
         lhs.y -= rhs.y;
@@ -171,7 +173,7 @@ struct [[nodiscard]] Vec3
     /// \brief Member-wise addition of two vec3s
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr Vec3 operator+(const Vec3& lhs, const Vec3& rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr Vec3 operator+(const Vec3 lhs, const Vec3 rhs)
     {
         return Vec3(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z);
     }
@@ -181,7 +183,7 @@ struct [[nodiscard]] Vec3
     /// \brief Member-wise subtraction of two vec3s
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr Vec3 operator-(const Vec3& lhs, const Vec3& rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr Vec3 operator-(const Vec3 lhs, const Vec3 rhs)
     {
         return Vec3(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z);
     }
@@ -191,7 +193,7 @@ struct [[nodiscard]] Vec3
     /// \brief Member-wise multiplication of a vec3 by a scalar
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr Vec3 operator*(const Vec3& lhs, const T rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr Vec3 operator*(const Vec3 lhs, const T rhs)
     {
         return Vec3(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs);
     }
@@ -201,7 +203,7 @@ struct [[nodiscard]] Vec3
     /// \brief Member-wise multiplication of a scalar by a vec3
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr Vec3 operator*(const T lhs, const Vec3& rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr Vec3 operator*(const T lhs, const Vec3 rhs)
     {
         return Vec3(rhs.x * lhs, rhs.y * lhs, rhs.z * lhs);
     }
@@ -225,9 +227,9 @@ struct [[nodiscard]] Vec3
     /// \brief Member-wise division of a vec3 by a scalar (asserts `rhs != 0`)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr Vec3 operator/(const Vec3& lhs, const T rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr Vec3 operator/(const Vec3 lhs, const T rhs)
     {
-        ZA_ASSERT(rhs != 0 && "cannot divide by 0");
+        ZA_ASSERT_AND_ASSUME(rhs != 0 && "cannot divide by 0");
 
         return Vec3(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs);
     }
@@ -239,7 +241,7 @@ struct [[nodiscard]] Vec3
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline, gnu::flatten]] friend constexpr Vec3& operator/=(Vec3& lhs, const T rhs)
     {
-        ZA_ASSERT(rhs != 0 && "cannot divide by 0");
+        ZA_ASSERT_AND_ASSUME(rhs != 0 && "cannot divide by 0");
 
         lhs.x /= rhs;
         lhs.y /= rhs;
