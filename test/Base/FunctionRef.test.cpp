@@ -2,6 +2,8 @@
 
 #include "Zancle/Vocabulary/FunctionRef.hpp"
 
+#include "Zancle/Trait/IsConvertible.hpp"
+
 #include "Zancle/Base/Macros.hpp"
 
 
@@ -408,6 +410,42 @@ TEST_CASE("[Base] Base/FunctionRef.hpp")
         CHECK(fr(2) == 3);
         CHECK(fr(7) == 10);
         CHECK(accumulator == 10);
+    }
+}
+
+
+////////////////////////////////////////////////////////////
+[[nodiscard]] int overloadedOnSignature(za::FunctionRef<int(int)> f)
+{
+    return f(1);
+}
+
+
+////////////////////////////////////////////////////////////
+[[nodiscard]] int overloadedOnSignature(za::FunctionRef<int(const char*)> f)
+{
+    return f("abc") + 100;
+}
+
+
+////////////////////////////////////////////////////////////
+TEST_CASE("[Base] za::FunctionRef - construction is constrained to matching callables")
+{
+    SECTION("Non-callables and mismatched signatures are rejected")
+    {
+        auto takesInt = [](int x) { return x; };
+
+        STATIC_CHECK(ZA_IS_CONVERTIBLE(decltype(takesInt), za::FunctionRef<int(int)>));
+        STATIC_CHECK(ZA_IS_CONVERTIBLE(decltype(takesInt), za::FunctionRef<void(int)>));
+        STATIC_CHECK(!ZA_IS_CONVERTIBLE(int, za::FunctionRef<int(int)>));
+        STATIC_CHECK(!ZA_IS_CONVERTIBLE(decltype(takesInt), za::FunctionRef<int(const char*)>));
+        STATIC_CHECK(!ZA_IS_CONVERTIBLE(decltype([] {}), za::FunctionRef<int()>)); // `void` result
+    }
+
+    SECTION("Overloads on different signatures are not ambiguous")
+    {
+        CHECK(overloadedOnSignature([](int x) { return x + 1; }) == 2);
+        CHECK(overloadedOnSignature([](const char* s) { return static_cast<int>(s[0]); }) == 'a' + 100);
     }
 }
 

@@ -6,6 +6,7 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/Trait/IsInvocableR.hpp"
 #include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/RemoveCVRef.hpp"
 #include "Zancle/Trait/RemoveReference.hpp"
@@ -71,12 +72,14 @@ public:
     /// \brief Construct from any callable object (lambda, functor, ...)
     ///
     /// The callable is referenced, not copied. Its lifetime must
-    /// extend across any subsequent calls to `operator()`.
+    /// extend across any subsequent calls to `operator()`. Only
+    /// participates in overload resolution if the callable is
+    /// invocable with the signature's arguments and return type.
     ///
     ////////////////////////////////////////////////////////////
     template <typename TFFwd>
         requires(!za::isSame<za::RemoveCVRefIndirect<TFFwd>, FunctionRef> &&
-                 !za::isSame<za::RemoveCVRefIndirect<TFFwd>, FnPtrType>)
+                 !za::isSame<za::RemoveCVRefIndirect<TFFwd>, FnPtrType> && za::isInvocableR<TFFwd&, TReturn, Ts...>)
     [[nodiscard, gnu::always_inline]] FunctionRef(TFFwd&& f) noexcept :
         m_obj{const_cast<void*>(static_cast<const void*>(&f))},
         m_thunk{[](void* o, Ts&&... args) -> TReturn

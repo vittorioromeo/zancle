@@ -7,6 +7,7 @@
 // Headers
 ////////////////////////////////////////////////////////////
 #include "Zancle/Trait/IsCopyConstructible.hpp"
+#include "Zancle/Trait/IsInvocableR.hpp"
 #include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/IsTriviallyCopyable.hpp"
 #include "Zancle/Trait/RemoveCVRef.hpp"
@@ -194,9 +195,13 @@ public:
     ////////////////////////////////////////////////////////////
     /// \brief Construct from a callable, stored (decayed) in internal storage by copy or move
     ///
+    /// Only participates in overload resolution if the callable is
+    /// invocable with the signature's arguments and return type.
+    ///
     ////////////////////////////////////////////////////////////
     template <typename TFFwd>
-        requires(!za::isSame<za::RemoveCVRefIndirect<TFFwd>, FixedFunction>)
+        requires(!za::isSame<za::RemoveCVRefIndirect<TFFwd>, FixedFunction> &&
+                 za::isInvocableR<za::RemoveCVRefIndirect<TFFwd>&, TReturn, Ts...>)
     [[nodiscard]] FixedFunction(TFFwd&& f) : FixedFunction()
     {
         emplace<ZA_REMOVE_CVREF(TFFwd)>(ZA_FORWARD(f));

@@ -4,6 +4,8 @@
 
 #include "Zancle/Vocabulary/UniquePtr.hpp"
 
+#include "Zancle/Trait/IsConvertible.hpp"
+
 #include "Zancle/Base/Macros.hpp"
 
 
@@ -709,6 +711,31 @@ struct Pair
     int a;
     int b;
 };
+
+
+////////////////////////////////////////////////////////////
+TEST_CASE("[Base] za::FixedFunction - construction is constrained to matching callables")
+{
+    SECTION("Non-callables and mismatched signatures are rejected")
+    {
+        using FFi  = za::FixedFunction<int(int), 64>;
+        using FFvi = za::FixedFunction<void(int), 64>;
+        using FFs  = za::FixedFunction<int(const char*), 64>;
+
+        auto takesInt = [](int x) { return x; };
+
+        STATIC_CHECK(ZA_IS_CONVERTIBLE(decltype(takesInt), FFi));
+        STATIC_CHECK(ZA_IS_CONVERTIBLE(decltype(takesInt), FFvi));
+        STATIC_CHECK(!ZA_IS_CONVERTIBLE(int, FFi));
+        STATIC_CHECK(!ZA_IS_CONVERTIBLE(decltype(takesInt), FFs));
+    }
+
+    SECTION("Copy-initialization from nullptr results in an empty function")
+    {
+        FF ff = nullptr;
+        CHECK(!ff);
+    }
+}
 
 
 ////////////////////////////////////////////////////////////
