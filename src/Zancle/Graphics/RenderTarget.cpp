@@ -837,21 +837,21 @@ BatchedGeometry RenderTarget::draw(const priv::ShapeDataConcept auto& shapeData,
 
 
 ////////////////////////////////////////////////////////////
-template BatchedGeometry RenderTarget::draw(const ArrowShapeData&, const RenderStates&);
-template BatchedGeometry RenderTarget::draw(const ChevronShapeData&, const RenderStates&);
-template BatchedGeometry RenderTarget::draw(const CircleShapeData&, const RenderStates&);
-template BatchedGeometry RenderTarget::draw(const CogShapeData&, const RenderStates&);
-template BatchedGeometry RenderTarget::draw(const CrossShapeData&, const RenderStates&);
-template BatchedGeometry RenderTarget::draw(const CurvedArrowShapeData&, const RenderStates&);
-template BatchedGeometry RenderTarget::draw(const EllipseShapeData&, const RenderStates&);
-template BatchedGeometry RenderTarget::draw(const HeartShapeData&, const RenderStates&);
-template BatchedGeometry RenderTarget::draw(const PieSliceShapeData&, const RenderStates&);
-template BatchedGeometry RenderTarget::draw(const RectangleShapeData&, const RenderStates&);
-template BatchedGeometry RenderTarget::draw(const RingShapeData&, const RenderStates&);
-template BatchedGeometry RenderTarget::draw(const RingPieSliceShapeData&, const RenderStates&);
-template BatchedGeometry RenderTarget::draw(const RoundedRectangleShapeData&, const RenderStates&);
-template BatchedGeometry RenderTarget::draw(const StarShapeData&, const RenderStates&);
-template BatchedGeometry RenderTarget::draw(const TrapezoidShapeData&, const RenderStates&);
+template ZA_GRAPHICS_API BatchedGeometry RenderTarget::draw(const ArrowShapeData&, const RenderStates&);
+template ZA_GRAPHICS_API BatchedGeometry RenderTarget::draw(const ChevronShapeData&, const RenderStates&);
+template ZA_GRAPHICS_API BatchedGeometry RenderTarget::draw(const CircleShapeData&, const RenderStates&);
+template ZA_GRAPHICS_API BatchedGeometry RenderTarget::draw(const CogShapeData&, const RenderStates&);
+template ZA_GRAPHICS_API BatchedGeometry RenderTarget::draw(const CrossShapeData&, const RenderStates&);
+template ZA_GRAPHICS_API BatchedGeometry RenderTarget::draw(const CurvedArrowShapeData&, const RenderStates&);
+template ZA_GRAPHICS_API BatchedGeometry RenderTarget::draw(const EllipseShapeData&, const RenderStates&);
+template ZA_GRAPHICS_API BatchedGeometry RenderTarget::draw(const HeartShapeData&, const RenderStates&);
+template ZA_GRAPHICS_API BatchedGeometry RenderTarget::draw(const PieSliceShapeData&, const RenderStates&);
+template ZA_GRAPHICS_API BatchedGeometry RenderTarget::draw(const RectangleShapeData&, const RenderStates&);
+template ZA_GRAPHICS_API BatchedGeometry RenderTarget::draw(const RingShapeData&, const RenderStates&);
+template ZA_GRAPHICS_API BatchedGeometry RenderTarget::draw(const RingPieSliceShapeData&, const RenderStates&);
+template ZA_GRAPHICS_API BatchedGeometry RenderTarget::draw(const RoundedRectangleShapeData&, const RenderStates&);
+template ZA_GRAPHICS_API BatchedGeometry RenderTarget::draw(const StarShapeData&, const RenderStates&);
+template ZA_GRAPHICS_API BatchedGeometry RenderTarget::draw(const TrapezoidShapeData&, const RenderStates&);
 
 
 ////////////////////////////////////////////////////////////

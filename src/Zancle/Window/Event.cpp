@@ -80,10 +80,10 @@ const TEventSubtype* Event::getIf() const
 
 template class ZA_PRIV_EVENT_VARIANT_TYPE;
 
-#define ZA_PRIV_EVENT_X_TEMPLATE_CTOR(x)        template za::Event::Event(const x&);
-#define ZA_PRIV_EVENT_X_TEMPLATE_IS(x)          template bool za::Event::is<x>() const;
-#define ZA_PRIV_EVENT_X_TEMPLATE_GETIF(x)       template x* za::Event::getIf<x>();
-#define ZA_PRIV_EVENT_X_TEMPLATE_GETIF_CONST(x) template const x* za::Event::getIf<x>() const;
+#define ZA_PRIV_EVENT_X_TEMPLATE_CTOR(x)        template ZA_WINDOW_API za::Event::Event(const x&);
+#define ZA_PRIV_EVENT_X_TEMPLATE_IS(x)          template ZA_WINDOW_API bool za::Event::is<x>() const;
+#define ZA_PRIV_EVENT_X_TEMPLATE_GETIF(x)       template ZA_WINDOW_API x* za::Event::getIf<x>();
+#define ZA_PRIV_EVENT_X_TEMPLATE_GETIF_CONST(x) template ZA_WINDOW_API const x* za::Event::getIf<x>() const;
 
 ZA_PRIV_EVENTS_X_MACRO(ZA_PRIV_EVENT_X_TEMPLATE_CTOR, ZA_PRIV_EVENT_X_SEMICOLON);
 ZA_PRIV_EVENTS_X_MACRO(ZA_PRIV_EVENT_X_TEMPLATE_IS, ZA_PRIV_EVENT_X_SEMICOLON);

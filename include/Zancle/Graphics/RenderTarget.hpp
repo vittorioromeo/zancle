@@ -654,7 +654,7 @@ public:
     /// changes those render states behind your back.
     ///
     ////////////////////////////////////////////////////////////
-    class [[nodiscard]] WithRenderStatesContext
+    class [[nodiscard]] ZA_GRAPHICS_API WithRenderStatesContext
     {
     private:
         ////////////////////////////////////////////////////////////

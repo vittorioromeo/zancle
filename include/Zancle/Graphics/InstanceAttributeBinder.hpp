@@ -6,6 +6,8 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/Graphics/Export.hpp"
+
 #include "Zancle/Graphics/GlDataType.hpp"
 
 #include "Zancle/Container/InPlaceVector.hpp"
@@ -88,7 +90,7 @@ namespace za
 /// only within the scope of the callback that received it.
 ///
 ////////////////////////////////////////////////////////////
-struct [[nodiscard]] InstanceAttributeBinder
+struct [[nodiscard]] ZA_GRAPHICS_API InstanceAttributeBinder
 {
     ////////////////////////////////////////////////////////////
     explicit InstanceAttributeBinder(za::SizeT instanceCount);

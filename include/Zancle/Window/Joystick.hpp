@@ -33,7 +33,7 @@ namespace za
 /// \brief Give access to the real-time state of the joysticks
 ///
 ////////////////////////////////////////////////////////////
-struct Joystick
+struct ZA_WINDOW_API Joystick
 {
     ////////////////////////////////////////////////////////////
     /// \brief Axes supported by Zancle joysticks
@@ -73,7 +73,7 @@ struct Joystick
     /// joystick states are not refreshed automatically.
     ///
     ////////////////////////////////////////////////////////////
-    ZA_WINDOW_API static void update();
+    static void update();
 
     // Forward declaration for friendship
     class Query;

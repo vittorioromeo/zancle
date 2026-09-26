@@ -209,7 +209,7 @@ struct CPUStorage
 /// It involves more complex GPU memory management, including Vertex Array Objects (VAOs).
 ///
 ////////////////////////////////////////////////////////////
-struct PersistentGPUStorage
+struct ZA_GRAPHICS_API PersistentGPUStorage
 {
     ////////////////////////////////////////////////////////////
     /// \brief Default constructor (3 frame states for CPU/GPU pipelining)

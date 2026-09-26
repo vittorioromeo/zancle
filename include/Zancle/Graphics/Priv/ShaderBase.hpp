@@ -71,7 +71,7 @@ public:
     /// \brief Type-safe wrapper over a non-null shader uniform location
     ///
     ////////////////////////////////////////////////////////////
-    class [[nodiscard]] UniformLocation
+    class [[nodiscard]] ZA_GRAPHICS_API UniformLocation
     {
         friend Shader;
 

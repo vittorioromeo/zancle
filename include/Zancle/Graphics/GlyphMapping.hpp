@@ -50,7 +50,7 @@ namespace za
 /// ranges respectively (both include U+0020 and U+0078).
 ///
 ////////////////////////////////////////////////////////////
-struct [[nodiscard]] GlyphLoadSettings
+struct [[nodiscard]] ZA_GRAPHICS_API GlyphLoadSettings
 {
     const char32_t* codePoints{};     //!< Pointer to the array of code points to rasterize
     za::SizeT       codePointCount{}; //!< Number of code points in `codePoints` // TODO P1: span?

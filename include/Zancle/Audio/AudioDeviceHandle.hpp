@@ -108,7 +108,7 @@ public:
     /// underlying device (matching driver-level identifier).
     ///
     ////////////////////////////////////////////////////////////
-    friend bool operator==(const AudioDeviceHandle& lhs, const AudioDeviceHandle& rhs);
+    friend ZA_AUDIO_API bool operator==(const AudioDeviceHandle& lhs, const AudioDeviceHandle& rhs);
 
 protected:
     friend PlaybackDevice;
@@ -162,7 +162,7 @@ private:
 /// \brief Compare equality between device handles
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard]] bool operator==(const AudioDeviceHandle& lhs, const AudioDeviceHandle& rhs);
+[[nodiscard]] ZA_AUDIO_API bool operator==(const AudioDeviceHandle& lhs, const AudioDeviceHandle& rhs);
 
 ////////////////////////////////////////////////////////////
 /// \brief CRTP-style strong typedef around `AudioDeviceHandle`
