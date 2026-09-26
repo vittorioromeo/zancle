@@ -71,6 +71,7 @@ namespace za
 {
 ////////////////////////////////////////////////////////////
 template <SizeT N, typename... Ts>
+    requires(N < sizeof...(Ts)) // otherwise `typePackElementImpl` would silently yield `void`
 using TypePackElement = typename decltype(priv::typePackElementImpl<N, Ts...>())::type;
 
 
