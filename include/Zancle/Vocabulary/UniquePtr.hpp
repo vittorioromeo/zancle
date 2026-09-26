@@ -7,7 +7,6 @@
 // Headers
 ////////////////////////////////////////////////////////////
 #include "Zancle/Base/Assert.hpp"
-#include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/TrivialAbi.hpp"
 
 #include "Zancle/Trait/EnableTrivialRelocation.hpp"
@@ -181,7 +180,7 @@ public:
     /// \brief Get the underlying raw pointer (or `nullptr`)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T* get() const noexcept ZA_LIFETIMEBOUND
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T* get() const noexcept
     {
         return m_ptr;
     }
@@ -191,7 +190,7 @@ public:
     /// \brief Dereference the held object (asserts non-null)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline]] constexpr T& operator*() const noexcept ZA_LIFETIMEBOUND
+    [[nodiscard, gnu::always_inline]] constexpr T& operator*() const noexcept
     {
         ZA_ASSERT(m_ptr != nullptr);
         return *m_ptr;
@@ -202,7 +201,7 @@ public:
     /// \brief Member access on the held object (asserts non-null)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline]] constexpr T* operator->() const noexcept ZA_LIFETIMEBOUND
+    [[nodiscard, gnu::always_inline]] constexpr T* operator->() const noexcept
     {
         ZA_ASSERT(m_ptr != nullptr);
         return m_ptr;
