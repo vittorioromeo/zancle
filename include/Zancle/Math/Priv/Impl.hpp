@@ -6,7 +6,7 @@
 ////////////////////////////////////////////////////////////
 /// \file
 ///
-/// \brief Internal helpers for `za::math::*` math wrappers
+/// \brief Internal helpers for the `za::<name>` math wrappers (e.g. `za::sqrt`)
 ///
 /// Provides `ZA_PRIV_HAS_MATH_BUILTIN(name)`, which checks
 /// whether all three of `__builtin_<name>`, `__builtin_<name>f`, and
@@ -20,6 +20,14 @@
 /// `za::<name>` function template that calls the appropriate
 /// `ZA_MATH_<NAME>(F|L)` macro for `float`, `double`, or
 /// `long double`. Caller must define those macros before invoking.
+///
+/// \warning The generated wrappers are `constexpr`, but whether they can
+///          actually be evaluated at compile time depends on the compiler's
+///          constant folding of the underlying builtin: GCC can evaluate all
+///          of them except `rint` (which depends on the run-time rounding
+///          mode), whereas Clang can only evaluate `fabs`, `fmax`, and `fmin`.
+///          Code relying on a compile-time evaluation of any other wrapper
+///          compiles with GCC but not with Clang.
 ///
 ////////////////////////////////////////////////////////////
 
