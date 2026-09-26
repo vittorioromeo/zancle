@@ -8,6 +8,7 @@
 ////////////////////////////////////////////////////////////
 #include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsSame.hpp"
+#include "Zancle/Trait/IsTriviallyCopyable.hpp"
 #include "Zancle/Trait/RemoveCVRef.hpp"
 
 #include "Zancle/Base/Abort.hpp"
@@ -15,10 +16,10 @@
 #include "Zancle/Base/Launder.hpp"
 #include "Zancle/Base/Macros.hpp"
 #include "Zancle/Base/MaxAlignT.hpp"
+#include "Zancle/Base/Memcpy.hpp"
 #include "Zancle/Base/PlacementNew.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
-// TODO P1: provide triviallyrelocatable version
 
 namespace za
 {
@@ -33,6 +34,10 @@ class FixedFunction;
 ////////////////////////////////////////////////////////////
 /// \brief Non-allocating `std::function` alternative with fixed storage size
 ///
+/// Every callable (including function pointers) is stored in the internal
+/// buffer. Trivially copyable callables (function pointers, most lambdas)
+/// are copied and moved with `memcpy`, without any indirect call.
+///
 /// Move-only callables are supported, but copying a `FixedFunction`
 /// that holds one aborts at run time (the callable type is erased).
 ///
@@ -44,9 +49,9 @@ private:
     ////////////////////////////////////////////////////////////
     enum class Operation : unsigned char
     {
-        Destroy       = 0u,
-        MoveConstruct = 1u,
-        CopyConstruct = 2u,
+        Destroy       = 0u, //!< Destroy `target`
+        CopyConstruct = 1u, //!< Copy-construct `target` from `source`
+        Relocate      = 2u, //!< Move-construct `target` from `source`, then destroy `source`
     };
 
 
@@ -55,36 +60,133 @@ private:
 
 
     ////////////////////////////////////////////////////////////
-    using FnPtrType  = RetType (*)(Ts...);
-    using MethodType = RetType (*)(char*, FnPtrType, Ts&&...);
-    using AllocType  = void (*)(char*, void* objectPtr, const Operation operation);
+    using FnPtrType   = RetType (*)(Ts...);
+    using InvokerType = RetType (*)(char*, Ts&&...);
+    using ManagerType = void (*)(char* target, char* source, Operation operation);
 
 
     ////////////////////////////////////////////////////////////
-    union
+    alignas(MaxAlignT) char objStorage[TStorageSize];
+    InvokerType m_invokerPtr; //!< `nullptr` if empty
+    ManagerType m_managerPtr; //!< `nullptr` if empty or if the stored callable is trivially copyable
+
+
+    ////////////////////////////////////////////////////////////
+    template <typename StoredType, typename TFFwd>
+    [[gnu::always_inline]] void emplace(TFFwd&& f)
     {
-        alignas(MaxAlignT) char objStorage[TStorageSize];
-        FnPtrType functionPtr;
-    };
+        static_assert(sizeof(StoredType) <= TStorageSize);
+        static_assert(alignof(StoredType) <= alignof(MaxAlignT));
+
+        ZA_PLACEMENT_NEW(objStorage) StoredType(ZA_FORWARD(f));
+
+        // NOLINTNEXTLINE(readability-non-const-parameter)
+        m_invokerPtr = [](char* s, Ts&&... xs) -> RetType
+        {
+            if constexpr (ZA_IS_SAME(RetType, void))
+                (*ZA_LAUNDER_CAST(StoredType*, s))(ZA_FORWARD(xs)...); // Discard any result
+            else
+                return (*ZA_LAUNDER_CAST(StoredType*, s))(ZA_FORWARD(xs)...);
+        };
+
+        // Trivially copyable callables have no manager: they are copied/moved
+        // with `memcpy` and there is nothing to destroy
+        if constexpr (!ZA_IS_TRIVIALLY_COPYABLE(StoredType))
+            m_managerPtr = makeManager<StoredType>();
+    }
 
 
     ////////////////////////////////////////////////////////////
-    MethodType m_methodPtr;
-    AllocType  m_allocPtr;
-
-
-    ////////////////////////////////////////////////////////////
-    [[gnu::always_inline, gnu::flatten]] void destroyIfNeeded() noexcept
+    template <typename StoredType>
+    [[nodiscard, gnu::always_inline]] static ManagerType makeManager() noexcept
     {
-        if (m_allocPtr == nullptr)
+        // NOLINTNEXTLINE(readability-non-const-parameter)
+        return [](char* target, char* source, const Operation operation)
+        {
+            ZA_ASSERT(target != nullptr);
+
+            if (operation == Operation::Destroy)
+            {
+                ZA_LAUNDER_CAST(StoredType*, target)->~StoredType();
+                return;
+            }
+
+            ZA_ASSERT(source != nullptr);
+            auto* const sourceObj = ZA_LAUNDER_CAST(StoredType*, source);
+
+            if (operation == Operation::Relocate)
+            {
+                ZA_PLACEMENT_NEW(target) StoredType(ZA_MOVE(*sourceObj));
+                sourceObj->~StoredType();
+                return;
+            }
+
+            ZA_ASSERT(operation == Operation::CopyConstruct);
+
+            if constexpr (isCopyConstructible<StoredType>)
+            {
+                ZA_PLACEMENT_NEW(target) StoredType(static_cast<const StoredType&>(*sourceObj));
+            }
+            else
+            {
+                ZA_ASSERT(false && "Cannot copy a `FixedFunction` holding a move-only callable");
+                za::abort();
+            }
+        };
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    [[gnu::always_inline]] void destroyAndReset() noexcept
+    {
+        if (m_managerPtr != nullptr)
+            m_managerPtr(objStorage, nullptr, Operation::Destroy);
+
+        m_invokerPtr = nullptr;
+        m_managerPtr = nullptr;
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    // Precondition: `*this` is empty
+    void copyFrom(const FixedFunction& rhs)
+    {
+        if (rhs.m_invokerPtr == nullptr)
             return;
 
-        m_allocPtr(objStorage, nullptr, Operation::Destroy);
+        if (rhs.m_managerPtr == nullptr)
+            ZA_MEMCPY(objStorage, rhs.objStorage, TStorageSize);
+        else
+            rhs.m_managerPtr(objStorage, const_cast<char*>(rhs.objStorage), Operation::CopyConstruct);
+
+        m_invokerPtr = rhs.m_invokerPtr;
+        m_managerPtr = rhs.m_managerPtr;
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    // Precondition: `*this` is empty. Leaves `rhs` empty.
+    void relocateFrom(FixedFunction& rhs) noexcept
+    {
+        if (rhs.m_invokerPtr == nullptr)
+            return;
+
+        if (rhs.m_managerPtr == nullptr)
+            ZA_MEMCPY(objStorage, rhs.objStorage, TStorageSize);
+        else
+            rhs.m_managerPtr(objStorage, rhs.objStorage, Operation::Relocate);
+
+        m_invokerPtr = rhs.m_invokerPtr;
+        m_managerPtr = rhs.m_managerPtr;
+
+        rhs.m_invokerPtr = nullptr;
+        rhs.m_managerPtr = nullptr;
     }
 
 public:
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] FixedFunction() noexcept : functionPtr{nullptr}, m_methodPtr{nullptr}, m_allocPtr{nullptr}
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    [[nodiscard]] FixedFunction() noexcept : m_invokerPtr{nullptr}, m_managerPtr{nullptr}
     {
     }
 
@@ -97,51 +199,7 @@ public:
         requires(!za::isSame<za::RemoveCVRefIndirect<TFFwd>, FixedFunction>)
     [[nodiscard]] FixedFunction(TFFwd&& f) : FixedFunction()
     {
-        using StoredType = ZA_REMOVE_CVREF(TFFwd);
-
-        static_assert(sizeof(StoredType) <= TStorageSize);
-        static_assert(alignof(StoredType) <= alignof(MaxAlignT));
-
-        ZA_PLACEMENT_NEW(objStorage) StoredType(ZA_FORWARD(f));
-
-        // NOLINTNEXTLINE(readability-non-const-parameter)
-        m_methodPtr = [](char* s, FnPtrType, Ts&&... xs) -> RetType
-        {
-            if constexpr (ZA_IS_SAME(RetType, void))
-                ZA_LAUNDER_CAST(StoredType*, s)->operator()(ZA_FORWARD(xs)...); // Discard any result
-            else
-                return ZA_LAUNDER_CAST(StoredType*, s)->operator()(ZA_FORWARD(xs)...);
-        };
-
-        // NOLINTNEXTLINE(readability-non-const-parameter)
-        m_allocPtr = [](char* s, void* o, const Operation operation)
-        {
-            if (operation == Operation::Destroy)
-            {
-                ZA_ASSERT(s != nullptr);
-                ZA_LAUNDER_CAST(StoredType*, s)->~StoredType();
-            }
-            else if (operation == Operation::MoveConstruct)
-            {
-                ZA_ASSERT(o != nullptr);
-                ZA_PLACEMENT_NEW(s) StoredType(ZA_MOVE(*static_cast<StoredType*>(o)));
-            }
-            else
-            {
-                ZA_ASSERT(operation == Operation::CopyConstruct);
-                ZA_ASSERT(o != nullptr);
-
-                if constexpr (isCopyConstructible<StoredType>)
-                {
-                    ZA_PLACEMENT_NEW(s) StoredType(*static_cast<const StoredType*>(o));
-                }
-                else
-                {
-                    ZA_ASSERT(false && "Cannot copy a `FixedFunction` holding a move-only callable");
-                    za::abort();
-                }
-            }
-        };
+        emplace<ZA_REMOVE_CVREF(TFFwd)>(ZA_FORWARD(f));
     }
 
 
@@ -149,39 +207,23 @@ public:
     /// \brief Construct from a function pointer; a null pointer results in an empty function
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] FixedFunction(FnPtrType f) noexcept : functionPtr{f}, m_methodPtr{nullptr}, m_allocPtr{nullptr}
+    [[nodiscard]] FixedFunction(FnPtrType f) noexcept : FixedFunction()
     {
         if (f != nullptr)
-            m_methodPtr = [](char* /* unused */, FnPtrType xf, Ts&&... xs) -> RetType { return xf(ZA_FORWARD(xs)...); };
+            emplace<FnPtrType>(f);
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] explicit FixedFunction(decltype(nullptr)) noexcept :
-        functionPtr{nullptr},
-        m_methodPtr{nullptr},
-        m_allocPtr{nullptr}
+    [[nodiscard]] explicit FixedFunction(decltype(nullptr)) noexcept : FixedFunction()
     {
     }
+
 
     ////////////////////////////////////////////////////////////
     FixedFunction(const FixedFunction& rhs) : FixedFunction()
     {
-        if (rhs.m_allocPtr == nullptr)
-        {
-            // Free-function path: no copy can throw, set both fields.
-            m_methodPtr = rhs.m_methodPtr;
-            functionPtr = rhs.functionPtr;
-            return;
-        }
-
-        // Stored-callable path: the copy-construct can throw.
-        // Update our metadata only after it succeeds, so that a
-        // partially-constructed `*this` destroys cleanly during
-        // exception unwind (`m_allocPtr == nullptr` -> no-op).
-        rhs.m_allocPtr(objStorage, const_cast<char*>(rhs.objStorage), Operation::CopyConstruct);
-        m_methodPtr = rhs.m_methodPtr;
-        m_allocPtr  = rhs.m_allocPtr;
+        copyFrom(rhs);
     }
 
 
@@ -191,24 +233,8 @@ public:
         if (this == &rhs)
             return *this;
 
-        destroyIfNeeded();
-
-        m_allocPtr  = nullptr; // Safe empty state in case copy-construct throws
-        m_methodPtr = nullptr;
-
-        if (rhs.m_allocPtr == nullptr)
-        {
-            // Free-function path: no copy can throw, set both fields.
-            m_methodPtr = rhs.m_methodPtr;
-            functionPtr = rhs.functionPtr;
-            return *this;
-        }
-
-        // Stored-callable path: the copy-construct can throw.
-        // Update our metadata only after it succeeds.
-        rhs.m_allocPtr(objStorage, const_cast<char*>(rhs.objStorage), Operation::CopyConstruct);
-        m_methodPtr = rhs.m_methodPtr;
-        m_allocPtr  = rhs.m_allocPtr;
+        destroyAndReset();
+        copyFrom(rhs);
 
         return *this;
     }
@@ -217,12 +243,7 @@ public:
     ////////////////////////////////////////////////////////////
     FixedFunction& operator=(decltype(nullptr)) noexcept
     {
-        destroyIfNeeded();
-
-        m_methodPtr = nullptr;
-        m_allocPtr  = nullptr;
-        functionPtr = nullptr;
-
+        destroyAndReset();
         return *this;
     }
 
@@ -230,23 +251,7 @@ public:
     ////////////////////////////////////////////////////////////
     FixedFunction(FixedFunction&& rhs) noexcept : FixedFunction()
     {
-        m_methodPtr = rhs.m_methodPtr;
-
-        if (rhs.m_allocPtr == nullptr)
-        {
-            functionPtr     = rhs.functionPtr;
-            rhs.m_methodPtr = nullptr;
-            rhs.functionPtr = nullptr;
-
-            return;
-        }
-
-        m_allocPtr = rhs.m_allocPtr;
-        m_allocPtr(objStorage, rhs.objStorage, Operation::MoveConstruct);
-
-        rhs.m_allocPtr(rhs.objStorage, nullptr, Operation::Destroy);
-        rhs.m_methodPtr = nullptr;
-        rhs.m_allocPtr  = nullptr;
+        relocateFrom(rhs);
     }
 
 
@@ -256,35 +261,18 @@ public:
         if (this == &rhs)
             return *this;
 
-        destroyIfNeeded();
-
-        m_methodPtr = rhs.m_methodPtr;
-        m_allocPtr  = nullptr;
-
-        if (rhs.m_allocPtr == nullptr)
-        {
-            functionPtr     = rhs.functionPtr;
-            rhs.m_methodPtr = nullptr;
-            rhs.functionPtr = nullptr;
-
-            return *this;
-        }
-
-        m_allocPtr = rhs.m_allocPtr;
-        m_allocPtr(objStorage, rhs.objStorage, Operation::MoveConstruct);
-
-        rhs.m_allocPtr(rhs.objStorage, nullptr, Operation::Destroy);
-        rhs.m_methodPtr = nullptr;
-        rhs.m_allocPtr  = nullptr;
+        destroyAndReset();
+        relocateFrom(rhs);
 
         return *this;
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline, gnu::flatten]] ~FixedFunction() noexcept
+    [[gnu::always_inline]] ~FixedFunction() noexcept
     {
-        destroyIfNeeded();
+        if (m_managerPtr != nullptr)
+            m_managerPtr(objStorage, nullptr, Operation::Destroy);
     }
 
 
@@ -301,15 +289,15 @@ public:
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline, gnu::flatten]] RetType operator()(Ts... args) const
     {
-        ZA_ASSERT(m_methodPtr != nullptr);
-        return m_methodPtr(const_cast<char*>(objStorage), functionPtr, ZA_FORWARD(args)...);
+        ZA_ASSERT(m_invokerPtr != nullptr);
+        return m_invokerPtr(const_cast<char*>(objStorage), ZA_FORWARD(args)...);
     }
 
 
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::flatten]] explicit operator bool() const
     {
-        return m_methodPtr != nullptr;
+        return m_invokerPtr != nullptr;
     }
 };
 

@@ -544,6 +544,50 @@ TEST_CASE("[Base] Base/FixedFunction.hpp")
         CHECK(c.alive() == 0);
     }
 
+    SECTION("Trivially copyable callable - copy and move")
+    {
+        int x = 5;
+        FF  ff1([x, y = 7] { return x * y; });
+
+        FF ff2(ff1); // NOLINT(performance-unnecessary-copy-initialization)
+        CHECK(ff1() == 35);
+        CHECK(ff2() == 35);
+
+        FF ff3(ZA_MOVE(ff1));
+        CHECK(!ff1);
+        CHECK(ff3() == 35);
+
+        FF ff4;
+        ff4 = ff3;
+        CHECK(ff4() == 35);
+
+        ff4 = ZA_MOVE(ff2);
+        CHECK(!ff2);
+        CHECK(ff4() == 35);
+    }
+
+    SECTION("Reassigning between trivially copyable and non-trivial callables")
+    {
+        Counters c;
+
+        {
+            FF ff([] { return 1; });
+            CHECK(ff() == 1);
+
+            ff = FF(LifecycleTracker(c, 2));
+            CHECK(ff() == 2);
+
+            ff = FF([] { return 3; }); // Destroys the tracker
+            CHECK(ff() == 3);
+            CHECK(c.alive() == 0);
+
+            ff = FF(LifecycleTracker(c, 4));
+            CHECK(ff() == 4);
+        }
+
+        CHECK(c.alive() == 0);
+    }
+
     SECTION("Function pointer - copy and move")
     {
         FF ff1(freeFunction);
