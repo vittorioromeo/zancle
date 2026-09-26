@@ -450,7 +450,7 @@ struct [[nodiscard]] ZA_GRAPHICS_API Color
     /// \return `true` if colors are equal, `false` if they are different
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::const]] constexpr bool operator==(const Color& rhs) const = default;
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr bool operator==(const Color& rhs) const = default;
 
 
     ////////////////////////////////////////////////////////////

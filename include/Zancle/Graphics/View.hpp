@@ -119,7 +119,7 @@ struct [[nodiscard]] ZA_GRAPHICS_API View
     /// \param rectangle Rectangle defining the zone to display
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::const]] static constexpr View fromRect(const Rect2f& rectangle)
+    [[nodiscard, gnu::always_inline, gnu::pure]] static constexpr View fromRect(const Rect2f& rectangle)
     {
         return {.center = rectangle.position + rectangle.size / 2.f, .size = rectangle.size};
     }
@@ -138,7 +138,7 @@ struct [[nodiscard]] ZA_GRAPHICS_API View
     /// \return A view spanning `[0, 0, size.x, size.y]`
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::const]] static constexpr View fromScreenSize(const Vec2f& size)
+    [[nodiscard, gnu::always_inline, gnu::pure]] static constexpr View fromScreenSize(const Vec2f& size)
     {
         return {.center = size / 2.f, .size = size};
     }
