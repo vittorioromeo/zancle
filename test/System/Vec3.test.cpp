@@ -15,6 +15,14 @@
 #include "Zancle/Trait/IsTriviallyMoveAssignable.hpp"
 #include "Zancle/Trait/IsTriviallyMoveConstructible.hpp"
 
+
+////////////////////////////////////////////////////////////
+// Explicit instantiations: compile-check every member function
+////////////////////////////////////////////////////////////
+template struct za::Vec3<float>;
+template struct za::Vec3<double>;
+
+
 TEMPLATE_TEST_CASE("[System] za::Vec3", "", int, float)
 {
     SECTION("Type traits")

@@ -269,16 +269,6 @@ using Vec3uz = Vec3<za::SizeT>;
 
 
 ////////////////////////////////////////////////////////////
-// Explicit instantiation declarations
-////////////////////////////////////////////////////////////
-extern template struct za::Vec3<float>;
-extern template struct za::Vec3<double>;
-extern template struct za::Vec3<int>;
-extern template struct za::Vec3<unsigned int>;
-extern template struct za::Vec3<za::SizeT>;
-
-
-////////////////////////////////////////////////////////////
 /// \class za::Vec3
 /// \ingroup system
 ///

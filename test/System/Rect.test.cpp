@@ -18,6 +18,17 @@
 
 #include "Zancle/Base/Assert.hpp"
 
+
+////////////////////////////////////////////////////////////
+// Explicit instantiations: compile-check every member function
+////////////////////////////////////////////////////////////
+template class za::Rect2<float>;
+template class za::Rect2<double>;
+template class za::Rect2<int>;
+template class za::Rect2<unsigned int>;
+template class za::Rect2<za::SizeT>;
+
+
 TEMPLATE_TEST_CASE("[System] za::Rect2", "", int, float)
 {
     SECTION("Type traits")

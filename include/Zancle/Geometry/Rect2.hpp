@@ -440,16 +440,6 @@ using Rect2uz = Rect2<za::SizeT>;
 
 
 ////////////////////////////////////////////////////////////
-// Explicit instantiation declarations
-////////////////////////////////////////////////////////////
-extern template class za::Rect2<float>;
-extern template class za::Rect2<double>;
-extern template class za::Rect2<int>;
-extern template class za::Rect2<unsigned int>;
-extern template class za::Rect2<za::SizeT>;
-
-
-////////////////////////////////////////////////////////////
 /// \class za::Rect2
 /// \ingroup system
 ///

@@ -20,6 +20,14 @@
 #include "Zancle/Trait/IsTriviallyMoveAssignable.hpp"
 #include "Zancle/Trait/IsTriviallyMoveConstructible.hpp"
 
+
+////////////////////////////////////////////////////////////
+// Explicit instantiations: compile-check every member function
+////////////////////////////////////////////////////////////
+template struct za::Vec2<float>;
+template struct za::Vec2<double>;
+
+
 using namespace za::Literals;
 
 TEMPLATE_TEST_CASE("[System] za::Vec2", "", int, float)
