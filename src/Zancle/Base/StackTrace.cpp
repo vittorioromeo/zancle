@@ -118,7 +118,7 @@ backtrace_state* getState()
     static backtrace_state* const state = backtrace_create_state(
         /* filename */ nullptr,
         /* threaded */ 1,
-        /* error_cb */ nullptr,
+        /* error_cb */ &errorCallback,
         /* data     */ nullptr);
 
     return state;
@@ -202,8 +202,15 @@ void printStackTrace()
 
     #else
 
+    backtrace_state* const state = getState();
+    if (state == nullptr)
+    {
+        std::fputs("  <stack trace unavailable>\n", stderr);
+        return;
+    }
+
     int index = 0;
-    backtrace_full(getState(), /* skip */ 1, &frameCallback, &errorCallback, &index);
+    backtrace_full(state, /* skip */ 1, &frameCallback, &errorCallback, &index);
 
     #endif
 
