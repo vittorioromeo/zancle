@@ -9,8 +9,14 @@
 /// The extra `int` parameter disambiguates this overload from the
 /// standard placement-new.
 ///
+/// Deliberately not `noexcept`: a new-expression calling a non-throwing
+/// allocation function must null-check the returned pointer before
+/// constructing the object ([expr.new]), and only the standard placement
+/// form is exempt. That check was emitted at every call site, even at
+/// `-O2`. `gnu::returns_nonnull` additionally removes it on Clang.
+///
 ////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline, gnu::const]] inline constexpr void* operator new(decltype(sizeof(int)), int, void* ptr) noexcept
+[[nodiscard, gnu::always_inline, gnu::const, gnu::returns_nonnull]] inline void* operator new(decltype(sizeof(int)), int, void* ptr)
 {
     return ptr;
 }
@@ -20,7 +26,7 @@
 /// \brief Matching no-op placement-delete (required by the language for completeness)
 ///
 ////////////////////////////////////////////////////////////
-[[gnu::always_inline]] inline constexpr void operator delete(void*, int, void*) noexcept
+[[gnu::always_inline]] inline void operator delete(void*, int, void*) noexcept
 {
 }
 
