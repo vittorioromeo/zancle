@@ -138,6 +138,28 @@ TEST_CASE("[Base] Base/FixedFunction.hpp")
         CHECK(ff(5) == 10);
     }
 
+    SECTION("Function with a compatible (non-identical) signature")
+    {
+        // Stored as a function pointer, as a function type cannot be stored
+        za::FixedFunction<long(short), 64> fromLvalue(freeFunctionWithArg);
+        CHECK(!!fromLvalue);
+        CHECK(fromLvalue(5) == 10L);
+
+        za::FixedFunction<long(short), 64> fromPtr(&freeFunctionWithArg);
+        CHECK(fromPtr(6) == 12L);
+
+        za::FixedFunction<void(), 64> discardingResult(freeFunction);
+        discardingResult();
+    }
+
+    SECTION("Null function pointer with a compatible signature results in an empty function")
+    {
+        int (*const nullFn)(int) = nullptr;
+
+        za::FixedFunction<long(short), 64> ff(nullFn);
+        CHECK(!ff);
+    }
+
     SECTION("Stateless lambda")
     {
         FF ff([] { return 99; });

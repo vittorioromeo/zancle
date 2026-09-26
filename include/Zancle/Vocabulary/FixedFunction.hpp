@@ -15,8 +15,10 @@
 #include "Zancle/Base/PlacementNew.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
+#include "Zancle/Trait/Decay.hpp"
 #include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsInvocableR.hpp"
+#include "Zancle/Trait/IsPointer.hpp"
 #include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/IsTriviallyCopyable.hpp"
 #include "Zancle/Trait/RemoveCVRef.hpp"
@@ -198,6 +200,8 @@ public:
     ///
     /// Only participates in overload resolution if the callable is
     /// invocable with the signature's arguments and return type.
+    /// Functions are stored as function pointers, and a null function
+    /// pointer results in an empty function.
     ///
     ////////////////////////////////////////////////////////////
     template <typename TFFwd>
@@ -205,7 +209,13 @@ public:
                  za::isInvocableR<za::RemoveCVRefIndirect<TFFwd>&, TReturn, Ts...>)
     [[nodiscard]] FixedFunction(TFFwd&& f) : FixedFunction()
     {
-        emplace<ZA_REMOVE_CVREF(TFFwd)>(ZA_FORWARD(f));
+        using StoredType = ZA_DECAY(TFFwd); // not `ZA_REMOVE_CVREF`: a function type cannot be stored
+
+        if constexpr (ZA_IS_POINTER(ZA_REMOVE_CVREF(TFFwd))) // a function reference is never null
+            if (f == nullptr)
+                return;
+
+        emplace<StoredType>(ZA_FORWARD(f));
     }
 
 
