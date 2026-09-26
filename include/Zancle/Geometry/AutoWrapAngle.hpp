@@ -119,14 +119,65 @@ public:
     }
 
     ////////////////////////////////////////////////////////////
-    // Make the non-mutating `za::Angle` operators (hidden friends of `za::Angle`)
-    // findable via ADL when all operands are `AutoWrapAngle`, e.g. `a < b` or
+    /// \brief Ordering of the wrapped angle values
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr bool operator<(const AutoWrapAngle lhs,
+                                                                                                const AutoWrapAngle rhs)
+    {
+        return lhs.m_radians < rhs.m_radians;
+    }
+
+    ////////////////////////////////////////////////////////////
+    /// \copydoc operator<(AutoWrapAngle, AutoWrapAngle)
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr bool operator>(const AutoWrapAngle lhs,
+                                                                                                const AutoWrapAngle rhs)
+    {
+        return lhs.m_radians > rhs.m_radians;
+    }
+
+    ////////////////////////////////////////////////////////////
+    /// \copydoc operator<(AutoWrapAngle, AutoWrapAngle)
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr bool operator<=(const AutoWrapAngle lhs,
+                                                                                                 const AutoWrapAngle rhs)
+    {
+        return lhs.m_radians <= rhs.m_radians;
+    }
+
+    ////////////////////////////////////////////////////////////
+    /// \copydoc operator<(AutoWrapAngle, AutoWrapAngle)
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr bool operator>=(const AutoWrapAngle lhs,
+                                                                                                 const AutoWrapAngle rhs)
+    {
+        return lhs.m_radians >= rhs.m_radians;
+    }
+
+    ////////////////////////////////////////////////////////////
+    // Mixed ordering with an unwrapped `za::Angle` is ambiguous: comparing the
+    // raw values (e.g. `AutoWrapAngle{10_deg} < 370_deg`) would disagree with
+    // `operator==`, which wraps the `za::Angle` operand. Wrap or unwrap explicitly
+    // instead, e.g. `awa < AutoWrapAngle{angle}` or `static_cast<Angle>(awa) < angle`.
+    ////////////////////////////////////////////////////////////
+    friend bool operator<(AutoWrapAngle lhs, Angle rhs)  = delete;
+    friend bool operator<(Angle lhs, AutoWrapAngle rhs)  = delete;
+    friend bool operator>(AutoWrapAngle lhs, Angle rhs)  = delete;
+    friend bool operator>(Angle lhs, AutoWrapAngle rhs)  = delete;
+    friend bool operator<=(AutoWrapAngle lhs, Angle rhs) = delete;
+    friend bool operator<=(Angle lhs, AutoWrapAngle rhs) = delete;
+    friend bool operator>=(AutoWrapAngle lhs, Angle rhs) = delete;
+    friend bool operator>=(Angle lhs, AutoWrapAngle rhs) = delete;
+
+    ////////////////////////////////////////////////////////////
+    // Make the non-mutating arithmetic `za::Angle` operators (hidden friends of
+    // `za::Angle`) findable via ADL when all operands are `AutoWrapAngle`, e.g.
     // `a + b`. The operands are converted to their wrapped `za::Angle` values.
     ////////////////////////////////////////////////////////////
-    friend constexpr bool  operator<(Angle lhs, Angle rhs);
-    friend constexpr bool  operator>(Angle lhs, Angle rhs);
-    friend constexpr bool  operator<=(Angle lhs, Angle rhs);
-    friend constexpr bool  operator>=(Angle lhs, Angle rhs);
     friend constexpr Angle operator-(Angle rhs);
     friend constexpr Angle operator+(Angle lhs, Angle rhs);
     friend constexpr Angle operator-(Angle lhs, Angle rhs);

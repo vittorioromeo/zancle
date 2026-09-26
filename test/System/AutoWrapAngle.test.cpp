@@ -17,6 +17,15 @@
 #include "Zancle/Trait/IsTriviallyDestructible.hpp"
 
 
+namespace
+{
+////////////////////////////////////////////////////////////
+template <typename L, typename R>
+concept LessThanComparable = requires(const L l, const R r) { l < r; };
+
+} // namespace
+
+
 TEST_CASE("[System] za::AutoWrapAngle")
 {
     SECTION("Type traits")
@@ -73,8 +82,17 @@ TEST_CASE("[System] za::AutoWrapAngle")
             STATIC_CHECK(b > a);
             STATIC_CHECK(a <= a);
             STATIC_CHECK(b >= a);
-            STATIC_CHECK(a < za::radians(2.f));
-            STATIC_CHECK(za::radians(0.5f) < a);
+
+            // Mixed ordering is deleted, as comparing unwrapped values would disagree with `operator==`
+            STATIC_CHECK(LessThanComparable<za::AutoWrapAngle, za::AutoWrapAngle>);
+            STATIC_CHECK(LessThanComparable<za::Angle, za::Angle>);
+            STATIC_CHECK(!LessThanComparable<za::AutoWrapAngle, za::Angle>);
+            STATIC_CHECK(!LessThanComparable<za::Angle, za::AutoWrapAngle>);
+
+            // Explicit conversions are fine
+            STATIC_CHECK(static_cast<za::Angle>(a) < za::radians(2.f));
+            STATIC_CHECK(za::radians(0.5f) < static_cast<za::Angle>(a));
+            STATIC_CHECK(a < za::AutoWrapAngle{za::radians(2.f)});
         }
 
         SECTION("Arithmetic")
