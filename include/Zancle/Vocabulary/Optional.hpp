@@ -591,8 +591,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] friend inline constexpr bool operator==(const Optional& lhs,
-                                                                                         const Optional& rhs) noexcept
+    [[nodiscard, gnu::always_inline]] friend inline constexpr bool operator==(const Optional& lhs, const Optional& rhs) noexcept
         requires requires { *lhs == *rhs; }
     {
         return lhs.m_engaged == rhs.m_engaged && (!lhs.m_engaged || *lhs == *rhs);
@@ -600,8 +599,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] friend inline constexpr bool operator>=(const Optional& lhs,
-                                                                                         const Optional& rhs) noexcept
+    [[nodiscard, gnu::always_inline]] friend inline constexpr bool operator>=(const Optional& lhs, const Optional& rhs) noexcept
         requires requires { *lhs >= *rhs; }
     {
         return !rhs.m_engaged || (lhs.m_engaged && *lhs >= *rhs);
@@ -609,8 +607,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] friend inline constexpr bool operator<=(const Optional& lhs,
-                                                                                         const Optional& rhs) noexcept
+    [[nodiscard, gnu::always_inline]] friend inline constexpr bool operator<=(const Optional& lhs, const Optional& rhs) noexcept
         requires requires { *lhs <= *rhs; }
     {
         return !lhs.m_engaged || (rhs.m_engaged && *lhs <= *rhs);
@@ -618,8 +615,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] friend inline constexpr bool operator>(const Optional& lhs,
-                                                                                        const Optional& rhs) noexcept
+    [[nodiscard, gnu::always_inline]] friend inline constexpr bool operator>(const Optional& lhs, const Optional& rhs) noexcept
         requires requires { *lhs > *rhs; }
     {
         return lhs.m_engaged && (!rhs.m_engaged || *lhs > *rhs);
@@ -627,8 +623,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] friend inline constexpr bool operator<(const Optional& lhs,
-                                                                                        const Optional& rhs) noexcept
+    [[nodiscard, gnu::always_inline]] friend inline constexpr bool operator<(const Optional& lhs, const Optional& rhs) noexcept
         requires requires { *lhs < *rhs; }
     {
         return rhs.m_engaged && (!lhs.m_engaged || *lhs < *rhs);
@@ -668,7 +663,7 @@ private:
 ///
 ////////////////////////////////////////////////////////////
 template <typename Object>
-[[nodiscard, gnu::always_inline, gnu::pure]] inline constexpr auto makeOptional(Object&& object)
+[[nodiscard, gnu::always_inline]] inline constexpr auto makeOptional(Object&& object)
 {
     return Optional<ZA_REMOVE_CVREF(Object)>{ZA_FORWARD(object)};
 }
@@ -679,7 +674,7 @@ template <typename Object>
 ///
 ////////////////////////////////////////////////////////////
 template <typename T, typename... Args>
-[[nodiscard, gnu::always_inline, gnu::pure]] inline constexpr Optional<T> makeOptional(Args&&... args)
+[[nodiscard, gnu::always_inline]] inline constexpr Optional<T> makeOptional(Args&&... args)
 {
     return Optional<T>{inPlace, ZA_FORWARD(args)...};
 }
@@ -691,7 +686,7 @@ template <typename T, typename... Args>
 ///
 ////////////////////////////////////////////////////////////
 template <typename F>
-[[nodiscard, gnu::always_inline, gnu::pure]] inline constexpr auto makeOptionalFromFunc(F&& f)
+[[nodiscard, gnu::always_inline]] inline constexpr auto makeOptionalFromFunc(F&& f)
 {
     return Optional<decltype(ZA_FORWARD(f)())>{fromFunc, ZA_FORWARD(f)};
 }
