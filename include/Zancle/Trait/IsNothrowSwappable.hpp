@@ -20,7 +20,7 @@ namespace za::priv::swap_adl
 // unqualified `swap` also sees the deleted generic `swap`, which makes ambiguous
 // ADL candidates (e.g. `std::swap`) fall through to the move-based path.
 template <typename T>
-[[nodiscard]] consteval bool isNothrowSwappableImpl()
+[[nodiscard]] consteval bool isNoThrowSwappableImpl()
 {
     if constexpr (requires(T& a, T& b) { a.swap(b); })
         return noexcept(declVal<T&>().swap(declVal<T&>()));
@@ -33,12 +33,12 @@ template <typename T>
 
 ////////////////////////////////////////////////////////////
 template <typename T>
-inline constexpr bool isNothrowSwappable = isNothrowSwappableImpl<T>();
+inline constexpr bool isNoThrowSwappable = isNoThrowSwappableImpl<T>();
 
 
 ////////////////////////////////////////////////////////////
 template <typename T, SwapFn::SizeT N>
-inline constexpr bool isNothrowSwappable<T[N]> = isNothrowSwappable<T>;
+inline constexpr bool isNoThrowSwappable<T[N]> = isNoThrowSwappable<T>;
 
 } // namespace za::priv::swap_adl
 
@@ -55,10 +55,10 @@ namespace za
 ///
 ////////////////////////////////////////////////////////////
 template <typename T>
-inline constexpr bool isNothrowSwappable = priv::swap_adl::isNothrowSwappable<T>;
+inline constexpr bool isNoThrowSwappable = priv::swap_adl::isNoThrowSwappable<T>;
 
 } // namespace za
 
 
 ////////////////////////////////////////////////////////////
-#define ZA_IS_NOTHROW_SWAPPABLE(...) ::za::isNothrowSwappable<__VA_ARGS__>
+#define ZA_IS_NOTHROW_SWAPPABLE(...) ::za::isNoThrowSwappable<__VA_ARGS__>

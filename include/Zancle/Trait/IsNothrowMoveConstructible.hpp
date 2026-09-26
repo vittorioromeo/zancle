@@ -27,6 +27,6 @@ namespace za
 {
 ////////////////////////////////////////////////////////////
 template <typename T>
-inline constexpr bool isNothrowMoveConstructible = ZA_IS_NOTHROW_MOVE_CONSTRUCTIBLE(T);
+inline constexpr bool isNoThrowMoveConstructible = ZA_IS_NOTHROW_MOVE_CONSTRUCTIBLE(T);
 
 } // namespace za

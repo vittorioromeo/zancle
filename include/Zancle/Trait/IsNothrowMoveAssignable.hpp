@@ -28,6 +28,6 @@ namespace za
 {
 ////////////////////////////////////////////////////////////
 template <typename T>
-inline constexpr bool isNothrowMoveAssignable = ZA_IS_NOTHROW_MOVE_ASSIGNABLE(T);
+inline constexpr bool isNoThrowMoveAssignable = ZA_IS_NOTHROW_MOVE_ASSIGNABLE(T);
 
 } // namespace za

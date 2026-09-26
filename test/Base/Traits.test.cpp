@@ -290,8 +290,8 @@ static_assert(!za::isCopyAssignable<void>);
 static_assert(!za::isCopyConstructible<void>);
 static_assert(!za::isMoveAssignable<void>);
 static_assert(!za::isMoveConstructible<void>);
-static_assert(!za::isNothrowMoveAssignable<void>);
-static_assert(!za::isNothrowMoveConstructible<void>);
+static_assert(!za::isNoThrowMoveAssignable<void>);
+static_assert(!za::isNoThrowMoveConstructible<void>);
 static_assert(!za::isTriviallyCopyAssignable<const void>);
 static_assert(!za::isTriviallyMoveConstructible<const void>);
 static_assert(ZA_IS_COPY_CONSTRUCTIBLE(int&));
@@ -328,15 +328,15 @@ struct ThrowingMove
     }
 };
 
-static_assert(za::isNothrowSwappable<int>);
-static_assert(za::isNothrowSwappable<int*>);
-static_assert(za::isNothrowSwappable<int[3]>);
-static_assert(za::isNothrowSwappable<Pair<int, float>>);
-static_assert(za::isNothrowSwappable<NothrowMemberSwap>);
-static_assert(!za::isNothrowSwappable<ThrowingMemberSwap>);
-static_assert(!za::isNothrowSwappable<ThrowingMove>);
-static_assert(!za::isNothrowSwappable<ThrowingMove[2]>);
-static_assert(!za::isNothrowSwappable<const int>);
+static_assert(za::isNoThrowSwappable<int>);
+static_assert(za::isNoThrowSwappable<int*>);
+static_assert(za::isNoThrowSwappable<int[3]>);
+static_assert(za::isNoThrowSwappable<Pair<int, float>>);
+static_assert(za::isNoThrowSwappable<NothrowMemberSwap>);
+static_assert(!za::isNoThrowSwappable<ThrowingMemberSwap>);
+static_assert(!za::isNoThrowSwappable<ThrowingMove>);
+static_assert(!za::isNoThrowSwappable<ThrowingMove[2]>);
+static_assert(!za::isNoThrowSwappable<const int>);
 
 
 ////////////////////////////////////////////////////////////
