@@ -59,7 +59,7 @@ struct Span
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline]] constexpr Span(T* data, SizeT size) : theData{data}, theSize{size}
     {
-        ZA_ASSERT(theData != nullptr || (theData == nullptr && theSize == 0u));
+        ZA_ASSERT(theData != nullptr || theSize == 0u);
     }
 
 
@@ -86,7 +86,8 @@ struct Span
     /// \brief Construct a span from any contiguous range exposing `data()` and `size()`
     ///
     /// Disabled when `Range` is itself a `Span` so it does not shadow the
-    /// implicitly generated copy constructor.
+    /// implicitly generated copy constructor. Also provides the implicit
+    /// conversion from `Span<T>` to `Span<const T>`.
     ///
     ////////////////////////////////////////////////////////////
     template <typename Range>
@@ -97,16 +98,6 @@ struct Span
                  })
     [[nodiscard, gnu::always_inline]] constexpr Span(Range&& range) : theData{range.data()}, theSize{range.size()}
     {
-    }
-
-
-    ////////////////////////////////////////////////////////////
-    /// \brief Implicit conversion to a read-only span
-    ///
-    ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten]] constexpr operator Span<const T>() const
-    {
-        return Span<const T>{theData, theSize};
     }
 
 
@@ -210,24 +201,6 @@ struct Span
     [[nodiscard, gnu::always_inline]] constexpr bool valueEquals(const Span& rhs) const
     {
         return valueEquals(rhs.theData, rhs.theSize);
-    }
-
-
-    ////////////////////////////////////////////////////////////
-    /// \brief Swap the data pointer and size of two spans
-    ///
-    ////////////////////////////////////////////////////////////
-    [[gnu::always_inline]] friend void swap(Span& lhs, Span& rhs) noexcept
-    {
-        const auto swapImpl = []<typename U>(U& a, U& b)
-        {
-            U tempA = a;
-            a       = b;
-            b       = tempA;
-        };
-
-        swapImpl(lhs.theData, rhs.theData);
-        swapImpl(lhs.theSize, rhs.theSize);
     }
 
 

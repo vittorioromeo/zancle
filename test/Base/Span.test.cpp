@@ -6,6 +6,7 @@
 
 #include "Zancle/Trait/IsAggregate.hpp"
 #include "Zancle/Trait/IsConstructible.hpp"
+#include "Zancle/Trait/IsConvertible.hpp"
 #include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/IsStandardLayout.hpp"
 #include "Zancle/Trait/IsTrivial.hpp"
@@ -17,6 +18,8 @@
 #include "Zancle/Trait/IsTriviallyMoveAssignable.hpp"
 #include "Zancle/Trait/IsTriviallyMoveConstructible.hpp"
 #include "Zancle/Trait/IsTriviallyRelocatable.hpp"
+
+#include "Zancle/Base/Swap.hpp"
 
 
 namespace
@@ -112,6 +115,35 @@ TEST_CASE("[Base] Base/Span.hpp")
 
         // Types lacking .data()/.size() must not match the range constructor.
         STATIC_CHECK(!ZA_IS_CONSTRUCTIBLE(za::Span<int>, int));
+    }
+
+    SECTION("Implicit conversion to a read-only span")
+    {
+        STATIC_CHECK(ZA_IS_CONVERTIBLE(za::Span<int>, za::Span<const int>));
+        STATIC_CHECK(!ZA_IS_CONVERTIBLE(za::Span<const int>, za::Span<int>));
+
+        int                 array[]{1, 2, 3};
+        const za::Span<int> span{array};
+
+        const za::Span<const int> cspan = span;
+        CHECK(cspan.data() == array);
+        CHECK(cspan.size() == 3u);
+    }
+
+    SECTION("Swap")
+    {
+        int array0[]{1, 2};
+        int array1[]{3, 4, 5};
+
+        za::Span<int> a{array0};
+        za::Span<int> b{array1};
+
+        za::genericSwap(a, b);
+
+        CHECK(a.data() == array1);
+        CHECK(a.size() == 3u);
+        CHECK(b.data() == array0);
+        CHECK(b.size() == 2u);
     }
 
     SECTION("data() preserves the element type's constness")
