@@ -12,6 +12,8 @@
 #include "Zancle/Base/Popcountll.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
+#include "Zancle/Trait/EnableTrivialRelocation.hpp"
+
 
 namespace za
 {
@@ -59,7 +61,7 @@ class [[nodiscard]] Bitset
 
 public:
     ////////////////////////////////////////////////////////////
-    using TriviallyRelocatableTag = Bitset;
+    ZA_ENABLE_TRIVIAL_RELOCATION;
 
 
     ////////////////////////////////////////////////////////////

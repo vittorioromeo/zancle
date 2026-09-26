@@ -84,14 +84,14 @@ struct ZA_GRAPHICS_API TextureAtlasUtils
     ////////////////////////////////////////////////////////////
     /// \brief Pack the pixels of another `za::Texture` into the target texture
     ///
-    /// Performs a GPU-to-CPU readback on `texture` and uploads
-    /// the result into `targetTexture`. As the readback is
-    /// slow, this is best used during loading.
+    /// Copies `texture` into a free region of `targetTexture`
+    /// via a GPU-to-GPU framebuffer blit; the pixels never
+    /// leave the GPU.
     ///
-    /// \param targetTexture Texture into which the pixels are uploaded
+    /// \param targetTexture Texture into which the pixels are copied
     /// \param rectPacker    Rect packer used to allocate free regions of `targetTexture`
     /// \param padding       Padding to leave around the image (each side)
-    /// \param texture       Source texture (will be downloaded first)
+    /// \param texture       Source texture (copied on the GPU)
     ///
     /// \return Texture rectangle of the inserted image, or `za::nullOpt` if no free region was found
     ///

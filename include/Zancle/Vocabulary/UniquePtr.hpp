@@ -6,13 +6,13 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
-#include "Zancle/Trait/Conditional.hpp"
+#include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/TrivialAbi.hpp"
+
+#include "Zancle/Trait/EnableTrivialRelocation.hpp"
 #include "Zancle/Trait/IsBaseOf.hpp"
 #include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/IsTriviallyRelocatable.hpp"
-
-#include "Zancle/Base/Assert.hpp"
-#include "Zancle/Base/TrivialAbi.hpp"
 
 
 namespace za
@@ -69,7 +69,7 @@ private:
 
 public:
     ////////////////////////////////////////////////////////////
-    using TriviallyRelocatableTag = Conditional<ZA_IS_TRIVIALLY_RELOCATABLE(TDeleter), UniquePtr, void>;
+    ZA_ENABLE_TRIVIAL_RELOCATION_IF(ZA_IS_TRIVIALLY_RELOCATABLE(TDeleter));
 
 
     ////////////////////////////////////////////////////////////

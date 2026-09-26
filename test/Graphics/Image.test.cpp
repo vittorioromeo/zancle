@@ -14,14 +14,14 @@
 
 #include "Zancle/Vocabulary/Optional.hpp"
 
+#include "Zancle/Base/IntTypes.hpp"
+#include "Zancle/Base/SizeT.hpp"
+
 #include "Zancle/Trait/IsCopyAssignable.hpp"
 #include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsDefaultConstructible.hpp"
 #include "Zancle/Trait/IsNothrowMoveAssignable.hpp"
 #include "Zancle/Trait/IsNothrowMoveConstructible.hpp"
-
-#include "Zancle/Base/IntTypes.hpp"
-#include "Zancle/Base/SizeT.hpp"
 
 
 TEST_CASE("[Graphics] za::Image")

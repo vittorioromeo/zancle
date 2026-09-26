@@ -12,16 +12,16 @@
 
 #include "Zancle/Window/WindowContext.hpp"
 
-#include "Zancle/Trait/IsCopyAssignable.hpp"
-#include "Zancle/Trait/IsCopyConstructible.hpp"
-#include "Zancle/Trait/IsNothrowMoveAssignable.hpp"
-#include "Zancle/Trait/IsNothrowMoveConstructible.hpp"
-
 #include "Zancle/Base/Macros.hpp"
 #include "Zancle/Base/Memcmp.hpp"
 #include "Zancle/Base/Memcpy.hpp"
 #include "Zancle/Base/Memset.hpp"
 #include "Zancle/Base/SizeT.hpp"
+
+#include "Zancle/Trait/IsCopyAssignable.hpp"
+#include "Zancle/Trait/IsCopyConstructible.hpp"
+#include "Zancle/Trait/IsNothrowMoveAssignable.hpp"
+#include "Zancle/Trait/IsNothrowMoveConstructible.hpp"
 
 
 #ifndef ZA_OPENGL_ES
@@ -235,7 +235,7 @@ TEST_CASE("[GLUtils] za::GLPersistentBuffer" * tst::skip(skipDisplayTests))
         sb.buffer.flushBytesToGPU(sb.obj, /* byteOffset */ 32u, /* byteCount */ 64u);
     }
 
-    SECTION("Growth with preserveExistingData=true retains the original bytes")
+    SECTION("Growth with preserveByteCount retains the original bytes")
     {
         ScopedPersistentBuffer<VBO> sb;
         REQUIRE(sb.buffer.reserve(sb.obj, 128u, false));
@@ -250,14 +250,9 @@ TEST_CASE("[GLUtils] za::GLPersistentBuffer" * tst::skip(skipDisplayTests))
         ZA_MEMCPY(writePtr, pattern, 128u);
         sb.buffer.flushBytesToGPU(sb.obj, 0u, 128u);
 
-        // Grow: internally memcpys the old [0, 128) range into the new mapping.
-        REQUIRE(sb.buffer.reserve(sb.obj, 4096u, /* preserveExistingData */ true));
+        // Grow: server-side-copies the old live [0, 128) range into the new buffer.
+        REQUIRE(sb.buffer.reserve(sb.obj, 4096u, /* preserveByteCount */ 128u));
         REQUIRE(sb.buffer.data() != nullptr);
-
-        // The internal memcpy is done through the CPU-side mapping; the new
-        // mapping must be flushed before `glGetNamedBufferSubData` is allowed
-        // to see the bytes.
-        sb.buffer.flushBytesToGPU(sb.obj, 0u, 128u);
 
         unsigned char readback[128]{};
         readbackBufferBytes(sb.obj, /* offset */ 0u, /* size */ 128u, readback);
@@ -278,7 +273,7 @@ TEST_CASE("[GLUtils] za::GLPersistentBuffer" * tst::skip(skipDisplayTests))
         CHECK(ZA_MEMCMP(tailReadback, tail, 256u) == 0);
     }
 
-    SECTION("Growth with preserveExistingData=false leaves a writable mapping")
+    SECTION("Growth with preserveByteCount=0 leaves a writable mapping")
     {
         ScopedPersistentBuffer<VBO> sb;
         REQUIRE(sb.buffer.reserve(sb.obj, 128u, false));
@@ -289,7 +284,7 @@ TEST_CASE("[GLUtils] za::GLPersistentBuffer" * tst::skip(skipDisplayTests))
         ZA_MEMSET(sb.buffer.data(), 0xAB, 128u);
         sb.buffer.flushBytesToGPU(sb.obj, 0u, 128u);
 
-        REQUIRE(sb.buffer.reserve(sb.obj, 4096u, /* preserveExistingData */ false));
+        REQUIRE(sb.buffer.reserve(sb.obj, 4096u, /* preserveByteCount */ 0u));
         REQUIRE(sb.buffer.data() != nullptr);
 
         unsigned char fresh[256];
@@ -339,7 +334,8 @@ TEST_CASE("[GLUtils] za::GLPersistentBuffer" * tst::skip(skipDisplayTests))
 
         for (za::SizeT size = 64u; size <= 16u * 1024u; size *= 2u)
         {
-            (void)sb.buffer.reserve(sb.obj, size, /* preserveExistingData */ true);
+            // Previous iteration wrote `size / 2` bytes (nothing on the first).
+            (void)sb.buffer.reserve(sb.obj, size, /* preserveByteCount */ size / 2u);
             REQUIRE(sb.buffer.data() != nullptr);
 
             ZA_MEMSET(sb.buffer.data(), static_cast<int>(size & 0xFFu), size);
@@ -377,7 +373,7 @@ TEST_CASE("[GLUtils] za::GLPersistentBuffer" * tst::skip(skipDisplayTests))
         CHECK(!dest.buffer.reserve(dest.obj, 512u, false));
 
         // And can still grow further.
-        CHECK(dest.buffer.reserve(dest.obj, 2048u, /* preserveExistingData */ true));
+        CHECK(dest.buffer.reserve(dest.obj, 2048u, /* preserveByteCount */ 512u));
         CHECK(dest.buffer.data() != nullptr);
     }
 

@@ -11,7 +11,6 @@
 
 #include "Zancle/Err/Err.hpp"
 
-#include "Zancle/Base/Abort.hpp"
 #include "Zancle/Base/Assert.hpp"
 
 
@@ -89,8 +88,13 @@ const Glyph& GlyphMapping::getGlyph(const char32_t                      codePoin
     if (const auto* it = map.find(codePoint); it != map.end())
         return it->second;
 
-    priv::errMsg("Glyph not found in mapping for code point: {}", static_cast<unsigned int>(codePoint));
-    za::abort();
+    // Unmapped code point: warn once per code point and render the font's
+    // missing-glyph placeholder instead of hard failure
+    if (warnedMissingCodePoints.insert(codePoint).second)
+        priv::errMsg("Code point U+{:x} is not present in the glyph mapping, rendering missing-glyph placeholder",
+                     static_cast<unsigned int>(codePoint));
+
+    return (theOutlineThickness != 0.f) ? fallbackOutlineGlyph : fallbackFillGlyph;
 }
 
 
@@ -105,20 +109,21 @@ GlyphMapping::GlyphPair GlyphMapping::getFillAndOutlineGlyph(
     ZA_ASSERT(theBold == bold);
     ZA_ASSERT(theOutlineThickness != 0.f && theOutlineThickness == outlineThickness);
 
-    const auto* fillIt = fillGlyphs.find(codePoint);
-
-    if (fillIt == fillGlyphs.end()) [[unlikely]]
-    {
-        priv::errMsg("Fill glyph not found in mapping for code point: {}", static_cast<unsigned int>(codePoint));
-        za::abort();
-    }
-
+    const auto* fillIt    = fillGlyphs.find(codePoint);
     const auto* outlineIt = outlineGlyphs.find(codePoint);
 
-    if (outlineIt == outlineGlyphs.end()) [[unlikely]]
+    if (fillIt == fillGlyphs.end() || outlineIt == outlineGlyphs.end()) [[unlikely]]
     {
-        priv::errMsg("Outline glyph not found in mapping for code point: {}", static_cast<unsigned int>(codePoint));
-        za::abort();
+        // Unmapped code point: warn once per code point and render the font's
+        // missing-glyph placeholder instead of hard failure (see `getGlyph`)
+        if (warnedMissingCodePoints.insert(codePoint).second)
+            priv::errMsg("Code point U+{:x} is not present in the glyph mapping, rendering missing-glyph placeholder",
+                         static_cast<unsigned int>(codePoint));
+
+        return {
+            .fillGlyph    = fillIt == fillGlyphs.end() ? fallbackFillGlyph : fillIt->second,
+            .outlineGlyph = outlineIt == outlineGlyphs.end() ? fallbackOutlineGlyph : outlineIt->second,
+        };
     }
 
     return {

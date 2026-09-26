@@ -12,6 +12,9 @@
 
 #include "Zancle/Algorithm/Copy.hpp"
 
+#include "Zancle/Base/Macros.hpp"
+#include "Zancle/Base/SizeT.hpp"
+
 #include "Zancle/Trait/IsCopyAssignable.hpp"
 #include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsMoveAssignable.hpp"
@@ -19,9 +22,6 @@
 #include "Zancle/Trait/IsTrivial.hpp"
 #include "Zancle/Trait/IsTriviallyCopyable.hpp"
 #include "Zancle/Trait/IsTriviallyRelocatable.hpp"
-
-#include "Zancle/Base/Macros.hpp"
-#include "Zancle/Base/SizeT.hpp"
 
 
 namespace

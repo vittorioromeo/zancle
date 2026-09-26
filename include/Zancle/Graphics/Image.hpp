@@ -172,9 +172,15 @@ public:
     /// details on the \b over operator.
     ///
     /// Note that this function can fail if either image is invalid
-    /// (i.e. zero-sized width or height), or if `sourceRect` is
-    /// not within the boundaries of the `source` parameter, or
-    /// if the destination area is out of the boundaries of this image.
+    /// (i.e. zero-sized width or height), if `sourceRect` has a
+    /// negative component or does not fit within the boundaries of
+    /// the `source` parameter, or if the destination position is out
+    /// of the boundaries of this image. If the source region extends
+    /// past this image's bounds, the copy is clipped to fit instead
+    /// of failing.
+    ///
+    /// `source` may be `*this` only if the source and destination
+    /// regions do not overlap (debug-asserted).
     ///
     /// On failure, the destination image is left unchanged.
     ///
@@ -322,7 +328,8 @@ public:
     /// \brief Encode the image into an in-memory buffer
     ///
     /// The encoding format must be specified explicitly. See
-    /// `SaveFormat` for the available options.
+    /// `SaveFormat` for the available options. The behavior is
+    /// undefined if `format` is not a valid `SaveFormat` value.
     ///
     /// \param format Encoding format to use
     ///

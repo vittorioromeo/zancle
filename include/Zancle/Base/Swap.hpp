@@ -6,57 +6,22 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
-#include "Zancle/Base/DeclVal.hpp"
+#include "Zancle/Trait/SwapResolution.hpp"
 
 
 namespace za::priv::swap_adl
 {
 ////////////////////////////////////////////////////////////
-// A deleted generic template. If ADL finds a generic `std::swap`, it will
-// collide with this and cause an ambiguity.
-template <typename T>
-void swap(T&, T&) = delete;
-
-
-////////////////////////////////////////////////////////////
-using SizeT = decltype(sizeof(0));
-
-
-////////////////////////////////////////////////////////////
-// Whether swapping two `T` lvalues via `SwapFn` cannot throw. Mirrors the
-// dispatch of `SwapFn::operator()` below, and is the single source of truth
-// for both its `noexcept`-specifier and `za::isNoThrowSwappable`. Uses
-// builtins only, as `Base` cannot depend on the `Trait` module.
-template <typename T>
-[[nodiscard]] consteval bool isNoThrowSwappableImpl() noexcept
-{
-    if constexpr (requires(T& a, T& b) { a.swap(b); })
-        return noexcept(declVal<T&>().swap(declVal<T&>()));
-    else if constexpr (requires(T& a, T& b) { swap(a, b); })
-        return noexcept(swap(declVal<T&>(), declVal<T&>()));
-    else // nested requirement: `false` rather than a hard error for e.g. `void`
-        return requires { requires __is_nothrow_constructible(T, T&&) && __is_nothrow_assignable(T&, T&&); };
-}
-
-
-////////////////////////////////////////////////////////////
-template <typename T>
-inline constexpr bool isNoThrowSwappable = isNoThrowSwappableImpl<T>();
-
-
-////////////////////////////////////////////////////////////
-// Arrays are swapped element-wise (see `SwapFn`'s array overload)
-template <typename T, SizeT N>
-inline constexpr bool isNoThrowSwappable<T[N]> = isNoThrowSwappable<T>;
-
-
-////////////////////////////////////////////////////////////
 // Niebloid (Customization Point Object)
 struct SwapFn
 {
     ////////////////////////////////////////////////////////////
+    using SizeT = decltype(sizeof(0));
+
+
+    ////////////////////////////////////////////////////////////
     template <typename T, SizeT N>
-    [[gnu::always_inline]] static constexpr void operator()(T (&a)[N], T (&b)[N]) noexcept(isNoThrowSwappable<T>)
+    [[gnu::always_inline]] static constexpr void operator()(T (&a)[N], T (&b)[N]) noexcept(isNoThrowSwappableV<T>)
     {
         for (SizeT i = 0; i < N; ++i)
             operator()(a[i], b[i]);
@@ -65,21 +30,21 @@ struct SwapFn
 
     ////////////////////////////////////////////////////////////
     template <typename T>
-    [[gnu::always_inline]] static constexpr void operator()(T& a, T& b) noexcept(isNoThrowSwappable<T>)
+    [[gnu::always_inline]] static constexpr void operator()(T& a, T& b) noexcept(isNoThrowSwappableV<T>)
     {
-        if constexpr (requires { a.swap(b); })
+        if constexpr (MemberSwappable<T>)
         {
             // Highest priority: explicit member function exists
             a.swap(b);
         }
-        else if constexpr (requires { swap(a, b); }) // Fails in case of ambiguity too
+        else if constexpr (AdlSwappable<T>)
         {
             // A specialized ADL swap exists and is unambiguous
             swap(a, b);
         }
         else
         {
-            // No valid specialized ADL swap was found, or an ambiguity occurred
+            // No valid specialized swap was found: fall back to move-swap
             T tempA = static_cast<T&&>(a);
             a       = static_cast<T&&>(b);
             b       = static_cast<T&&>(tempA);

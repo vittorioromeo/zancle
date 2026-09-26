@@ -42,20 +42,6 @@
 
 using GLhandle = GLuint;
 
-#if defined(ZA_SYSTEM_MACOS) || defined(ZA_SYSTEM_IOS)
-
-    #include "Zancle/Base/PtrDiffT.hpp"
-
-    #define castToGlHandle(x)   reinterpret_cast<GLEXT_GLhandle>(::za::PtrDiffT{x})
-    #define castFromGlHandle(x) static_cast<unsigned int>(reinterpret_cast<::za::PtrDiffT>(x))
-
-#else
-
-    #define castToGlHandle(x)   (x)
-    #define castFromGlHandle(x) (x)
-
-#endif
-
 
 namespace
 {
@@ -89,18 +75,17 @@ struct [[nodiscard]] BufferSlice
 ////////////////////////////////////////////////////////////
 // Read the contents of a file and append them (followed by a null terminator)
 // to `buffer`, returning the slice of `buffer` that holds the new contents.
+// The returned slice EXCLUDES the trailing null terminator: its length flows
+// into `glShaderSource`, and NUL is outside the GLSL source character set.
 [[nodiscard]] za::Optional<BufferSlice> appendFileContentsToVector(const za::Path& filename, za::Vector<char>& buffer)
 {
     const za::SizeT bufferSizeBeforeRead = buffer.size();
 
     if (!za::appendFromFile(filename, buffer))
-    {
-        za::priv::errMsg("Failed to open shader file");
         return za::nullOpt;
-    }
 
     buffer.pushBack('\0');
-    return za::makeOptional<BufferSlice>(bufferSizeBeforeRead, buffer.size() - bufferSizeBeforeRead);
+    return za::makeOptional<BufferSlice>(bufferSizeBeforeRead, buffer.size() - bufferSizeBeforeRead - 1u);
 }
 
 
@@ -111,33 +96,35 @@ struct [[nodiscard]] BufferSlice
     const za::Optional<za::SizeT> size = stream.getSize();
 
     if (!size.hasValue() || size.value() == 0)
-    {
-        za::priv::errMsg("Failed to read shader stream (empty or unsized)");
         return za::nullOpt;
-    }
 
     if (!stream.seek(0).hasValue())
-    {
-        za::priv::errMsg("Failed to seek shader stream");
         return za::nullOpt;
-    }
 
     const za::SizeT bufferSizeBeforeRead = buffer.size();
     buffer.reserve(bufferSizeBeforeRead + *size + 1u);
     buffer.unsafeSetSize(bufferSizeBeforeRead + *size);
 
-    const za::Optional<za::SizeT> read = stream.read(buffer.data() + bufferSizeBeforeRead, *size);
-
-    if (!read.hasValue() || *read != *size)
+    // `InputStream::read` may legally return fewer bytes than requested
+    // ("up to `size`" contract) -- keep reading until all `*size` bytes are
+    // accumulated. `nullOpt` (I/O error) or `0` (premature end) is a failure.
+    za::SizeT totalRead = 0u;
+    while (totalRead < *size)
     {
-        // Roll back the size grow so `buffer` is left as the caller saw it.
-        buffer.unsafeSetSize(bufferSizeBeforeRead);
-        za::priv::errMsg("Failed to read stream contents into buffer");
-        return za::nullOpt;
+        const za::Optional<za::SizeT> read = stream.read(buffer.data() + bufferSizeBeforeRead + totalRead, *size - totalRead);
+
+        if (!read.hasValue() || *read == 0u)
+        {
+            // Roll back the size grow so `buffer` is left as the caller saw it.
+            buffer.unsafeSetSize(bufferSizeBeforeRead);
+            return za::nullOpt;
+        }
+
+        totalRead += *read;
     }
 
     buffer.pushBack('\0');
-    return za::makeOptional<BufferSlice>(bufferSizeBeforeRead, buffer.size() - bufferSizeBeforeRead);
+    return za::makeOptional<BufferSlice>(bufferSizeBeforeRead, buffer.size() - bufferSizeBeforeRead - 1u);
 }
 
 
@@ -174,6 +161,11 @@ static_assert(sizeof(za::Glsl::Mat4) == 16 * sizeof(float));
 // not preamble-relative ones. The preamble is constant per build, so callers
 // pass it as a separate source string to `glShaderSource(count=2)` and avoid
 // the per-compile concatenation.
+//
+// Note: `#line 1` assumes the common C-style driver behavior ("the NEXT line
+// is line 1"). A spec-literal GLSL compiler ("behaves as if compiling at line
+// `line`+1") would report user line N as N+1 -- accepted as a cosmetic
+// off-by-one in diagnostics on such drivers.
 [[nodiscard]] constexpr za::StringView getShaderPreamble()
 {
     return
@@ -294,7 +286,7 @@ thread_local unsigned int currentProgramCacheContextId = 0u;
 ////////////////////////////////////////////////////////////
 void useProgram(const unsigned int program)
 {
-    glCheck(glUseProgram(castToGlHandle(program)));
+    glCheck(glUseProgram(program));
 
     currentProgramCacheValue     = program;
     currentProgramCacheContextId = za::GraphicsContext::getActiveThreadLocalGlContextId();
@@ -331,15 +323,40 @@ void destroyProgramIfNeeded(const unsigned int program)
     za::priv::GLSharedContextGuard guard;
 
     ZA_ASSERT(za::GraphicsContext::hasActiveThreadLocalGlContext());
-    ZA_ASSERT(glCheck(glIsProgram(castToGlHandle(program))));
-    glCheck(glDeleteProgram(castToGlHandle(program)));
+    ZA_ASSERT(glCheck(glIsProgram(program)));
+    glCheck(glDeleteProgram(program));
 
     // GL handles can be reused after deletion. If the cache still names this
-    // handle, a future `useProgram(reusedId)` would skip the bind on a hit
-    // and leave the wrong program current. Clear the cache to force a real
-    // bind on the next operation.
+    // handle, a future `UniformBinder{reusedId}` would compare against it,
+    // conclude the (new, unrelated) program is already bound, and skip the
+    // bind. Clear the cache to force a real bind on the next operation.
     if (currentProgramCacheValue == program)
         currentProgramCacheValue = 0u;
+}
+
+
+////////////////////////////////////////////////////////////
+// `RenderTarget` uploads the built-in uniforms to hardcoded layout locations
+// rather than by the queried location. A user shader declaring one of the
+// built-in names at a different location would get an unrelated uniform silently
+// corrupted by those uploads -- detect that here and warn.
+//
+// On Emscripten these queries also double as the lazy uniform-location-table
+// warm-up workaround for `-sGL_EXPLICIT_UNIFORM_LOCATION=1` (see CLEAN-2 note
+// on the constructor).
+[[nodiscard]] bool checkBuiltInUniform(const unsigned int shaderProgram, const char* name, const GLint expectedLocation)
+{
+    const GLint location = glCheck(glGetUniformLocation(shaderProgram, name));
+
+    if (location != -1 && location != expectedLocation) [[unlikely]]
+        za::priv::errMsg(
+            "Shader declares built-in uniform '{}' at location {} (expected layout location {}) -- built-in "
+            "uniform uploads from the render target will write to the wrong location",
+            name,
+            location,
+            expectedLocation);
+
+    return location != -1;
 }
 
 } // namespace
@@ -541,7 +558,7 @@ za::Optional<Shader> Shader::loadFromStream(const LoadFromStreamSettings& settin
         optBufferSlice = appendStreamContentsToVector(*optStream, buffer);
         if (!optBufferSlice.hasValue())
         {
-            priv::errMsg("Failed to open {} shader from stream", typeStr);
+            priv::errMsg("Failed to read {} shader from stream (I/O error, empty stream, or unknown stream size)", typeStr);
             return false;
         }
 
@@ -577,7 +594,11 @@ za::Optional<Shader::UniformLocation> Shader::getUniformLocation(za::StringView 
         maxUniformNameLength = 256
     };
 
-    ZA_ASSERT(uniformName.size() < maxUniformNameLength && "Uniform name too long");
+    if (uniformName.size() >= maxUniformNameLength) [[unlikely]]
+    {
+        priv::errMsg("Uniform name too long ({} characters, maximum is {})", uniformName.size(), maxUniformNameLength - 1);
+        return za::nullOpt;
+    }
 
     // To get a a null-terminated string
     char uniformNameBuffer[maxUniformNameLength];
@@ -585,7 +606,7 @@ za::Optional<Shader::UniformLocation> Shader::getUniformLocation(za::StringView 
     uniformNameBuffer[uniformName.size()] = '\0';
 
     // Request the location from OpenGL
-    const int location = glCheck(glGetUniformLocation(castToGlHandle(m_impl->shaderProgram), uniformNameBuffer));
+    const int location = glCheck(glGetUniformLocation(m_impl->shaderProgram, uniformNameBuffer));
     return location == -1 ? za::nullOpt : za::makeOptional(UniformLocation{location});
 }
 
@@ -723,6 +744,7 @@ void Shader::setUniform(UniformLocation location, const Glsl::Mat4& matrix) cons
 bool Shader::setUniform(UniformLocation location, const Texture& texture) const
 {
     ++m_uniformGeneration;
+    ++m_textureBindingsGeneration;
 
     ZA_ASSERT(m_impl->shaderProgram);
     ZA_ASSERT(GraphicsContext::hasActiveThreadLocalGlContext());
@@ -754,6 +776,7 @@ bool Shader::setUniform(UniformLocation location, const Texture& texture) const
 void Shader::setUniform(UniformLocation location, CurrentTextureType)
 {
     ++m_uniformGeneration;
+    ++m_textureBindingsGeneration;
 
     ZA_ASSERT(m_impl->shaderProgram);
     ZA_ASSERT(GraphicsContext::hasActiveThreadLocalGlContext());
@@ -837,15 +860,11 @@ void Shader::bind() const
     ZA_ASSERT(m_impl->shaderProgram != 0u);
 
     // Enable the program
-    ZA_ASSERT(glCheck(glIsProgram(castToGlHandle(m_impl->shaderProgram))));
+    ZA_ASSERT(glCheck(glIsProgram(m_impl->shaderProgram)));
     useProgram(m_impl->shaderProgram);
 
-    // Bind the textures
+    // Bind the textures (including the special `CurrentTexture` sampler)
     bindTextures();
-
-    // Bind the current texture
-    if (m_impl->currentTexture != -1)
-        glCheck(glUniform1i(m_impl->currentTexture, 0));
 }
 
 
@@ -872,6 +891,12 @@ bool Shader::isGeometryAvailable()
 
 
 ////////////////////////////////////////////////////////////
+// Note: the `glGetUniformLocation` calls below also serve as the workaround
+// for an Emscripten bug with `-sGL_EXPLICIT_UNIFORM_LOCATION=1`: Emscripten
+// lazily populates its internal uniform location table (`uniformLocsById`)
+// only on `glGetUniformLocation`, NOT on `glUniform*` -- without at least one
+// query here, `glUniform*` on a newly linked program would silently no-op.
+// See: https://github.com/emscripten-core/emscripten/issues/26672
 Shader::Shader(za::PassKey<Shader>&&, unsigned int shaderProgram) :
     m_impl(
         [&]
@@ -879,9 +904,9 @@ Shader::Shader(za::PassKey<Shader>&&, unsigned int shaderProgram) :
     ZA_ASSERT(shaderProgram != 0);
     return shaderProgram;
 }()),
-    m_hasBuiltInUniformMVPRow0(glCheck(glGetUniformLocation(shaderProgram, "za_u_mvpRow0")) != -1),
-    m_hasBuiltInUniformMVPRow1(glCheck(glGetUniformLocation(shaderProgram, "za_u_mvpRow1")) != -1),
-    m_hasBuiltInUniformInvTextureSize(glCheck(glGetUniformLocation(shaderProgram, "za_u_invTextureSize")) != -1)
+    m_hasBuiltInUniformMVPRow0(checkBuiltInUniform(shaderProgram, "za_u_mvpRow0", 0)),
+    m_hasBuiltInUniformMVPRow1(checkBuiltInUniform(shaderProgram, "za_u_mvpRow1", 1)),
+    m_hasBuiltInUniformInvTextureSize(checkBuiltInUniform(shaderProgram, "za_u_invTextureSize", 3))
 {
 }
 
@@ -894,7 +919,7 @@ za::Optional<Shader> Shader::compile(za::StringView vertexShaderCode,
     ZA_ASSERT(GraphicsContext::hasActiveThreadLocalGlContext());
 
     // Make sure we can use geometry shaders
-    if (geometryShaderCode.data() != nullptr && !isGeometryAvailable())
+    if (!geometryShaderCode.empty() && !isGeometryAvailable())
     {
         priv::errMsg(
             "Failed to create a shader: your system doesn't support geometry shaders (you should test "
@@ -919,8 +944,8 @@ za::Optional<Shader> Shader::compile(za::StringView vertexShaderCode,
 
         const GLhandle shader = glCheck(glCreateShader(type));
 
-        const GLcharARB* sources[2]{preamble.data(), shaderCode.data()};
-        const GLint      lengths[2]{static_cast<GLint>(preamble.size()), static_cast<GLint>(shaderCode.size())};
+        const GLchar* sources[2]{preamble.data(), shaderCode.data()};
+        const GLint   lengths[2]{static_cast<GLint>(preamble.size()), static_cast<GLint>(shaderCode.size())};
 
         glCheck(glShaderSource(shader, 2, sources, lengths));
         glCheck(glCompileShader(shader));
@@ -953,7 +978,7 @@ za::Optional<Shader> Shader::compile(za::StringView vertexShaderCode,
         return true;
     };
 
-    if (vertexShaderCode.data() == nullptr)
+    if (vertexShaderCode.empty())
         vertexShaderCode = DefaultShader::srcVertex;
 
     if (!makeShader(GL_VERTEX_SHADER, "vertex", vertexShaderCode))
@@ -961,13 +986,13 @@ za::Optional<Shader> Shader::compile(za::StringView vertexShaderCode,
 
 
     // Create the geometry shader if needed
-    if (geometryShaderCode.data())
+    if (!geometryShaderCode.empty())
     {
         if (!makeShader(GL_GEOMETRY_SHADER, "geometry", geometryShaderCode))
             return za::nullOpt;
     }
 
-    if (fragmentShaderCode.data() == nullptr)
+    if (fragmentShaderCode.empty())
         fragmentShaderCode = DefaultShader::srcFragment;
 
     // Create the fragment shader
@@ -1000,21 +1025,7 @@ za::Optional<Shader> Shader::compile(za::StringView vertexShaderCode,
     // in all contexts immediately (solves problems in multi-threaded apps)
     glCheck(glFlush());
 
-#ifdef ZA_SYSTEM_EMSCRIPTEN
-    // Workaround for Emscripten bug with `-sGL_EXPLICIT_UNIFORM_LOCATION=1`:
-    // Emscripten lazily populates its internal uniform location table
-    // (`uniformLocsById`) only when `glGetUniformLocation` is called, NOT
-    // when `glUniform*` is called. So `glUniform*(loc, ...)` on a newly
-    // linked program silently does nothing -- the location resolves to
-    // `undefined` in JavaScript, and WebGL ignores the call.
-    // Calling `glGetUniformLocation` once forces the table to be built.
-    // See: src/lib/libwebgl.js `webglPrepareUniformLocationsBeforeFirstUse`
-    // See: https://github.com/emscripten-core/emscripten/issues/26672
-    glCheck(glGetUniformLocation(castToGlHandle(shaderProgram), "za_u_mvpRow0"));
-    glCheck(glGetUniformLocation(castToGlHandle(shaderProgram), "za_u_mvpRow1"));
-#endif
-
-    return za::makeOptional<Shader>(za::PassKey<Shader>{}, castFromGlHandle(shaderProgram));
+    return za::makeOptional<Shader>(za::PassKey<Shader>{}, shaderProgram);
 }
 
 
@@ -1037,6 +1048,10 @@ void Shader::bindTextures() const
 
     // Make sure that the texture unit which is left active is the number 0
     glCheck(glActiveTexture(GL_TEXTURE0));
+
+    // Bind the special `CurrentTexture` sampler to texture unit 0, if set
+    if (m_impl->currentTexture != -1)
+        glCheck(glUniform1i(m_impl->currentTexture, 0));
 }
 
 } // namespace za

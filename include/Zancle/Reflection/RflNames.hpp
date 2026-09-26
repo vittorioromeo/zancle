@@ -12,12 +12,12 @@
 
 #include "Zancle/Container/Array.hpp"
 
-#include "Zancle/Trait/IsArray.hpp"
-#include "Zancle/Trait/IsUnion.hpp"
-
 #include "Zancle/Base/IndexSequence.hpp"
 #include "Zancle/Base/MakeIndexSequence.hpp"
 #include "Zancle/Base/SizeT.hpp"
+
+#include "Zancle/Trait/IsArray.hpp"
+#include "Zancle/Trait/IsUnion.hpp"
 
 
 namespace za::rfl::priv

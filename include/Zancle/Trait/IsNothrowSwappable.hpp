@@ -6,7 +6,7 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
-#include "Zancle/Base/Swap.hpp"
+#include "Zancle/Trait/SwapResolution.hpp"
 
 
 namespace za
@@ -18,11 +18,11 @@ namespace za
 /// unambiguous ADL `swap`, then move-construct + move-assign; arrays
 /// element-wise) and reports the `noexcept`-ness of the selected
 /// operation. Equivalent to `noexcept(genericSwap(a, b))`, as both
-/// share the same implementation (see `Zancle/Base/Swap.hpp`).
+/// share the same implementation (see `Zancle/Trait/SwapResolution.hpp`).
 ///
 ////////////////////////////////////////////////////////////
 template <typename T>
-inline constexpr bool isNoThrowSwappable = priv::swap_adl::isNoThrowSwappable<T>;
+inline constexpr bool isNoThrowSwappable = priv::swap_adl::isNoThrowSwappableV<T>;
 
 } // namespace za
 

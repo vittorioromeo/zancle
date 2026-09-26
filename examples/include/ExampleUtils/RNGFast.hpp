@@ -13,11 +13,11 @@
 #include "Zancle/Math/Sin.hpp"
 #include "Zancle/Math/Sqrt.hpp"
 
-#include "Zancle/Trait/IsIntegral.hpp"
-#include "Zancle/Trait/MakeUnsigned.hpp"
-
 #include "Zancle/Base/AssertAndAssume.hpp"
 #include "Zancle/Base/IntTypes.hpp"
+
+#include "Zancle/Trait/IsIntegral.hpp"
+#include "Zancle/Trait/MakeUnsigned.hpp"
 
 
 ////////////////////////////////////////////////////////////

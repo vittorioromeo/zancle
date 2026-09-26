@@ -25,8 +25,6 @@ TEST_CASE("[Graphics] za::Glyph")
     {
         constexpr za::Glyph glyph{};
         STATIC_CHECK(glyph.advance == 0.f);
-        STATIC_CHECK(glyph.lsbDelta == 0);
-        STATIC_CHECK(glyph.rsbDelta == 0);
         STATIC_CHECK(glyph.bounds == za::Rect2f());
         STATIC_CHECK(glyph.textureRect == za::Rect2f());
     }

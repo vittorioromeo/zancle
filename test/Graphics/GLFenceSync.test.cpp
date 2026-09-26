@@ -11,12 +11,12 @@
 
 #include "Zancle/Window/WindowContext.hpp"
 
+#include "Zancle/Base/Macros.hpp"
+
 #include "Zancle/Trait/IsCopyAssignable.hpp"
 #include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsNothrowMoveAssignable.hpp"
 #include "Zancle/Trait/IsNothrowMoveConstructible.hpp"
-
-#include "Zancle/Base/Macros.hpp"
 
 
 #ifndef ZA_OPENGL_ES

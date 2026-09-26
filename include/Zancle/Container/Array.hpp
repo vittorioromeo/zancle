@@ -6,11 +6,11 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
-#include "Zancle/Trait/Conditional.hpp"
-#include "Zancle/Trait/IsTriviallyRelocatable.hpp"
-
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/SizeT.hpp"
+
+#include "Zancle/Trait/EnableTrivialRelocation.hpp"
+#include "Zancle/Trait/IsTriviallyRelocatable.hpp"
 
 
 namespace za
@@ -30,7 +30,7 @@ template <typename T, SizeT N>
 struct [[nodiscard]] Array
 {
     ////////////////////////////////////////////////////////////
-    using TriviallyRelocatableTag = Conditional<ZA_IS_TRIVIALLY_RELOCATABLE(T), Array, void>;
+    ZA_ENABLE_TRIVIAL_RELOCATION_IF(ZA_IS_TRIVIALLY_RELOCATABLE(T));
 
 
     ////////////////////////////////////////////////////////////

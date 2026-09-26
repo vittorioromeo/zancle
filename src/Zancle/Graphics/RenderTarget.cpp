@@ -61,8 +61,6 @@
 
 #include "Zancle/Math/MinMax.hpp"
 
-#include "Zancle/Trait/IsSame.hpp"
-
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/GetArraySize.hpp"
 #include "Zancle/Base/IntTypes.hpp"
@@ -70,6 +68,8 @@
 #include "Zancle/Base/OffsetOf.hpp"
 #include "Zancle/Base/ScopeGuard.hpp"
 #include "Zancle/Base/SizeT.hpp"
+
+#include "Zancle/Trait/IsSame.hpp"
 
 #ifdef ZA_OPENGL_ES
     #include "Zancle/Base/Abort.hpp"
@@ -175,6 +175,9 @@ void setupVertexAttribPointers()
 
 
 ////////////////////////////////////////////////////////////
+// Emits the winding-corrected `(0,1,2)(2,1,3)` pattern per quad -- the same
+// convention as `DrawableBatchUtils::appendQuadIndices`, so the immediate
+// (`drawQuads`) and batched paths produce identically-wound triangles.
 constexpr unsigned int precomputedQuadIndices[]{
 #include "Zancle/Graphics/PrecomputedQuadIndices.inl"
 };
@@ -205,8 +208,6 @@ struct [[nodiscard]] StatesCache
 
     View lastView; //!< Cached latest view
 
-    Transform lastRenderStatesTransform; //!< Cached renderstates transform
-
     bool scissorEnabled{false}; //!< Is scissor testing enabled?
     bool stencilEnabled{false}; //!< Is stencil testing enabled?
 
@@ -229,6 +230,8 @@ struct [[nodiscard]] StatesCache
     za::U64     lastTextureId{0u};         //!< Cached texture
 
     GLuint lastProgramId{0u}; //!< GL id of the last used shader program
+
+    za::U32 lastTextureBindingsGeneration{0u}; //!< `Shader::m_textureBindingsGeneration` at the last (re)bind
 };
 
 
@@ -247,7 +250,6 @@ struct [[nodiscard]] RenderTarget::Impl
     PersistentGPUDrawableBatch gpuAutoBatch; //!< Internal GPU autobatch (3 frame states for CPU/GPU pipelining)
     za::SizeT                  gpuAutoBatchIndexOffset{0u};  //!< Tracks how many indices have been drawn this frame
     za::SizeT                  gpuAutoBatchVertexOffset{0u}; //!< Tracks how many vertices have been drawn this frame
-    bool                       needsFrameSync{false};
 #endif
 
     ////////////////////////////////////////////////////////////
@@ -322,10 +324,6 @@ RenderTarget& RenderTarget::operator=(RenderTarget&&) noexcept = default;
         return false;
     }
 
-    syncGPUStartFrame();
-
-    m_currentDrawStats = {};
-
     // Unbind texture to fix RenderTexture preventing clear
     unapplyTexture(); // See https://en.zancle.org/forums/index.php?topic=9350
 
@@ -335,6 +333,22 @@ RenderTarget& RenderTarget::operator=(RenderTarget&&) noexcept = default;
     {
         glCheck(glDisable(GL_SCISSOR_TEST));
         m_impl->cache.scissorEnabled = false;
+
+        // Also invalidate the cached view: `applyView` is the only place that
+        // re-enables scissor, and `setupDraw` skips it when the view compares
+        // equal to the cache -- so an unchanged scissored view would otherwise
+        // render unclipped from the second frame onwards.
+        m_impl->cache.lastView = View{};
+    }
+
+    // Reset the stencil write mask so `clear`/`clearStencil` always affect
+    // every stencil bit (`glClear` honors the write mask). Mirror the change
+    // in the cached mode so the next stenciled `setupDraw` sees a mismatch
+    // and re-applies the user's mask via `applyStencilMode`.
+    if (!m_impl->cache.enable || m_impl->cache.lastStencilMode.stencilMask.value != ~0u)
+    {
+        glCheck(glStencilMask(~0u));
+        m_impl->cache.lastStencilMode.stencilMask = StencilValue{~0u};
     }
 
     return true;
@@ -729,6 +743,12 @@ void RenderTarget::draw(const CPUDrawableBatch& drawableBatch, const RenderState
 ////////////////////////////////////////////////////////////
 void RenderTarget::draw(const PersistentGPUDrawableBatch& drawableBatch, RenderStates states)
 {
+    // Empty batch: nothing to draw. Also avoids flushing a batch that was
+    // never filled, whose persistent buffers were never created/mapped
+    // (`flushBytesToGPU` asserts a live buffer object and mapping).
+    if (drawableBatch.getNumIndices() == 0u)
+        return;
+
     if (m_autoBatchMode != AutoBatchMode::Disabled)
         flush();
 
@@ -912,18 +932,25 @@ void RenderTarget::drawQuads(const DrawQuadsSettings& settings, const RenderStat
     static_assert(drawQuadsMaxQuadsPerCall * 6u == za::getArraySize(RenderTargetImpl::precomputedQuadIndices));
     static_assert(drawQuadsMaxVerticesPerCall == drawQuadsMaxQuadsPerCall * 4u);
 
-    const auto vertexCount = settings.vertexSpan.size();
+    const auto totalVertexCount = settings.vertexSpan.size();
 
-    ZA_ASSERT(vertexCount % 4u == 0u);
-    ZA_ASSERT(vertexCount <= drawQuadsMaxVerticesPerCall);
+    ZA_ASSERT(totalVertexCount % 4u == 0u);
 
-    drawIndexedVertices(
-        {
-            .vertexSpan    = settings.vertexSpan,
-            .indexSpan     = {RenderTargetImpl::precomputedQuadIndices, vertexCount / 4u * 6u},
-            .primitiveType = settings.primitiveType,
-        },
-        states);
+    // Split draws exceeding the precomputed index table into multiple calls
+    // (e.g. `Text` with 65'536+ quads); an unsplit call would build an index
+    // span past the end of the table.
+    for (za::SizeT offset = 0u; offset < totalVertexCount; offset += drawQuadsMaxVerticesPerCall)
+    {
+        const za::SizeT vertexCount = za::min(totalVertexCount - offset, za::SizeT{drawQuadsMaxVerticesPerCall});
+
+        drawIndexedVertices(
+            {
+                .vertexSpan    = {settings.vertexSpan.data() + offset, vertexCount},
+                .indexSpan     = {RenderTargetImpl::precomputedQuadIndices, vertexCount / 4u * 6u},
+                .primitiveType = settings.primitiveType,
+            },
+            states);
+    }
 }
 
 
@@ -1181,8 +1208,12 @@ RenderTarget::WithRenderStatesContext::WithRenderStatesContext(RenderTarget& rt,
     m_states{states},
     m_locked{locked}
 {
-    if (m_rt->getAutoBatchMode() != AutoBatchMode::Disabled)
-        m_rt->flushIfNeeded(m_states);
+    // Sync `m_lastRenderStates` (and flush if needed) regardless of the
+    // auto-batch mode: with `AutoBatchMode::Disabled`, skipping this left
+    // `m_lastRenderStates` stale, so the locked-state assertion in
+    // `flushIfNeeded` could fire spuriously on the first `draw` through the
+    // context. `flush()` is a no-op when auto-batching is disabled.
+    m_rt->flushIfNeeded(m_states);
 
     if (m_locked)
     {
@@ -1204,39 +1235,33 @@ RenderTarget::WithRenderStatesContext::WithRenderStatesContext::~WithRenderState
 
 
 ////////////////////////////////////////////////////////////
-void RenderTarget::syncGPUStartFrame()
+void RenderTarget::syncGPUEndFrame()
 {
+    // Statistics are per-frame, and `display` is the frame boundary: both
+    // `display` implementations capture `flush()`'s return value before
+    // calling this, so resetting here starts the next frame's counters.
+    // (Resetting in `prepare` instead would tie the counters to `clear`,
+    // dropping work flushed by `clear` itself and breaking no-`clear` loops.)
+    m_currentDrawStats = {};
+
 #ifndef ZA_OPENGL_ES
-    if (!m_impl->needsFrameSync)
-        return;
-
-    m_impl->needsFrameSync = false;
-
-    // Commit the previous frame state's ring buffer writes before
-    // rotating away from it. The fence inserted by commit() covers
-    // all GPU work up to this point (including the previous frame's
-    // draws). Committing here keeps the ring buffer uncommitted
-    // between frames, so the batch can be drawn again after `display`
-    // without `clear` -- `reclaim` won't reset the cursor mid-use
-    // since no marker exists.
+    // Commit the frame's ring buffer writes: the fence inserted by commit()
+    // covers all GPU work up to this point, including this frame's draws
+    // (both `display` implementations `flush()` before calling this, so no
+    // unflushed vertices can be pending).
     m_impl->gpuAutoBatch.m_storage.commitPendingDrawSubmission();
 
-    // Internally rotates to the next frame state and drains it.
-    // The drained state was last used 2 frames ago, so its fence
-    // is almost always signaled and drain returns instantly.
+    // Rotate the GPU auto-batch to the next frame state and drain it. The
+    // drained state was last used 2 frames ago, so its fence is almost
+    // always signaled and drain returns instantly. Rotating eagerly at the
+    // frame boundary (rather than lazily at the next append) is safe:
+    // cursors are only ever reset by this explicit `drain`, never by
+    // `reclaim`/overflow handling, so draws issued after `display` without
+    // an intervening `clear` simply land in the fresh frame state.
     m_impl->gpuAutoBatch.clear();
 
     m_impl->gpuAutoBatchIndexOffset  = 0u;
     m_impl->gpuAutoBatchVertexOffset = 0u;
-#endif
-}
-
-
-////////////////////////////////////////////////////////////
-void RenderTarget::syncGPUEndFrame()
-{
-#ifndef ZA_OPENGL_ES
-    m_impl->needsFrameSync = true;
 #endif
 }
 
@@ -1305,7 +1330,7 @@ void RenderTarget::applyStencilMode(const StencilMode& mode)
         if (!m_impl->cache.enable || m_impl->cache.stencilEnabled)
         {
             glCheck(glDisable(GL_STENCIL_TEST));
-            glCheck(glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE));
+            glCheck(glStencilMask(~0u)); // Restore the full write mask so stencil clears affect every bit
 
             m_impl->cache.stencilEnabled = false;
         }
@@ -1324,6 +1349,9 @@ void RenderTarget::applyStencilMode(const StencilMode& mode)
     glCheck(glStencilFunc(priv::stencilFunctionToGlConstant(mode.stencilComparison),
                           static_cast<int>(mode.stencilReference.value),
                           mode.stencilMask.value));
+
+    // Mask which stencil bits the update operation may write
+    glCheck(glStencilMask(mode.stencilMask.value));
 
     m_impl->cache.stencilEnabled = true;
 }
@@ -1405,18 +1433,28 @@ void RenderTarget::setupDraw(const GLVAOGroup& vaoGroup, const RenderStates& sta
         usedShader.bind();
         m_impl->cache.lastProgramId = usedNativeHandle;
     }
+    else if (usedShader.m_textureBindingsGeneration != m_impl->cache.lastTextureBindingsGeneration)
+    {
+        // Same program, but a texture uniform was (re)assigned since the last
+        // draw: `setUniform(loc, texture)` / `setUniform(loc, CurrentTexture)`
+        // only record CPU-side state -- the GL work happens at bind time, and
+        // the full `bind()` above was skipped. Re-run the texture bindings.
+        usedShader.bindTextures();
+    }
+
+    m_impl->cache.lastTextureBindingsGeneration = usedShader.m_textureBindingsGeneration;
 
     // Apply the view
     const bool viewChanged = m_impl->cache.lastView != usedView;
     if (!m_impl->cache.enable || viewChanged)
         applyView(usedView);
 
-    // Set the model-view-projection matrix
-    if (!m_impl->cache.enable || shaderChanged || viewChanged || states.transform != m_impl->cache.lastRenderStatesTransform)
-        setupDrawMVP(states.transform,
-                     m_impl->cache.lastView.getTransform(),
-                     usedShader.m_hasBuiltInUniformMVPRow0,
-                     usedShader.m_hasBuiltInUniformMVPRow1);
+    // Set the model-view-projection matrix. Always evaluated: uniform values
+    // live in the shared program object, so a per-render-target "unchanged"
+    // shortcut goes stale whenever another render target draws with the same
+    // program (e.g. two windows using the built-in shader). `setupDrawMVP`
+    // dedups the actual uploads against a per-`Shader` shadow.
+    setupDrawMVP(states.transform, m_impl->cache.lastView.getTransform(), usedShader);
 
     // Apply the blend mode
     if (!m_impl->cache.enable || (states.blendMode != m_impl->cache.lastBlendMode))
@@ -1431,7 +1469,7 @@ void RenderTarget::setupDraw(const GLVAOGroup& vaoGroup, const RenderStates& sta
         glCheck(glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE));
 
     // Deal with texture
-    setupDrawTexture(states, shaderChanged, usedShader.m_hasBuiltInUniformInvTextureSize);
+    setupDrawTexture(states, usedShader);
 
     // Update last used render states
     m_lastRenderStates = states;
@@ -1439,37 +1477,41 @@ void RenderTarget::setupDraw(const GLVAOGroup& vaoGroup, const RenderStates& sta
 
 
 ////////////////////////////////////////////////////////////
-void RenderTarget::setupDrawMVP(const Transform& renderStatesTransform,
-                                const Transform& viewTransform,
-                                const bool       uploadMVPRow0,
-                                const bool       uploadMVPRow1)
+void RenderTarget::setupDrawMVP(const Transform& renderStatesTransform, const Transform& viewTransform, const Shader& usedShader)
 {
     // Compute the final draw transform
     const Transform trsfm = viewTransform * /* model-view matrix */ renderStatesTransform;
 
-    // Update the cached transform
-    m_impl->cache.lastRenderStatesTransform = renderStatesTransform;
-
     // Upload the 2D affine transform as two vec3 rows:
     //   row0 = (a00, a01, a02)  ->  gl_Position.x = dot(row0, vec3(pos, 1))
     //   row1 = (a10, a11, a12)  ->  gl_Position.y = dot(row1, vec3(pos, 1))
+    //
+    // Uniform values live in the (possibly shared) program object, not in any
+    // GL context or render target, so redundant uploads are avoided by
+    // comparing against the per-`Shader` shadow of the last uploaded value.
 
-    if (uploadMVPRow0)
+    if (usedShader.m_hasBuiltInUniformMVPRow0)
     {
-        const float mvpRow0[]{trsfm.a00, trsfm.a01, trsfm.a02};
-        glCheck(glUniform3fv(/* location */ 0u, /* count */ 1, mvpRow0)); // `za_u_mvpRow0`
+        if (const za::Array<float, 3> mvpRow0{trsfm.a00, trsfm.a01, trsfm.a02}; usedShader.m_lastUploadedMVPRow0 != mvpRow0)
+        {
+            glCheck(glUniform3fv(/* location */ 0u, /* count */ 1, mvpRow0.data())); // `za_u_mvpRow0`
+            usedShader.m_lastUploadedMVPRow0 = mvpRow0;
+        }
     }
 
-    if (uploadMVPRow1)
+    if (usedShader.m_hasBuiltInUniformMVPRow1)
     {
-        const float mvpRow1[]{trsfm.a10, trsfm.a11, trsfm.a12};
-        glCheck(glUniform3fv(/* location */ 1u, /* count */ 1, mvpRow1)); // `za_u_mvpRow1`
+        if (const za::Array<float, 3> mvpRow1{trsfm.a10, trsfm.a11, trsfm.a12}; usedShader.m_lastUploadedMVPRow1 != mvpRow1)
+        {
+            glCheck(glUniform3fv(/* location */ 1u, /* count */ 1, mvpRow1.data())); // `za_u_mvpRow1`
+            usedShader.m_lastUploadedMVPRow1 = mvpRow1;
+        }
     }
 }
 
 
 ////////////////////////////////////////////////////////////
-void RenderTarget::setupDrawTexture(const RenderStates& states, const bool shaderChanged, const bool uploadInvTextureSizeUniform)
+void RenderTarget::setupDrawTexture(const RenderStates& states, const Shader& usedShader)
 {
     // Select texture to be used
     const Texture& usedTexture = states.texture != nullptr ? *states.texture
@@ -1492,11 +1534,19 @@ void RenderTarget::setupDrawTexture(const RenderStates& states, const bool shade
         m_impl->cache.lastTextureId = usedTexture.m_cacheId;
     }
 
-    // Upload inverse texture size if needed (hardcoded layout location `3u` for `za_u_invTextureSize`)
-    if ((mustApplyTexture || shaderChanged) && uploadInvTextureSizeUniform)
+    // Upload inverse texture size if needed (hardcoded layout location `3u` for `za_u_invTextureSize`).
+    // Always evaluated: the uniform value lives in the (possibly shared) program
+    // object, so redundant uploads are avoided by comparing against the
+    // per-`Shader` shadow of the last uploaded value (see `setupDrawMVP`).
+    if (usedShader.m_hasBuiltInUniformInvTextureSize)
     {
-        const auto invTexSize = 1.f / usedTexture.getSize().toVec2f();
-        glCheck(glUniform2f(/* location */ 3u, invTexSize.x, invTexSize.y));
+        const auto v = 1.f / usedTexture.getSize().toVec2f();
+
+        if (const za::Array<float, 2> invTexSize{v.x, v.y}; usedShader.m_lastUploadedInvTextureSize != invTexSize)
+        {
+            glCheck(glUniform2fv(/* location */ 3u, /* count */ 1, invTexSize.data()));
+            usedShader.m_lastUploadedInvTextureSize = invTexSize;
+        }
     }
 }
 

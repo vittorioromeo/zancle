@@ -6,6 +6,7 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/Graphics/DepthStencilFormat.hpp"
 #include "Zancle/Graphics/TextureWrapMode.hpp"
 
 
@@ -21,12 +22,12 @@ namespace za
 ////////////////////////////////////////////////////////////
 struct RenderTextureCreateSettings
 {
-    unsigned int    depthBits{0u};         //!< Number of bits for the depth buffer attachment (0 = no depth buffer)
-    unsigned int    stencilBits{0u};       //!< Number of bits for the stencil buffer attachment (0 = no stencil buffer)
-    unsigned int    antiAliasingLevel{0u}; //!< Multisampling (MSAA) sample count (0 or 1 = disabled)
-    bool            sRgbCapable{false};    //!< Whether the texture should use sRGB encoding
-    bool            smooth{false};         //!< Whether linear filtering should be enabled on the texture
+    bool            sRgbCapable{false};               //!< Whether the texture should use sRGB encoding
+    bool            smooth{false};                    //!< Whether linear filtering should be enabled on the texture
     TextureWrapMode wrapMode{TextureWrapMode::Clamp}; //!< Wrap mode used when sampling the attached texture
+
+    unsigned int       sampleCount{0u}; //!< Multisampling (MSAA) sample count (0 or 1 = disabled)
+    DepthStencilFormat depthStencilFormat{DepthStencilFormat::None}; //!< Depth/stencil attachment format
 };
 
 } // namespace za

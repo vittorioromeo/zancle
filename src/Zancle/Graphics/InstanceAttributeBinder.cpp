@@ -14,13 +14,13 @@
 #include "Zancle/Graphics/Priv/EnumToGlEnumConversions.hpp"
 #include "Zancle/Graphics/VBOHandle.hpp"
 
+#include "Zancle/Err/Err.hpp"
+
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/SizeT.hpp"
 #include "Zancle/Base/Unreachable.hpp"
 
 #ifdef ZA_OPENGL_ES
-    #include "Zancle/Err/Err.hpp"
-
     #include "Zancle/Base/Abort.hpp"
 #endif
 
@@ -144,7 +144,16 @@ void InstanceAttributeBinder::uploadData(VBOHandle& vboHandle, const void* const
     }
 
     if (!alreadyTouched)
+    {
+        if (m_touchedVBOHandles.size() == m_touchedVBOHandles.capacity()) [[unlikely]]
+        {
+            priv::errMsg("`InstanceAttributeBinder`: too many distinct VBOs for one draw, upload ignored");
+            ZA_ASSERT(false);
+            return;
+        }
+
         m_touchedVBOHandles.emplaceBack(&vboHandle);
+    }
 }
 
 
@@ -161,6 +170,14 @@ void InstanceAttributeBinder::setup(
     ZA_ASSERT(stride > 0u);
     ZA_ASSERT(fieldOffset < stride);
     ZA_ASSERT(m_currentVBOHandle != nullptr);
+
+    if (m_deferredSetups.size() == m_deferredSetups.capacity()) [[unlikely]]
+    {
+        priv::errMsg("`InstanceAttributeBinder`: too many attribute setups for one draw, setup ignored");
+        ZA_ASSERT(false);
+        return;
+    }
+
     m_deferredSetups.emplaceBack(DeferredSetup{
         .vboHandle  = m_currentVBOHandle,
         .location   = location,

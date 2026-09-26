@@ -10,13 +10,13 @@
 #include "Zancle/Geometry/Priv/Vec2Base.hpp"
 #include "Zancle/Geometry/Rect2.hpp"
 
+#include "Zancle/Base/Macros.hpp"
+
 #include "Zancle/Trait/IsConstructible.hpp"
 #include "Zancle/Trait/IsCopyAssignable.hpp"
 #include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsNothrowMoveAssignable.hpp"
 #include "Zancle/Trait/IsNothrowMoveConstructible.hpp"
-
-#include "Zancle/Base/Macros.hpp"
 
 
 namespace

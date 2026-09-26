@@ -6,7 +6,11 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
-#include "Zancle/Trait/Conditional.hpp"
+#include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/Macros.hpp"
+#include "Zancle/Base/PlacementNew.hpp"
+
+#include "Zancle/Trait/EnableTrivialRelocation.hpp"
 #include "Zancle/Trait/IsCopyAssignable.hpp"
 #include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsMoveAssignable.hpp"
@@ -18,10 +22,6 @@
 #include "Zancle/Trait/IsTriviallyMoveConstructible.hpp"
 #include "Zancle/Trait/IsTriviallyRelocatable.hpp"
 #include "Zancle/Trait/RemoveCVRef.hpp"
-
-#include "Zancle/Base/Assert.hpp"
-#include "Zancle/Base/Macros.hpp"
-#include "Zancle/Base/PlacementNew.hpp"
 
 
 namespace za::priv
@@ -125,7 +125,7 @@ private:
 
 public:
     ////////////////////////////////////////////////////////////
-    using TriviallyRelocatableTag = Conditional<ZA_IS_TRIVIALLY_RELOCATABLE(T), Optional, void>;
+    ZA_ENABLE_TRIVIAL_RELOCATION_IF(ZA_IS_TRIVIALLY_RELOCATABLE(T));
 
 
     ////////////////////////////////////////////////////////////

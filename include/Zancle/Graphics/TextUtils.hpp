@@ -360,7 +360,8 @@ inline auto createTextGeometryAndGetBounds(
     [[maybe_unused]] float maxX = 0.f;
     [[maybe_unused]] float maxY = 0.f;
 
-    char32_t prevChar = 0;
+    char32_t prevChar        = 0;
+    bool     lineHasContents = false;
 
     const auto addLines = [&](const float offset)
     {
@@ -412,6 +413,12 @@ inline auto createTextGeometryAndGetBounds(
         }
 
         prevChar = curChar;
+
+        // Track line content in lock-step with `precomputeTextQuadCount` so
+        // that the number of emitted decoration quads always exactly matches
+        // the precomputed quad count (the batch path commits the precomputed
+        // amount of vertices, so a mismatch would commit uninitialized data)
+        lineHasContents = (curChar != U'\n');
 
         // Handle special characters
         if ((curChar == U' ') || (curChar == U'\n') || (curChar == U'\t'))
@@ -481,11 +488,11 @@ inline auto createTextGeometryAndGetBounds(
     }
 
     // If we're using the underlined style, add the last line
-    if (inputs.underlined && (x > 0))
+    if (inputs.underlined && lineHasContents)
         addLines(underlineOffset);
 
     // If we're using the strike through style, add the last line across all characters
-    if (inputs.strikeThrough && (x > 0))
+    if (inputs.strikeThrough && lineHasContents)
         addLines(strikeThroughOffset);
 
     if constexpr (CalculateBounds)

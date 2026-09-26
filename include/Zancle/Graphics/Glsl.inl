@@ -13,6 +13,8 @@
 #include "Zancle/Base/Memcpy.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
+#include "Zancle/Trait/IsSame.hpp"
+
 
 ////////////////////////////////////////////////////////////
 // Forward declarations
@@ -129,12 +131,14 @@ struct [[nodiscard]] Vec4
     /// \brief Construct vec4 implicitly from color
     ///
     /// The vec4 is normalized to [0, 1] for floats, and left as-is
-    /// for ints. Not defined for other template arguments.
+    /// for ints. Only available for float and int vec4s
+    /// (`za::Glsl::Vec4` / `za::Glsl::Ivec4`).
     ///
     /// \param color Color instance
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] constexpr Vec4(Color color);
+    [[nodiscard]] constexpr Vec4(Color color)
+        requires(za::isSame<T, float> || za::isSame<T, int>);
 
     T x{}; //!< 1st component (X) of the vec4
     T y{}; //!< 2nd component (Y) of the vec4

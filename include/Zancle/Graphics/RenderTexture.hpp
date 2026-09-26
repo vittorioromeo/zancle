@@ -108,7 +108,7 @@ public:
     /// \return The maximum anti-aliasing level supported by the system
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] static unsigned int getMaximumAntiAliasingLevel();
+    [[nodiscard]] static unsigned int getMaximumSampleCount();
 
     ////////////////////////////////////////////////////////////
     /// \brief Enable or disable texture smoothing

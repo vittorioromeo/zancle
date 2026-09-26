@@ -18,8 +18,6 @@
 #include "Zancle/Fmt/FmtSpec.hpp"    // IWYU pragma: export
 #include "Zancle/Fmt/FmtString.hpp"  // IWYU pragma: export
 
-#include "Zancle/Trait/IsSame.hpp"
-
 #include "Zancle/Base/AssertAndAssume.hpp"
 #include "Zancle/Base/Memcpy.hpp"
 #include "Zancle/Base/Memmove.hpp"
@@ -27,6 +25,8 @@
 #include "Zancle/Base/NonDeduced.hpp"
 #include "Zancle/Base/SizeT.hpp"
 #include "Zancle/Base/Strlen.hpp"
+
+#include "Zancle/Trait/IsSame.hpp"
 
 
 ////////////////////////////////////////////////////////////

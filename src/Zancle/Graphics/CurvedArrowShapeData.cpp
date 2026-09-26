@@ -14,8 +14,10 @@
 #include "Zancle/Geometry/Rect2.hpp"
 #include "Zancle/Geometry/Vec2.hpp"
 
+#include "Zancle/Math/Ceil.hpp"
 #include "Zancle/Math/Constants.hpp"
 #include "Zancle/Math/Fabs.hpp"
+#include "Zancle/Math/MinMax.hpp"
 #include "Zancle/Math/MinMaxMacros.hpp"
 #include "Zancle/Math/Remainder.hpp"
 #include "Zancle/Math/SinCosLookup.hpp"
@@ -110,10 +112,16 @@ Rect2f CurvedArrowShapeData::getGlobalBounds() const noexcept
 
     const auto transform = Transform::fromPositionScaleOriginRotation(position, scale, origin, rotation);
 
-    const float        sweepRad   = sweepAngle.asRadians();
-    const float        startRad   = startAngle.asRadians();
-    const unsigned int arcSamples = pointCount;
-    const float        arcStep    = ShapeUtils::computeArcAngleStep(sweepRad, arcSamples);
+    const float sweepRad = sweepAngle.asRadians();
+    const float startRad = startAngle.asRadians();
+
+    // Must match the arc tessellation of `DrawableBatchImpl::add(const CurvedArrowShapeData&)`:
+    // `pointCount` is per 90 degrees of sweep.
+    const unsigned int arcSamples = za::max(2u,
+                                            static_cast<unsigned int>(ZA_MATH_CEILF(
+                                                static_cast<float>(pointCount) * (ZA_MATH_FABSF(sweepRad) / za::halfPi))));
+
+    const float arcStep = ShapeUtils::computeArcAngleStep(sweepRad, arcSamples);
 
     const auto transformFn = [&](const Vec2f p) noexcept { return transform.transformPoint(p); };
 

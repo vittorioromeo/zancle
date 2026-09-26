@@ -2563,7 +2563,7 @@ void Main::gameLoopTips(const float deltaTimeMs)
 ////////////////////////////////////////////////////////////
 void Main::recreateImGuiRenderTexture(const za::Vec2u newResolution)
 {
-    rtImGui = za::RenderTexture::create(newResolution, {.antiAliasingLevel = aaLevel, .smooth = true}).value();
+    rtImGui = za::RenderTexture::create(newResolution, {.smooth = true, .sampleCount = aaLevel}).value();
 }
 
 
@@ -2571,19 +2571,19 @@ void Main::recreateImGuiRenderTexture(const za::Vec2u newResolution)
 void Main::recreateBackgroundRenderTexture(const za::Vec2u newResolution)
 {
     rtBackground = za::RenderTexture::create(newResolution,
-                                             {.antiAliasingLevel = aaLevel, .smooth = true, .wrapMode = za::TextureWrapMode::Repeat})
+                                             {.smooth = true, .wrapMode = za::TextureWrapMode::Repeat, .sampleCount = aaLevel})
                        .value();
 
-    rtBackgroundProcessed = za::RenderTexture::create(newResolution, {.antiAliasingLevel = aaLevel, .smooth = true}).value();
+    rtBackgroundProcessed = za::RenderTexture::create(newResolution, {.smooth = true, .sampleCount = aaLevel}).value();
 }
 
 
 ////////////////////////////////////////////////////////////
 void Main::recreateGameRenderTexture(const za::Vec2u newResolution)
 {
-    rtCloudMask      = za::RenderTexture::create(newResolution, {.antiAliasingLevel = aaLevel, .smooth = true}).value();
-    rtCloudProcessed = za::RenderTexture::create(newResolution, {.antiAliasingLevel = aaLevel, .smooth = true}).value();
-    rtGame           = za::RenderTexture::create(newResolution, {.antiAliasingLevel = aaLevel, .smooth = true}).value();
+    rtCloudMask      = za::RenderTexture::create(newResolution, {.smooth = true, .sampleCount = aaLevel}).value();
+    rtCloudProcessed = za::RenderTexture::create(newResolution, {.smooth = true, .sampleCount = aaLevel}).value();
+    rtGame           = za::RenderTexture::create(newResolution, {.smooth = true, .sampleCount = aaLevel}).value();
 }
 
 

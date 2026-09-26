@@ -24,6 +24,7 @@ namespace za
 CircleShape::CircleShape(const Data& data) :
     Shape(priv::toShapeData(data)),
     m_radius{data.radius},
+    m_startAngle{data.startAngle},
     m_pointCount{data.pointCount}
 {
     updateCircleGeometry();
@@ -49,6 +50,24 @@ float CircleShape::getRadius() const
 
 
 ////////////////////////////////////////////////////////////
+void CircleShape::setStartAngle(Angle startAngle)
+{
+    if (startAngle == m_startAngle)
+        return;
+
+    m_startAngle = startAngle;
+    updateCircleGeometry();
+}
+
+
+////////////////////////////////////////////////////////////
+Angle CircleShape::getStartAngle() const
+{
+    return m_startAngle;
+}
+
+
+////////////////////////////////////////////////////////////
 void CircleShape::setPointCount(unsigned int pointCount)
 {
     if (pointCount == m_pointCount)
@@ -70,7 +89,7 @@ unsigned int CircleShape::getPointCount() const
 Vec2f CircleShape::getPoint(za::SizeT index) const
 {
     ZA_ASSERT(index < m_pointCount && "Index is out of bounds");
-    return ShapeUtils::computeCirclePoint(index, /* startAngle */ 0.f, m_pointCount, m_radius);
+    return ShapeUtils::computeCirclePoint(index, m_startAngle.asRadians(), m_pointCount, m_radius);
 }
 
 
@@ -87,7 +106,7 @@ void CircleShape::updateCircleGeometry()
     const float angleStep = za::tau / static_cast<float>(m_pointCount);
 
     updateFromFunc([&] [[gnu::always_inline, gnu::flatten]] (const za::SizeT i) {
-        return ShapeUtils::computeCirclePointFromAngleStep(i, /* startAngle */ 0.f, angleStep, m_radius);
+        return ShapeUtils::computeCirclePointFromAngleStep(i, m_startAngle.asRadians(), angleStep, m_radius);
     }, m_pointCount);
 }
 

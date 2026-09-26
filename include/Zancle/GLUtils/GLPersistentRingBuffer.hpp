@@ -58,17 +58,18 @@ namespace za
 ///   - `[writeCursor, capacity)`             : free tail
 ///
 /// When `reclaim()` finds signaled markers at the front of the FIFO, it
-/// removes them. Once every marker is gone AND nothing has been staged
-/// since the last commit (`writeCursor == lastCommitCursor`), the buffer
-/// is fully idle and both cursors reset to `0`, starting the next
-/// allocation from the front of the buffer.
+/// removes them. The cursors are never reset spontaneously: only the
+/// explicit `drain()` / `drainIfWouldOverflow()` entry points rewind
+/// them to `0`, so owners that track offsets into the buffer never
+/// observe the cursor moving behind their backs.
 ///
 /// # Usage modes
 ///
-///   - **Ring-buffer streaming** (`za::VBOHandle`): call `beginWrite` for
-///     each upload, `commit()` once after issuing the draw. A single
-///     marker covers all uploads in that cycle. `rollback()` discards any
-///     uncommitted writes if the draw path unwinds before submission.
+///   - **Ring-buffer streaming** (`za::VBOHandle`): call
+///     `drainIfWouldOverflow` + `beginWrite` for each upload, `commit()`
+///     once after issuing the draw. A single marker covers all uploads
+///     in that cycle. `rollback()` discards any uncommitted writes if
+///     the draw path unwinds before submission.
 ///
 ///   - **Batch filling with offset-from-0 guarantee**
 ///     (`PersistentGPUDrawableBatch`): call `drain()` at batch reset to
@@ -85,8 +86,7 @@ namespace za
 ///                          │                 │
 ///                          │                 │  fence signals
 ///                          │                 ▼
-///                          │              marker erased (reclaim);
-///                          │              cursors reset to 0 when idle
+///                          │              marker erased (reclaim)
 ///                          │
 ///                          └── rollback ──► writeCursor rewinds to lastCommit
 /// ```
@@ -95,11 +95,11 @@ namespace za
 ///
 /// - Persistent mapping requires desktop OpenGL 4.4+; methods that touch
 ///   the underlying `GLPersistentBuffer` abort on OpenGL ES.
-/// - Within a commit cycle the allocator is *linear*: it does not wrap
-///   around until all outstanding markers have been reclaimed. If the
-///   cycle exceeds capacity, the underlying buffer is grown. This keeps
-///   caller-visible offsets monotonic, which matters for batches that
-///   reserve storage incrementally.
+/// - The allocator is *linear*: the cursor only returns to `0` via the
+///   explicit `drain()` / `drainIfWouldOverflow()` entry points. If a
+///   commit cycle exceeds capacity, the underlying buffer is grown. This
+///   keeps caller-visible offsets monotonic, which matters for batches
+///   that reserve storage incrementally.
 /// - `commit()` must be called *after* the draw it fences has been
 ///   submitted to the GL driver, so the fence covers the draw.
 ///
@@ -127,24 +127,6 @@ private:
 
 
     ////////////////////////////////////////////////////////////
-    /// \brief Reset the cursors to 0 if the buffer is fully idle
-    ///
-    /// "Idle" = no markers in flight and nothing uncommitted since the
-    /// last commit. Returning to offset 0 lets subsequent `beginWrite`
-    /// calls restart from the front of the buffer.
-    ///
-    ////////////////////////////////////////////////////////////
-    [[gnu::always_inline]] void resetCursorsIfIdle()
-    {
-        if (m_markers.empty() && m_writeCursor == m_lastCommitCursor)
-        {
-            m_writeCursor      = 0u;
-            m_lastCommitCursor = 0u;
-        }
-    }
-
-
-    ////////////////////////////////////////////////////////////
     /// \brief Block on the oldest marker's fence and erase it
     ///
     ////////////////////////////////////////////////////////////
@@ -154,8 +136,6 @@ private:
 
         priv::waitOnFence(m_markers.front().fence);
         m_markers.erase(m_markers.begin());
-
-        resetCursorsIfIdle();
     }
 
 
@@ -168,12 +148,10 @@ private:
     /// + byteCount)` and defers to `GLPersistentBuffer::reserve`,
     /// which applies its own geometric growth policy on top.
     ///
-    /// If the current commit cycle has any live bytes
-    /// (`m_writeCursor > 0`), they are preserved across the remap
-    /// and re-flushed: the old mapping is invalidated by `reserve`,
-    /// and any prior `flushBytesToGPU` calls targeted that old
-    /// mapping. Without the re-flush, previously staged data can
-    /// become invisible to subsequent draws from the remapped buffer.
+    /// Any live bytes of the current commit cycle (`[0, writeCursor)`)
+    /// are preserved across the remap by a server-side copy inside
+    /// `reserve` (which flushes the old mapping first), so they stay
+    /// visible to subsequent draws without re-flushing the new mapping.
     ///
     /// Marked `[[gnu::cold, gnu::noinline]]` so it stays out of
     /// `beginWrite`'s hot path.
@@ -188,15 +166,8 @@ private:
     {
         const auto currentCapacity = m_persistentBuffer.capacity();
         const auto targetCapacity  = currentCapacity == 0u ? byteCount : m_writeCursor + byteCount;
-        const auto liveByteCount   = m_writeCursor;
 
-        m_persistentBuffer.reserve(obj, targetCapacity, /* preserve */ liveByteCount > 0u);
-
-        // Growing remaps the buffer. Any bytes copied into the new mapping
-        // must be flushed again, otherwise earlier uploads from this commit
-        // cycle stop being visible to subsequent draws.
-        if (liveByteCount > 0u)
-            m_persistentBuffer.flushBytesToGPU(obj, /* byteOffset */ 0u, liveByteCount);
+        m_persistentBuffer.reserve(obj, targetCapacity, /* preserveByteCount */ m_writeCursor);
     }
 
 
@@ -302,8 +273,8 @@ public:
     ///
     /// Used by callers that want to preallocate capacity ahead of time
     /// without staging any new writes yet. If a grow remaps the buffer,
-    /// any currently live bytes are copied into the new mapping and must be
-    /// re-flushed so previously staged data stays visible to the GPU.
+    /// any currently live bytes (`[0, writeCursor)`) are preserved via a
+    /// server-side copy inside `reserve` and stay visible to the GPU.
     ///
     ////////////////////////////////////////////////////////////
     void reserveCapacity(TBufferObject& obj, const za::SizeT byteCount)
@@ -313,11 +284,7 @@ public:
         if (m_persistentBuffer.capacity() >= byteCount)
             return;
 
-        const auto liveByteCount = m_writeCursor;
-        m_persistentBuffer.reserve(obj, byteCount, /* preserve */ liveByteCount > 0u);
-
-        if (liveByteCount > 0u)
-            m_persistentBuffer.flushBytesToGPU(obj, /* byteOffset */ 0u, liveByteCount);
+        m_persistentBuffer.reserve(obj, byteCount, /* preserveByteCount */ m_writeCursor);
     }
 
 
@@ -352,14 +319,17 @@ public:
     /// stopping as soon as the pending write fits:
     ///
     /// 1. `reclaim()` -- non-blocking poll that frees any signaled
-    ///    markers and, if the buffer is fully idle, resets both
-    ///    cursors to `0`. The cheapest path out: the GPU has already
-    ///    caught up and the freed region is reusable.
-    /// 2. If the write still doesn't fit, block on the oldest pending
-    ///    marker's fence and remove it, repeating until either the
-    ///    write fits or no markers remain.
-    /// 3. If all markers have been reclaimed and the write *still*
-    ///    doesn't fit, grow the underlying persistent buffer.
+    ///    markers, keeping the marker FIFO small.
+    /// 2. Block on the oldest pending marker's fence and remove it,
+    ///    repeating until no markers remain.
+    /// 3. Grow the underlying persistent buffer, preserving the live
+    ///    `[0, writeCursor)` bytes.
+    ///
+    /// Cursors are never reset here: owners that track offsets into the
+    /// buffer (`PersistentGPUDrawableBatch`) rely on the cursor only
+    /// rewinding via an explicit `drain()`. Streaming owners
+    /// (`za::VBOHandle`) get front-of-buffer reuse by calling
+    /// `drainIfWouldOverflow()` before `beginWrite`.
     ///
     /// Split out from `beginWrite` and marked `[[gnu::cold, gnu::noinline]]`
     /// so the common-case hot path (write fits without any marker
@@ -420,15 +390,43 @@ public:
     /// \brief Opportunistically reclaim markers whose fences have signaled
     ///
     /// Polls the front of the FIFO with `priv::tryWaitOnFence` (non-blocking).
-    /// When the buffer becomes fully idle, the cursors reset to `0`.
+    /// Never resets the cursors: owners tracking offsets derived from the
+    /// cursor (`PersistentGPUDrawableBatch`) must not observe spontaneous
+    /// resets; only `drain()` / `drainIfWouldOverflow()` rewind to `0`.
     ///
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline]] void reclaim()
     {
         while (!m_markers.empty() && priv::tryWaitOnFence(m_markers.front().fence))
             m_markers.erase(m_markers.begin());
+    }
 
-        resetCursorsIfIdle();
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Restart from offset `0` if the pending write would overflow (streaming mode)
+    ///
+    /// If `byteCount` more bytes do not fit at the current write cursor
+    /// and nothing has been staged since the last commit, blocks until
+    /// every in-flight marker signals and resets the cursors to `0`
+    /// (via `drain()`), so the following `beginWrite` reuses the buffer
+    /// from the front instead of growing it.
+    ///
+    /// A no-op when the write already fits or when uncommitted writes
+    /// are staged (restarting would discard them). Owners that require
+    /// monotonic offsets (`PersistentGPUDrawableBatch`) must NOT call
+    /// this; it exists for the streaming mode (`za::VBOHandle`), where
+    /// no offsets outlive a commit cycle.
+    ///
+    ////////////////////////////////////////////////////////////
+    [[gnu::always_inline]] void drainIfWouldOverflow(const za::SizeT byteCount)
+    {
+        if (m_writeCursor + byteCount <= m_persistentBuffer.capacity()) [[likely]]
+            return;
+
+        if (m_writeCursor != m_lastCommitCursor)
+            return; // Uncommitted writes staged; restarting would discard them
+
+        drain();
     }
 
 

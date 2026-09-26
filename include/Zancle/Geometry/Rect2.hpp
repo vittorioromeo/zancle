@@ -10,11 +10,11 @@
 
 #include "Zancle/Math/MinMaxMacros.hpp"
 
+#include "Zancle/Base/SizeT.hpp"
+
 #include "Zancle/Trait/IsFloatingPoint.hpp"
 #include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/IsUnsigned.hpp"
-
-#include "Zancle/Base/SizeT.hpp"
 
 
 namespace za::priv

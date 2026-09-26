@@ -40,17 +40,17 @@
 #include "Zancle/Vocabulary/Optional.hpp"
 #include "Zancle/Vocabulary/OverloadSet.hpp"
 
+#include "Zancle/Base/IntTypes.hpp"
+#include "Zancle/Base/Macros.hpp"
+#include "Zancle/Base/ScopeGuard.hpp"
+#include "Zancle/Base/SizeT.hpp"
+
 #include "Zancle/Trait/IsEnum.hpp"
 #include "Zancle/Trait/IsFloatingPoint.hpp"
 #include "Zancle/Trait/IsIntegral.hpp"
 #include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/RemoveCVRef.hpp"
 #include "Zancle/Trait/UnderlyingType.hpp"
-
-#include "Zancle/Base/IntTypes.hpp"
-#include "Zancle/Base/Macros.hpp"
-#include "Zancle/Base/ScopeGuard.hpp"
-#include "Zancle/Base/SizeT.hpp"
 
 // NOLINTBEGIN(readability-identifier-naming, misc-use-internal-linkage)
 

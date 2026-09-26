@@ -14,7 +14,6 @@
 #include "Zancle/Graphics/IndexType.hpp"
 #include "Zancle/Graphics/Transformable.hpp"
 #include "Zancle/Graphics/Vertex.hpp"
-#include "Zancle/Graphics/VertexSpan.hpp"
 
 #include "Zancle/Container/Vector.hpp"
 
@@ -277,7 +276,7 @@ struct PersistentGPUStorage
     [[nodiscard]] Vertex* reserveMoreVertices(za::SizeT count);
 
     ////////////////////////////////////////////////////////////
-    /// \brief Ensure the vertex buffer can accommodate `count` more vertices without changing the active count
+    /// \brief Ensure the vertex buffer can accommodate `count` vertices in total without changing the active count
     ///
     ////////////////////////////////////////////////////////////
     void reserveVertexCapacity(za::SizeT count);
@@ -296,7 +295,7 @@ struct PersistentGPUStorage
     [[nodiscard]] IndexType* reserveMoreIndices(za::SizeT count);
 
     ////////////////////////////////////////////////////////////
-    /// \brief Ensure the index buffer can accommodate `count` more indices without changing the active count
+    /// \brief Ensure the index buffer can accommodate `count` indices in total without changing the active count
     ///
     ////////////////////////////////////////////////////////////
     void reserveIndexCapacity(za::SizeT count);
@@ -1109,6 +1108,13 @@ public:
 ///
 /// Use the batch type that matches your update frequency and
 /// platform constraints.
+///
+/// \note Outlines for the `*ShapeData` `add` overloads are
+/// generated in the shape's **local** coordinate system, exactly
+/// like retained `za::Shape` objects: `outlineThickness` scales
+/// with the shape's transform, mirroring cannot flip the side the
+/// outline grows on, and outline texture coordinates map the
+/// outline texture rect over the outline's local bounds.
 ///
 /// \see `za::CPUDrawableBatch`, `za::PersistentGPUDrawableBatch`,
 ///      `za::Transformable`

@@ -2,6 +2,9 @@
 
 #include "Zancle/Container/Vector.hpp"
 
+#include "Zancle/Base/Macros.hpp"
+#include "Zancle/Base/SizeT.hpp"
+
 #include "Zancle/Trait/IsCopyAssignable.hpp"
 #include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsMoveAssignable.hpp"
@@ -13,9 +16,6 @@
 #include "Zancle/Trait/IsTriviallyDestructible.hpp"
 #include "Zancle/Trait/IsTriviallyMoveAssignable.hpp"
 #include "Zancle/Trait/IsTriviallyMoveConstructible.hpp"
-
-#include "Zancle/Base/Macros.hpp"
-#include "Zancle/Base/SizeT.hpp"
 
 
 namespace

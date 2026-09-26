@@ -13,14 +13,15 @@
 #include "Zancle/Network/TcpSocket.hpp"
 
 #include "Zancle/Scn/ScnStdin.hpp"
-#include "Zancle/Scn/ScnString.hpp"
 
 #include "Zancle/Fmt/Fmt.hpp"
-#include "Zancle/Fmt/FmtNumeric.hpp"
 
 #include "Zancle/String/String.hpp"
 
 #include "Zancle/Vocabulary/Optional.hpp"
+
+#include "Zancle/Base/IntTypes.hpp"
+#include "Zancle/Base/SizeT.hpp"
 
 
 constexpr za::U8 clientAudioData   = 1;

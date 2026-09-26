@@ -6,12 +6,6 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
-#include "Zancle/Trait/IsCopyConstructible.hpp"
-#include "Zancle/Trait/IsInvocableR.hpp"
-#include "Zancle/Trait/IsSame.hpp"
-#include "Zancle/Trait/IsTriviallyCopyable.hpp"
-#include "Zancle/Trait/RemoveCVRef.hpp"
-
 #include "Zancle/Base/Abort.hpp"
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/Launder.hpp"
@@ -21,6 +15,13 @@
 #include "Zancle/Base/PlacementNew.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
+#include "Zancle/Trait/IsCopyConstructible.hpp"
+#include "Zancle/Trait/IsInvocableR.hpp"
+#include "Zancle/Trait/IsSame.hpp"
+#include "Zancle/Trait/IsTriviallyCopyable.hpp"
+#include "Zancle/Trait/RemoveCVRef.hpp"
+
+// TODO P1: provide triviallyrelocatable version
 
 namespace za
 {

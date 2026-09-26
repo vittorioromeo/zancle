@@ -14,13 +14,13 @@
 
 #include "Zancle/Vocabulary/Optional.hpp"
 
+#include "Zancle/Base/Macros.hpp"
+#include "Zancle/Base/SizeT.hpp"
+
 #include "Zancle/Trait/IsCopyAssignable.hpp"
 #include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsNothrowMoveAssignable.hpp"
 #include "Zancle/Trait/IsNothrowMoveConstructible.hpp"
-
-#include "Zancle/Base/Macros.hpp"
-#include "Zancle/Base/SizeT.hpp"
 
 
 namespace

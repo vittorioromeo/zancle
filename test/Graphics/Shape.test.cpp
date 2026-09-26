@@ -117,5 +117,15 @@ TEST_CASE("[Graphics] za::Shape" * tst::skip(skipDisplayTests))
             CHECK(triangleShape.getLocalBounds() == Approx(za::Rect2f({-7.2150f, -10.f}, {44.4300f, 55.f})));
             CHECK(triangleShape.getGlobalBounds() == Approx(za::Rect2f({-7.2150f, -10.f}, {44.4300f, 55.f})));
         }
+
+        SECTION("Add beveled outline, reversed call order")
+        {
+            // Regression: `setMiterLimit` after `setOutlineThickness` used to treat stale
+            // outline vertices as polygon perimeter and grow the vertex array unboundedly.
+            triangleShape.setOutlineThickness(5);
+            triangleShape.setMiterLimit(2);
+            CHECK(triangleShape.getLocalBounds() == Approx(za::Rect2f({-7.2150f, -10.f}, {44.4300f, 55.f})));
+            CHECK(triangleShape.getGlobalBounds() == Approx(za::Rect2f({-7.2150f, -10.f}, {44.4300f, 55.f})));
+        }
     }
 }

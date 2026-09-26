@@ -10,6 +10,7 @@
 #include "Zancle/Graphics/FontInfo.hpp"
 #include "Zancle/Graphics/Glyph.hpp"
 #include "Zancle/Graphics/GlyphMapping.hpp"
+#include "Zancle/Graphics/Priv/QuantizeOutlineThickness.hpp"
 #include "Zancle/Graphics/TextureAtlas.hpp"
 
 #include "Zancle/Err/Err.hpp"
@@ -60,22 +61,19 @@
 namespace
 {
 ////////////////////////////////////////////////////////////
+// FreeType convention: for `count > 0` return the number of bytes read (`0`
+// signals an error); for `count == 0` (seek-only) return `0` on success and
+// nonzero on error.
 [[nodiscard]] unsigned long read(FT_Stream rec, unsigned long offset, unsigned char* buffer, unsigned long count)
 {
     auto* stream = static_cast<za::InputStream*>(rec->descriptor.pointer);
 
     if (za::Optional seekResult = stream->seek(offset); seekResult.hasValue() && *seekResult == offset)
-        return count == 0ul ? 0ul
-                            : static_cast<unsigned long>(stream->read(reinterpret_cast<char*>(buffer), count).value());
+        return count == 0ul
+                   ? 0ul
+                   : static_cast<unsigned long>(stream->read(reinterpret_cast<char*>(buffer), count).valueOr(0u));
 
     return count == 0ul ? 1ul : 0ul;
-}
-
-
-////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline, gnu::const]] inline za::I32 fontFaceQuantizeOutlineThickness(const float outlineThickness)
-{
-    return static_cast<za::I32>(outlineThickness * float{1 << 6});
 }
 
 
@@ -361,6 +359,15 @@ struct FontFace::Impl
         if (!setCurrentSize(characterSize))
             return result;
 
+        // An unmapped code point resolves to glyph index 0 (`.notdef`, the
+        // font's missing-glyph placeholder), which loads and renders like any
+        // other glyph. Warn so missing font coverage is diagnosable; callers
+        // cache the result, so this fires at most once per glyph variant.
+        if (codePoint != 0u && getCharIndex(codePoint) == 0u)
+            priv::errMsg("Code point U+{:x} is not present in font '{}', rendering missing-glyph placeholder",
+                         static_cast<unsigned int>(codePoint),
+                         m_info.family.cStr());
+
         const FT_Int32 flags = outlineThickness == 0.f
                                    ? FT_LOAD_TARGET_NORMAL | FT_LOAD_FORCE_AUTOHINT
                                    : FT_LOAD_TARGET_NORMAL | FT_LOAD_FORCE_AUTOHINT | FT_LOAD_NO_BITMAP;
@@ -391,7 +398,7 @@ struct FontFace::Impl
             if (outlineThickness != 0.f)
             {
                 FT_Stroker_Set(m_ftStroker,
-                               static_cast<FT_Fixed>(fontFaceQuantizeOutlineThickness(outlineThickness)),
+                               static_cast<FT_Fixed>(priv::quantizeOutlineThickness(outlineThickness)),
                                FT_STROKER_LINECAP_ROUND,
                                FT_STROKER_LINEJOIN_ROUND,
                                0);
@@ -424,9 +431,6 @@ struct FontFace::Impl
 
         result.glyph.advance = static_cast<float>(bitmapGlyph->root.advance.x >> 16) +
                                (bold ? static_cast<float>(weight) / float{1 << 6} : 0.f);
-
-        result.glyph.lsbDelta = static_cast<za::I16>(m_ftFace->glyph->lsb_delta);
-        result.glyph.rsbDelta = static_cast<za::I16>(m_ftFace->glyph->rsb_delta);
 
         if (bitmap.width == 0u || bitmap.rows == 0u)
             return result;
@@ -573,15 +577,14 @@ za::Optional<FontFace> FontFace::openFromFile(const Path& filename)
     auto                  stream = za::makeUnique<FileInputStream>(ZA_MOVE(*optStream));
     constexpr const char* type   = "file";
 #else
-    auto optStream = ResourceStream::open(filename);
-    if (!optStream.hasValue())
+    auto stream = za::makeUnique<priv::ResourceStream>();
+    if (!stream->open(filename))
     {
         priv::errMsg("Failed to load font face ({}): failed to open file", priv::PathDebugFormatter{filename});
         return result;
     }
 
-    auto                  stream = za::makeUnique<priv::ResourceStream>(ZA_MOVE(*optStream));
-    constexpr const char* type   = "Android resource stream";
+    constexpr const char* type = "Android resource stream";
 #endif
 
     result = openFromStreamImpl(*stream, type);
@@ -746,6 +749,10 @@ za::Optional<GlyphMapping> FontFace::loadGlyphs(TextureAtlas& atlas, const Glyph
     {
         const char32_t codePoint = settings.codePoints[i];
 
+        // Skip duplicate code points: they are already rasterized and mapped
+        if (result.fillGlyphs.contains(codePoint))
+            continue;
+
         const auto optFillGlyph = rasterizeAndPackGlyph(atlas, codePoint, settings.characterSize, settings.bold, 0.f);
 
         if (!optFillGlyph.hasValue())
@@ -767,6 +774,28 @@ za::Optional<GlyphMapping> FontFace::loadGlyphs(TextureAtlas& atlas, const Glyph
 
         result.outlineGlyphs[codePoint] = *optOutlineGlyph;
     }
+
+    // Text layout unconditionally queries U+0020 (space) to compute whitespace
+    // width (and U+0078 'x' when strike-through is enabled) -- warn at creation
+    // time instead of aborting at first draw (see `GlyphMapping::getGlyph`)
+    if (!result.fillGlyphs.contains(U' '))
+        priv::errMsg(
+            "GlyphMapping created without U+0020 (space): drawing any text with this mapping will render placeholders");
+
+    // Rasterize the font's missing-glyph placeholder (`.notdef`, glyph index 0,
+    // reached via code point 0) so unmapped code points render a visible
+    // placeholder at draw time instead of failing. Best-effort: on atlas
+    // exhaustion the fallbacks stay zero-sized (rendering nothing).
+    if (const auto optFallbackFill = rasterizeAndPackGlyph(atlas, char32_t{0}, settings.characterSize, settings.bold, 0.f))
+        result.fallbackFillGlyph = *optFallbackFill;
+
+    if (settings.outlineThickness != 0.f)
+        if (const auto optFallbackOutline = rasterizeAndPackGlyph(atlas,
+                                                                  char32_t{0},
+                                                                  settings.characterSize,
+                                                                  settings.bold,
+                                                                  settings.outlineThickness))
+            result.fallbackOutlineGlyph = *optFallbackOutline;
 
     return za::makeOptional(ZA_MOVE(result));
 }

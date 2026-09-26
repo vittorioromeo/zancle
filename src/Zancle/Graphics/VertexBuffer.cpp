@@ -181,10 +181,16 @@ bool VertexBuffer::update(const Vertex* vertices, za::SizeT vertexCount, unsigne
 
 
 ////////////////////////////////////////////////////////////
-bool VertexBuffer::update(const VertexBuffer& vertexBuffer) const
+bool VertexBuffer::update(const VertexBuffer& vertexBuffer)
 {
     if (!m_buffer || !vertexBuffer.m_buffer)
         return false;
+
+    if (vertexBuffer.m_size > m_size)
+    {
+        priv::errMsg("Could not copy vertex buffer, destination buffer is too small");
+        return false;
+    }
 
     ZA_ASSERT(GraphicsContext::hasActiveThreadLocalGlContext());
     ZA_ASSERT(GraphicsContext::isInstalled());

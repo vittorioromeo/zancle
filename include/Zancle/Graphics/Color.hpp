@@ -127,7 +127,13 @@ struct [[nodiscard]] ZA_GRAPHICS_API Color
     {
         auto& [hue, saturation, lightness] = hsl;
 
-        hue        = za::positiveRemainder(hue, 360.f);
+        hue = za::positiveRemainder(hue, 360.f);
+
+        // Float rounding at the wrap boundary: `positiveRemainder` can return exactly `360.f`
+        // for tiny negative hues; fold it back so `hueSegment` below stays in `[0, 5]`.
+        if (hue >= 360.f)
+            hue = 0.f;
+
         saturation = ZA_CLAMP(saturation, 0.f, 1.f);
         lightness  = ZA_CLAMP(lightness, 0.f, 1.f);
 

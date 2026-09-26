@@ -186,12 +186,15 @@ public:
     ////////////////////////////////////////////////////////////
     /// \brief Copy the contents of another buffer into this buffer
     ///
+    /// Fails if this buffer is smaller than `vertexBuffer`: the
+    /// destination is never grown by this function.
+    ///
     /// \param vertexBuffer Vertex buffer whose contents to copy into this vertex buffer
     ///
     /// \return `true` if the copy was successful
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] bool update(const VertexBuffer& vertexBuffer) const;
+    [[nodiscard]] bool update(const VertexBuffer& vertexBuffer);
 
     ////////////////////////////////////////////////////////////
     /// \brief Overload of assignment operator

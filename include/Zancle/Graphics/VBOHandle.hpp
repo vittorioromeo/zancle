@@ -33,7 +33,9 @@ namespace za
 /// `InstanceAttributeBinder` defers the final `glVertexAttribPointer`
 /// calls until every upload for the draw is complete.
 ///
-/// `VBOHandle` is move-only and should be cached across frames.
+/// `VBOHandle` is non-copyable and non-movable (it cannot live in
+/// relocatable containers); cache it across frames, e.g. behind a
+/// `za::UniquePtr` or as a long-lived member.
 ///
 ////////////////////////////////////////////////////////////
 class [[nodiscard]] VBOHandle
@@ -110,8 +112,8 @@ private:
 /// data into and that `za::InstanceAttributeBinder::setup`
 /// then reads from.
 ///
-/// `VBOHandle` is move-only and should be cached across frames
-/// to avoid unnecessary OpenGL allocations.
+/// `VBOHandle` is non-copyable and non-movable; cache it across
+/// frames to avoid unnecessary OpenGL allocations.
 ///
 /// \see `za::VAOHandle`, `za::InstanceAttributeBinder`,
 ///      `za::RenderTarget`

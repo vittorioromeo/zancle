@@ -8,13 +8,13 @@
 
 #include "Zancle/Geometry/Priv/Vec2Base.hpp"
 
+#include "Zancle/Base/IntTypes.hpp"
+
 #include "Zancle/Trait/IsCopyAssignable.hpp"
 #include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsDefaultConstructible.hpp"
 #include "Zancle/Trait/IsNothrowMoveAssignable.hpp"
 #include "Zancle/Trait/IsNothrowMoveConstructible.hpp"
-
-#include "Zancle/Base/IntTypes.hpp"
 
 TEST_CASE("[Window] za::Cursor" * tst::skip(skipDisplayTests))
 {

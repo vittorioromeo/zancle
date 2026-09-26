@@ -6,10 +6,10 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
-#include "Zancle/Trait/IsEnum.hpp"
-
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/SizeT.hpp"
+
+#include "Zancle/Trait/IsEnum.hpp"
 
 
 namespace za

@@ -1462,7 +1462,7 @@ int main()
     auto windowView = computeAspectRatioAwareView(window.getSize().toVec2f(), resolution);
     auto worldView  = za::View::fromScreenSize(resolution);
 
-    auto rtGame = makeAARenderTexture(resolution.toVec2u(), {.antiAliasingLevel = 8u}).value();
+    auto rtGame = makeAARenderTexture(resolution.toVec2u(), {.sampleCount = 8u}).value();
 
     //
     //

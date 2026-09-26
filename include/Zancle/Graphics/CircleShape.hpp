@@ -11,6 +11,7 @@
 #include "Zancle/Graphics/CircleShapeData.hpp"
 #include "Zancle/Graphics/Shape.hpp"
 
+#include "Zancle/Geometry/Angle.hpp"
 #include "Zancle/Geometry/Priv/Vec2Base.hpp"
 
 #include "Zancle/Base/SizeT.hpp"
@@ -63,6 +64,26 @@ public:
     ///
     ////////////////////////////////////////////////////////////
     [[nodiscard]] float getRadius() const;
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Set the starting angle of the first generated point on the contour
+    ///
+    /// \param startAngle New starting angle
+    ///
+    /// \see `getStartAngle`
+    ///
+    ////////////////////////////////////////////////////////////
+    void setStartAngle(Angle startAngle);
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Get the starting angle of the first generated point on the contour
+    ///
+    /// \return Starting angle of the first generated point
+    ///
+    /// \see `setStartAngle`
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] Angle getStartAngle() const;
 
     ////////////////////////////////////////////////////////////
     /// \brief Set the number of points of the circle
@@ -122,6 +143,7 @@ private:
     // Member data
     ////////////////////////////////////////////////////////////
     float        m_radius;     //!< Radius of the circle
+    Angle        m_startAngle; //!< Starting angle of the first generated point on the contour
     unsigned int m_pointCount; //!< Number of points composing the circle
 };
 

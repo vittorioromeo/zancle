@@ -24,11 +24,11 @@
 
 #include "Zancle/Vocabulary/Optional.hpp"
 
-#include "Zancle/Trait/Decay.hpp"
-#include "Zancle/Trait/IsSame.hpp"
-
 #include "Zancle/Base/Macros.hpp"
 #include "Zancle/Base/SizeT.hpp"
+
+#include "Zancle/Trait/Decay.hpp"
+#include "Zancle/Trait/IsSame.hpp"
 
 
 namespace

@@ -476,12 +476,10 @@ public:
     /// between the 2nd and 3rd vertex.
     ///
     /// \param settings Draw settings. `settings.vertexSpan.size()` must
-    ///                 be a multiple of 4 and at most
-    ///                 `drawQuadsMaxVerticesPerCall` (i.e. at most
-    ///                 `drawQuadsMaxQuadsPerCall` quads). Larger draws
-    ///                 must be split by the caller, or use
-    ///                 `drawIndexedVertices` with a caller-supplied
-    ///                 index buffer.
+    ///                 be a multiple of 4. Draws larger than
+    ///                 `drawQuadsMaxVerticesPerCall` (i.e. more than
+    ///                 `drawQuadsMaxQuadsPerCall` quads) are internally
+    ///                 split into multiple draw calls.
     ///
     /// \see `drawQuadsMaxQuadsPerCall`, `drawQuadsMaxVerticesPerCall`,
     ///      `drawIndexedVertices`
@@ -615,7 +613,7 @@ public:
     ////////////////////////////////////////////////////////////
     /// \brief Draws the currently autobatched drawables (if any)
     ///
-    /// \return Statistics about the draw calls that were made
+    /// \return Statistics about the draw calls made since the last `display()` (the current frame so far)
     ///
     ////////////////////////////////////////////////////////////
     [[gnu::cold]] RenderTarget::DrawStatistics flush();
@@ -798,17 +796,11 @@ protected:
     [[nodiscard]] explicit RenderTarget(bool isSrgb = false);
 
     ////////////////////////////////////////////////////////////
-    /// \brief Synchronize the GPU with the CPU (beginning of a frame)
+    /// \brief Mark the end of a frame (called by `display`)
     ///
-    /// Only useful when working with persistently mapped buffers.
-    ///
-    ////////////////////////////////////////////////////////////
-    void syncGPUStartFrame();
-
-    ////////////////////////////////////////////////////////////
-    /// \brief Synchronize the GPU with the CPU (end of a frame)
-    ///
-    /// Only useful when working with persistently mapped buffers.
+    /// Resets the per-frame draw statistics and rotates the
+    /// persistent GPU auto-batch to its next frame state. Must be
+    /// called with the target's GL context active, after flushing.
     ///
     ////////////////////////////////////////////////////////////
     void syncGPUEndFrame();
@@ -1008,26 +1000,25 @@ private:
     ////////////////////////////////////////////////////////////
     /// \brief Setup environment for drawing: MVP matrix
     ///
+    /// Uploads are deduplicated against `usedShader`'s shadow of the last
+    /// uploaded values, since uniform values live in the (possibly shared)
+    /// program object rather than in this render target.
+    ///
     /// \param renderStatesTransform Transform to use for the MVP matrix
     /// \param viewTransform         View transform to use for the MVP matrix
-    /// \param uploadMVPRow0         Whether to upload the `za_u_mvpRow0` uniform
-    /// \param uploadMVPRow1         Whether to upload the `za_u_mvpRow1` uniform
+    /// \param usedShader            Shader whose built-in MVP uniforms are updated
     ///
     ////////////////////////////////////////////////////////////
-    void setupDrawMVP(const Transform& renderStatesTransform,
-                      const Transform& viewTransform,
-                      bool             uploadMVPRow0,
-                      bool             uploadMVPRow1);
+    void setupDrawMVP(const Transform& renderStatesTransform, const Transform& viewTransform, const Shader& usedShader);
 
     ////////////////////////////////////////////////////////////
     /// \brief Setup environment for drawing: texture
     ///
-    /// \param states                      Render states to use for drawing
-    /// \param shaderChanged               Whether the shader program changed since the last draw call
-    /// \param uploadInvTextureSizeUniform Whether to upload the `za_u_invTextureSize` uniform
+    /// \param states     Render states to use for drawing
+    /// \param usedShader Shader whose built-in `za_u_invTextureSize` uniform is updated
     ///
     ////////////////////////////////////////////////////////////
-    void setupDrawTexture(const RenderStates& states, bool shaderChanged, bool uploadInvTextureSizeUniform);
+    void setupDrawTexture(const RenderStates& states, const Shader& usedShader);
 
     ////////////////////////////////////////////////////////////
     /// \brief Clean up environment after drawing
@@ -1301,7 +1292,7 @@ private:
 ///     // Process events, update game state, ...
 ///
 ///     window.clear(za::Color::Black);
-///     window.draw(sprite, texture);
+///     window.draw(sprite, {.texture = &texture});
 ///     window.draw(shape);
 ///     window.draw(text);
 ///     window.display();

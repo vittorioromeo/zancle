@@ -1,6 +1,8 @@
 #include "Zancle/Trait/CommonType.hpp"
 #include "Zancle/Trait/Conditional.hpp"
 #include "Zancle/Trait/Decay.hpp"
+#include "Zancle/Trait/DeclVal.hpp"
+#include "Zancle/Trait/EnableTrivialRelocation.hpp"
 #include "Zancle/Trait/IsArray.hpp"
 #include "Zancle/Trait/IsBaseOf.hpp"
 #include "Zancle/Trait/IsCopyAssignable.hpp"
@@ -35,8 +37,6 @@
 #include "Zancle/Trait/RemoveCVRef.hpp"
 #include "Zancle/Trait/RemoveReference.hpp"
 #include "Zancle/Trait/UnderlyingType.hpp"
-
-#include "Zancle/Base/DeclVal.hpp"
 
 
 namespace
@@ -229,7 +229,7 @@ static_assert(ZA_IS_TRIVIALLY_RELOCATABLE(TraitsTest::Custom2));
 
 struct Custom3
 {
-    using TriviallyRelocatableTag = Custom3;
+    ZA_ENABLE_TRIVIAL_RELOCATION;
 
     ~Custom3() // NOLINT(modernize-use-equals-default)
     {
@@ -255,7 +255,7 @@ static_assert(!ZA_IS_TRIVIALLY_RELOCATABLE(DerivedFromCustom3));
 template <bool Enable>
 struct ConditionallyRelocatable
 {
-    using TriviallyRelocatableTag = za::Conditional<Enable, ConditionallyRelocatable, void>;
+    ZA_ENABLE_TRIVIAL_RELOCATION_IF(Enable);
 
     ~ConditionallyRelocatable() // NOLINT(modernize-use-equals-default)
     {

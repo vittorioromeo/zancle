@@ -10,6 +10,7 @@
 #include "Zancle/Graphics/FontFace.hpp"
 #include "Zancle/Graphics/FontInfo.hpp"
 #include "Zancle/Graphics/Glyph.hpp"
+#include "Zancle/Graphics/Priv/QuantizeOutlineThickness.hpp"
 #include "Zancle/Graphics/Texture.hpp"
 #include "Zancle/Graphics/TextureAtlas.hpp"
 
@@ -24,7 +25,6 @@
 #include "Zancle/Vocabulary/PassKey.hpp"
 #include "Zancle/Vocabulary/UniquePtr.hpp"
 
-#include "Zancle/Base/Abort.hpp"
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/IntTypes.hpp"
 #include "Zancle/Base/Macros.hpp"
@@ -34,13 +34,6 @@
 
 namespace
 {
-////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline, gnu::const]] inline za::I32 quantizeOutlineThickness(const float outlineThickness)
-{
-    return static_cast<za::I32>(outlineThickness * float{1 << 6});
-}
-
-
 ////////////////////////////////////////////////////////////
 [[nodiscard, gnu::always_inline, gnu::const]] inline za::U32 bitCastU32(const za::I32 value)
 {
@@ -56,7 +49,7 @@ namespace
     const bool     bold,
     const char32_t index)
 {
-    return (za::U64{bitCastU32(quantizeOutlineThickness(outlineThickness))} << 32) | (za::U64{bold} << 31) | index;
+    return (za::U64{bitCastU32(za::priv::quantizeOutlineThickness(outlineThickness))} << 32) | (za::U64{bold} << 31) | index;
 }
 
 } // namespace
@@ -113,7 +106,12 @@ struct Font::Impl
                          bold,
                          outlineThickness);
 
-            za::abort();
+            // Atlas full (or rasterization failure): cache an empty glyph
+            // (renders nothing, zero advance) under the requested key so the
+            // failure is recoverable and subsequent frames don't re-rasterize
+            // and re-log. An alternative would be growing the atlas, but the
+            // fallback atlas is intentionally fixed-size.
+            return glyphsByCharacterSize.try_emplace(key, Glyph{});
         }
 
         return glyphsByCharacterSize.try_emplace(key, *optGlyph);
@@ -148,7 +146,6 @@ struct Font::Impl
 Font::Font(za::PassKey<Font>&&, FontFace&& fontFace, TextureAtlas* textureAtlas) :
     m_impl{za::makeUnique<Impl>(ZA_MOVE(fontFace), textureAtlas)}
 {
-    // m_impl is set by the factory methods after construction
 }
 
 
@@ -181,26 +178,13 @@ za::Optional<Font> Font::openFromMemory(const void* data, za::SizeT sizeInBytes,
 
 
 ////////////////////////////////////////////////////////////
-za::Optional<Font> Font::openFromStreamImpl(InputStream& stream, TextureAtlas* textureAtlas, const char* /* type */)
+za::Optional<Font> Font::openFromStream(InputStream& stream, TextureAtlas* textureAtlas)
 {
-    auto optFontFace = FontFace::openFromStream(stream);
+    auto optFontFace = FontFace::openFromStream(stream); // Seeks to `0` and logs errors on failure
     if (!optFontFace.hasValue())
         return za::nullOpt;
 
     return za::makeOptional<Font>(za::PassKey<Font>{}, ZA_MOVE(*optFontFace), textureAtlas);
-}
-
-
-////////////////////////////////////////////////////////////
-za::Optional<Font> Font::openFromStream(InputStream& stream, TextureAtlas* textureAtlas)
-{
-    if (!stream.seek(0).hasValue())
-    {
-        priv::errMsg("Failed to seek font stream");
-        return za::nullOpt;
-    }
-
-    return openFromStreamImpl(stream, textureAtlas, "stream");
 }
 
 
@@ -212,13 +196,8 @@ const FontInfo& Font::getInfo() const
 
 
 ////////////////////////////////////////////////////////////
-const Glyph& Font::getGlyph(const char32_t     codePoint,
-                            const unsigned int characterSize,
-                            const bool         bold,
-                            const float        outlineThickness) const
+Glyph Font::getGlyph(const char32_t codePoint, const unsigned int characterSize, const bool bold, const float outlineThickness) const
 {
-    ZA_ASSERT(m_impl->fontFace.hasGlyph(codePoint));
-
     return m_impl->getGlyphImpl(m_impl->glyphs[characterSize],
                                 combineGlyphTableKey(outlineThickness, bold, codePoint),
                                 codePoint,
@@ -235,7 +214,6 @@ Font::GlyphPair Font::getFillAndOutlineGlyph(const char32_t     codePoint,
                                              const float        outlineThickness) const
 {
     ZA_ASSERT(outlineThickness != 0.f);
-    ZA_ASSERT(m_impl->fontFace.hasGlyph(codePoint));
 
     auto& glyphsByCharacterSize = m_impl->glyphs[characterSize];
 

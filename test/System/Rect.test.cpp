@@ -5,6 +5,8 @@
 #include "Zancle/Geometry/Rect2.hpp"
 #include "Zancle/Geometry/RectUtils.hpp"
 
+#include "Zancle/Base/Assert.hpp"
+
 #include "Zancle/Trait/IsAggregate.hpp"
 #include "Zancle/Trait/IsStandardLayout.hpp"
 #include "Zancle/Trait/IsTrivial.hpp"
@@ -15,8 +17,6 @@
 #include "Zancle/Trait/IsTriviallyDestructible.hpp"
 #include "Zancle/Trait/IsTriviallyMoveAssignable.hpp"
 #include "Zancle/Trait/IsTriviallyMoveConstructible.hpp"
-
-#include "Zancle/Base/Assert.hpp"
 
 
 ////////////////////////////////////////////////////////////

@@ -25,7 +25,6 @@
 
     #include "Zancle/Base/Assert.hpp"
     #include "Zancle/Base/Macros.hpp"
-    #include "Zancle/Base/Memcpy.hpp"
 #endif
 
 
@@ -45,8 +44,8 @@ namespace za
 /// The class is responsible for:
 /// - Lazily allocating and mapping the underlying storage on first use
 /// - Growing the buffer geometrically (capacity * 1.5) on reservation
-///   requests that exceed the current capacity, copying any existing
-///   contents into the freshly allocated storage
+///   requests that exceed the current capacity, server-side-copying the
+///   requested number of live bytes into the freshly allocated storage
 /// - Unmapping the buffer on demand
 /// - Flushing explicit ranges of writes to the GPU
 ///
@@ -144,20 +143,21 @@ public:
     /// \param obj       The buffer object to (re)allocate. Will be
     ///                  move-assigned a fresh instance on growth.
     /// \param byteCount Minimum number of bytes to make available
-    /// \param preserveExistingData `true` to copy the old mapped bytes
-    ///                             into the new storage on growth,
-    ///                             `false` to discard them
+    /// \param preserveByteCount Number of bytes from the start of the old
+    ///                          storage to copy into the new one on growth
+    ///                          (server-side copy); `0` discards the old
+    ///                          contents
     ///
     /// \return `true` if a reallocation occurred, `false` if the
     ///         existing storage was already large enough
     ///
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline]] bool reserve(TBufferObject& obj, const za::SizeT byteCount, const bool preserveExistingData)
+    [[gnu::always_inline]] bool reserve(TBufferObject& obj, const za::SizeT byteCount, const za::SizeT preserveByteCount)
     {
         if (m_capacity >= byteCount) [[likely]]
             return false;
 
-        reserveImpl(obj, byteCount, preserveExistingData);
+        reserveImpl(obj, byteCount, preserveByteCount);
         return true;
     }
 
@@ -270,7 +270,7 @@ private:
     ////////////////////////////////////////////////////////////
     [[gnu::cold, gnu::noinline]] void reserveImpl([[maybe_unused]] TBufferObject&  obj,
                                                   [[maybe_unused]] const za::SizeT byteCount,
-                                                  [[maybe_unused]] const bool      preserveExistingData)
+                                                  [[maybe_unused]] const za::SizeT preserveByteCount)
     {
 #ifdef ZA_OPENGL_ES
         priv::errMsg("FATAL ERROR: Persistent OpenGL buffers are not available in OpenGL ES");
@@ -304,8 +304,30 @@ private:
 
         if (m_mappedPtr != nullptr)
         {
-            if (preserveExistingData)
-                ZA_MEMCPY(newMappedPtr, m_mappedPtr, m_capacity);
+            if (preserveByteCount > 0u)
+            {
+                ZA_ASSERT(preserveByteCount <= m_capacity);
+
+                // The old mapping has no `GL_MAP_READ_BIT`: reading it from the
+                // CPU (memcpy) is undefined per spec and hits uncached
+                // write-combined memory in practice. Copy server-side instead,
+                // and only the live bytes rather than the full old capacity.
+                //
+                // The mapping is `GL_MAP_FLUSH_EXPLICIT_BIT`, so CPU writes are
+                // only guaranteed visible to GL commands after an explicit
+                // flush -- and growth can happen mid-write-cycle, before the
+                // caller's own flush. Flush the live range first. Copying while
+                // still mapped is legal because the mapping is persistent
+                // (`GL_MAP_PERSISTENT_BIT`); `obj` stays alive until the
+                // move-assignment below, so the copy source is valid.
+                flushBytesToGPU(obj, /* byteOffset */ 0u, preserveByteCount);
+
+                glCheck(glCopyNamedBufferSubData(obj.getId(),
+                                                 newObj.getId(),
+                                                 /* readOffset */ 0,
+                                                 /* writeOffset */ 0,
+                                                 static_cast<GLsizeiptr>(preserveByteCount)));
+            }
 
             unmapIfNeeded(obj);
         }

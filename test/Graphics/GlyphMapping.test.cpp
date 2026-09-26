@@ -1,10 +1,10 @@
-#include "GraphicsUtil.hpp"
 #include "Tst/Tst.hpp"
 #include "WindowUtil.hpp"
 
 #include "Zancle/Graphics/GlyphMapping.hpp"
 
 #include "Zancle/Graphics/FontFace.hpp"
+#include "Zancle/Graphics/Glyph.hpp"
 #include "Zancle/Graphics/GlyphMappedText.hpp"
 #include "Zancle/Graphics/GraphicsContext.hpp"
 #include "Zancle/Graphics/TextureAtlas.hpp"
@@ -65,6 +65,28 @@ TEST_CASE("[Graphics] za::GlyphMapping" * tst::skip(skipDisplayTests))
         CHECK(glyph.bounds.size.y > 0.f);
         CHECK(glyph.textureRect.size.x > 0.f);
         CHECK(glyph.textureRect.size.y > 0.f);
+    }
+
+    SECTION("getGlyph for unmapped code point returns placeholder instead of aborting")
+    {
+        auto mapping = fontFace
+                           .loadGlyphs(atlas,
+                                       {
+                                           .codePoints       = testCodePoints,
+                                           .codePointCount   = testCodePointsCount,
+                                           .characterSize    = 24,
+                                           .bold             = false,
+                                           .outlineThickness = 0.f,
+                                       })
+                           .value();
+
+        // U+20AC ('EUR') and U+2713 (check mark) are not in the loaded set:
+        // both must resolve to the single shared `.notdef` placeholder
+        const za::Glyph& fallback0 = mapping.getGlyph(U'\u20ac', 24, false, 0.f);
+        const za::Glyph& fallback1 = mapping.getGlyph(U'\u2713', 24, false, 0.f);
+
+        CHECK(&fallback0 == &fallback1);
+        CHECK(&fallback0 == &mapping.fallbackFillGlyph);
     }
 
     SECTION("getGlyph for space has advance but no bounds")

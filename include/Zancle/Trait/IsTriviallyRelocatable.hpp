@@ -6,6 +6,7 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/Trait/DeclVal.hpp"
 #include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/IsTriviallyCopyable.hpp"
 #include "Zancle/Trait/RemoveCV.hpp"
@@ -34,15 +35,19 @@ namespace za
 ////////////////////////////////////////////////////////////
 /// \brief Opt-in customization point for trivial relocation
 ///
-/// `true` if `T` declares a `TriviallyRelocatableTag` member alias
-/// naming `T` itself. Requiring the alias to name the declaring
-/// class prevents derived classes (which inherit the alias) from
-/// silently inheriting the opt-in. Can also be explicitly specialized.
+/// `true` if `T` itself (not one of its bases) opted in via
+/// `ZA_ENABLE_TRIVIAL_RELOCATION` or `ZA_ENABLE_TRIVIAL_RELOCATION_IF`
+/// with a `true` predicate. Checking that `zaPrivTriviallyRelocatableSelf`
+/// returns a pointer to `T` itself prevents derived classes (which
+/// inherit the members declared by the macros) from silently inheriting
+/// the opt-in. Can also be explicitly specialized.
 ///
 ////////////////////////////////////////////////////////////
 template <typename T>
 inline constexpr bool enableTrivialRelocation = requires {
-    requires ZA_IS_SAME(typename T::TriviallyRelocatableTag, ZA_REMOVE_CV(T));
+    requires static_cast<bool>(T::enableTrivialRelocation);
+    requires ZA_IS_SAME(decltype(declVal<const ZA_REMOVE_CV(T) &>().zaPrivTriviallyRelocatableSelf()),
+                        const ZA_REMOVE_CV(T)*);
 };
 
 } // namespace za
@@ -80,27 +85,16 @@ inline constexpr bool isTriviallyRelocatable = ZA_IS_TRIVIALLY_RELOCATABLE(T);
 ///   (`__builtin_is_cpp_trivially_relocatable` or
 ///   `__is_trivially_relocatable`)
 /// - it is trivially copyable
-/// - it opts in by declaring `using TriviallyRelocatableTag = T;`
-///   (or by specializing `za::enableTrivialRelocation<T>`)
+/// - it opts in via the `ZA_ENABLE_TRIVIAL_RELOCATION` /
+///   `ZA_ENABLE_TRIVIAL_RELOCATION_IF(...)` macros (or by specializing
+///   `za::enableTrivialRelocation<T>`)
 ///
-/// User code can opt in by adding the `TriviallyRelocatableTag` alias
-/// to a class, e.g. when the class manages a heap buffer in a way
-/// that survives a `memcpy` (`Vector` itself is the canonical example):
-///
-/// \code
-/// class Vector
-/// {
-/// public:
-///     using TriviallyRelocatableTag = Vector;
-///     // ...
-/// };
-/// \endcode
-///
-/// Conditional opt-in (e.g. for wrappers) names `void` when disabled:
-///
-/// \code
-/// using TriviallyRelocatableTag = Conditional<ZA_IS_TRIVIALLY_RELOCATABLE(T), Optional, void>;
-/// \endcode
+/// User code can opt in via the `ZA_ENABLE_TRIVIAL_RELOCATION` /
+/// `ZA_ENABLE_TRIVIAL_RELOCATION_IF(...)` macros (in
+/// `Zancle/Trait/EnableTrivialRelocation.hpp`), e.g. when the class
+/// manages a heap buffer in a way that survives a `memcpy` (`Vector`
+/// itself is the canonical example), or to propagate relocatability
+/// from an element type.
 ///
 /// The opt-in is intentionally *not* inherited: a class deriving from
 /// an opted-in class must opt in again, as it may add members (e.g.

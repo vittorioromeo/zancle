@@ -38,7 +38,7 @@ struct [[nodiscard]] ZA_GRAPHICS_API RingPieSliceShapeData : LocalAnchorPointMix
     float        innerRadius{0.f}; //!< Radius of the inner circle defining the hole
     Angle        startAngle{};     //!< Starting angle of the pie slice
     Angle        sweepAngle{};     //!< Sweep angle of the pie slice
-    unsigned int pointCount{30u};  //!< Number of points composing the pie slice
+    unsigned int pointCount{30u};  //!< Number of points used to approximate the arcs (per full circle of sweep)
 
 
     ////////////////////////////////////////////////////////////
@@ -87,11 +87,12 @@ struct [[nodiscard]] ZA_GRAPHICS_API RingPieSliceShapeData : LocalAnchorPointMix
     ///
     /// \par Cost
     /// **Vertex iteration, O(pointCount)** -- transforms
-    /// `2 * pointCount` vertices (outer arc + inner arc) and folds
-    /// them into an AABB. Each iteration performs one trig lookup
-    /// and one point transform. Cost grows linearly with `pointCount`;
-    /// the default `pointCount = 30` means 60 vertex transforms per
-    /// call.
+    /// two vertices per rendered arc sample (outer arc + inner arc;
+    /// the sample count is sweep-scaled from `pointCount`, matching
+    /// the renderer) and folds them into an AABB. Each iteration
+    /// performs one trig lookup and one point transform. Cost grows
+    /// linearly with `pointCount`; the default `pointCount = 30`
+    /// means 60 vertex transforms per call at a full-circle sweep.
     ///
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::pure]] Rect2f getGlobalBounds() const noexcept;

@@ -41,7 +41,9 @@ namespace za
 /// per source texture.
 ///
 /// `za::TextureAtlas` owns its texture by value. The atlas
-/// texture is created by the caller and moved into the atlas;
+/// texture is created by the caller and moved into the atlas,
+/// which clears it to transparent black on construction so that
+/// entry padding and uncovered regions hold defined contents;
 /// from then on, the atlas takes care of inserting new
 /// sub-images via `add` and tracking their positions through
 /// the packer.
@@ -93,11 +95,11 @@ public:
     ////////////////////////////////////////////////////////////
     /// \brief Add the contents of another `za::Texture` to the atlas
     ///
-    /// Performs a GPU-to-CPU readback on `texture`, then
-    /// uploads its pixels into a free region of the atlas. As
-    /// the readback is slow, this is best used during loading.
+    /// Copies `texture` into a free region of the atlas via a
+    /// GPU-to-GPU framebuffer blit; the pixels never leave the
+    /// GPU.
     ///
-    /// \param texture Source texture (will be downloaded first)
+    /// \param texture Source texture (copied on the GPU)
     /// \param padding Padding to leave around the image (each side)
     ///
     /// \return Texture rectangle of the inserted image, or `za::nullOpt` if the atlas is full

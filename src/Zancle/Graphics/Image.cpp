@@ -207,7 +207,7 @@ za::Optional<Image> Image::create(Vec2u size, const za::U8* pixels)
         return za::nullOpt;
     }
 
-    return za::makeOptional<Image>(za::PassKey<Image>{}, size, pixels, pixels + size.x * size.y * 4);
+    return za::makeOptional<Image>(za::PassKey<Image>{}, size, pixels, pixels + za::SizeT{size.x} * za::SizeT{size.y} * 4);
 }
 
 
@@ -403,6 +403,12 @@ bool Image::copy(const Image& source, Vec2u dest, const Rect2i& sourceRect, bool
 
     // Then find the valid size of the destination rectangle
     const Vec2u dstSize(za::min(m_size.x - dest.x, srcRect.size.x), za::min(m_size.y - dest.y, srcRect.size.y));
+
+    // Self-copy is only valid when the source and destination regions do not
+    // overlap: the row copies below would otherwise `ZA_MEMCPY` overlapping
+    // ranges (UB), and the alpha path would read already-written pixels.
+    ZA_ASSERT(&source != this || dest.x >= srcRect.position.x + dstSize.x || srcRect.position.x >= dest.x + dstSize.x ||
+              dest.y >= srcRect.position.y + dstSize.y || srcRect.position.y >= dest.y + dstSize.y);
 
     // Precompute as much as possible
     const za::SizeT    pitch     = static_cast<za::SizeT>(dstSize.x) * 4;

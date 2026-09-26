@@ -78,14 +78,21 @@ za::Optional<GraphicsContext> GraphicsContext::create()
     };
 
     //
-    // Ensure graphics context is not already installed
+    // Ensure graphics context is not already installed.
+    // NOTE: this exists-check and the `emplace` below are not atomic; two
+    // threads racing `create()` could both pass the check. Acceptable, as a
+    // `GraphicsContext` is expected to be created once in `main` before any
+    // other thread touches the library.
     if (installedGraphicsContext.hasValue())
         return fail("a `za::GraphicsContext` object already exists");
 
     //
     // Install window context if necessary
-    auto windowContext = WindowContext::isInstalled() ? WindowContext{za::PassKey<GraphicsContext>{}}
-                                                      : WindowContext::create().value(); // TODO P1: propagate failure
+    auto windowContext = WindowContext::isInstalled() ? za::makeOptional<WindowContext>(za::PassKey<GraphicsContext>{})
+                                                      : WindowContext::create();
+
+    if (!windowContext.hasValue())
+        return fail("window context initialization failure");
 
     //
     // Initialize built-in shader
@@ -103,7 +110,7 @@ za::Optional<GraphicsContext> GraphicsContext::create()
     // Install graphics context
     installedGraphicsContext.emplace(*ZA_MOVE(shader), *ZA_MOVE(texture));
 
-    return za::makeOptional<GraphicsContext>(za::PassKey<GraphicsContext>{}, ZA_MOVE(windowContext));
+    return za::makeOptional<GraphicsContext>(za::PassKey<GraphicsContext>{}, ZA_MOVE(*windowContext));
 }
 
 

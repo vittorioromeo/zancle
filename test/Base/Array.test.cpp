@@ -2,6 +2,7 @@
 
 #include "Zancle/Container/Array.hpp"
 
+#include "Zancle/Trait/EnableTrivialRelocation.hpp"
 #include "Zancle/Trait/IsAggregate.hpp"
 #include "Zancle/Trait/IsStandardLayout.hpp"
 #include "Zancle/Trait/IsTrivial.hpp"
@@ -40,7 +41,7 @@ struct NonTrivial
 ////////////////////////////////////////////////////////////
 struct NonTrivialButRelocatable
 {
-    using TriviallyRelocatableTag = NonTrivialButRelocatable;
+    ZA_ENABLE_TRIVIAL_RELOCATION;
 
     static inline int si{};
 

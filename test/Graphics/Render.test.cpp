@@ -6,7 +6,9 @@
 #include "Zancle/GLUtils/GLVAOGroup.hpp"
 #include "Zancle/GLUtils/Glad.hpp"
 
+#include "Zancle/Graphics/CircleShape.hpp"
 #include "Zancle/Graphics/Color.hpp"
+#include "Zancle/Graphics/DepthStencilFormat.hpp"
 #include "Zancle/Graphics/DrawInstancedIndexedVerticesSettings.hpp"
 #include "Zancle/Graphics/DrawableBatch.hpp"
 #include "Zancle/Graphics/Font.hpp"
@@ -33,7 +35,10 @@
 
 #include "Zancle/Concurrency/Thread.hpp"
 
+#include "Zancle/Geometry/Angle.hpp"
 #include "Zancle/Geometry/Priv/Vec2Base.hpp"
+
+#include "Zancle/Math/Fabs.hpp"
 
 
 // Shared multi-context test helper, used by both this file and
@@ -105,7 +110,8 @@ TEST_CASE("[Graphics] Render Tests" * tst::skip(skipDisplayTests))
 
     SECTION("Stencil Tests")
     {
-        auto renderTexture = za::RenderTexture::create({100, 100}, {.depthBits = 0, .stencilBits = 8}).value();
+        auto renderTexture = za::RenderTexture::create({100, 100}, {.depthStencilFormat = za::DepthStencilFormat::Stencil8})
+                                 .value();
 
         renderTexture.clear(za::Color::Red, za::StencilValue{127u});
 
@@ -1589,5 +1595,86 @@ void main()
             CHECK(rtA.getTexture().copyToImage().getPixel({20, 20}) == za::Color::Green);
         }
 #endif
+    }
+}
+
+
+TEST_CASE("[Graphics] Shape vs ShapeData vertex parity" * tst::skip(skipDisplayTests))
+{
+    [[maybe_unused]] auto& graphicsContext = TST_CASE_SHARED(za::GraphicsContext::create().value());
+
+    // The retained `za::Shape` pipeline and the batch `*ShapeData` pipeline
+    // must produce identical geometry for the same aggregate: local-space
+    // outlines (thickness scales with the transform, mirroring cannot flip
+    // the grow side) and local-space fill/outline texture coordinates.
+    const auto checkParity = [](const auto& shape, const auto& shapeData)
+    {
+        const auto transform = shape.getTransform();
+
+        za::CPUDrawableBatch batch;
+        const auto           geo = batch.add(shapeData);
+
+        const auto fillVertices    = shape.getFillVertices();
+        const auto outlineVertices = shape.getOutlineVertices();
+
+        REQUIRE(geo.fill.size() == fillVertices.size());
+        REQUIRE(geo.outline.size() == outlineVertices.size());
+
+        const auto approxEq = [](const za::Vec2f a, const za::Vec2f b)
+        { return ZA_MATH_FABSF(a.x - b.x) < 0.01f && ZA_MATH_FABSF(a.y - b.y) < 0.01f; };
+
+        for (za::SizeT i = 0u; i < fillVertices.size(); ++i)
+        {
+            CHECK(approxEq(geo.fill[i].position, transform.transformPoint(fillVertices[i].position)));
+            CHECK(approxEq(geo.fill[i].texCoords, fillVertices[i].texCoords));
+            CHECK(geo.fill[i].color == fillVertices[i].color);
+        }
+
+        for (za::SizeT i = 0u; i < outlineVertices.size(); ++i)
+        {
+            CHECK(approxEq(geo.outline[i].position, transform.transformPoint(outlineVertices[i].position)));
+            CHECK(approxEq(geo.outline[i].texCoords, outlineVertices[i].texCoords));
+            CHECK(geo.outline[i].color == outlineVertices[i].color);
+        }
+    };
+
+    // Hostile transform on purpose: rotation + non-uniform scale + mirror +
+    // origin offset, textured fill and outline, custom miter limit
+    SECTION("CircleShape vs CircleShapeData")
+    {
+        const za::CircleShapeData
+            data{.position           = {30.f, 40.f},
+                 .scale              = {2.f, -1.5f},
+                 .origin             = {5.f, 6.f},
+                 .rotation           = za::degrees(30.f),
+                 .textureRect        = {{8.f, 16.f}, {32.f, 32.f}},
+                 .outlineTextureRect = {{4.f, 2.f}, {16.f, 8.f}},
+                 .fillColor          = za::Color::Green,
+                 .outlineColor       = za::Color::Red,
+                 .outlineThickness   = 4.f,
+                 .miterLimit         = 2.f,
+                 .radius             = 25.f,
+                 .startAngle         = za::degrees(15.f),
+                 .pointCount         = 8u};
+
+        checkParity(za::CircleShape{data}, data);
+    }
+
+    SECTION("RectangleShape vs RectangleShapeData")
+    {
+        const za::RectangleShapeData
+            data{.position           = {-10.f, 20.f},
+                 .scale              = {-1.25f, 3.f},
+                 .origin             = {12.f, 4.f},
+                 .rotation           = za::degrees(75.f),
+                 .textureRect        = {{0.f, 0.f}, {64.f, 64.f}},
+                 .outlineTextureRect = {{2.f, 2.f}, {8.f, 8.f}},
+                 .fillColor          = za::Color::Blue,
+                 .outlineColor       = za::Color::Yellow,
+                 .outlineThickness   = 3.f,
+                 .miterLimit         = 1.5f,
+                 .size               = {40.f, 20.f}};
+
+        checkParity(za::RectangleShape{data}, data);
     }
 }

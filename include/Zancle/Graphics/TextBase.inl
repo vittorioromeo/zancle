@@ -46,6 +46,12 @@ Vec2f TextBase::findCharacterPos(this const Self& self, za::SizeT index)
         if (i++ >= index)
             break;
 
+        // Skip the \r char to match the layout code, which skips it before any
+        // kerning accumulation and does not let it become `prevChar` (see
+        // `TextUtils::createTextGeometryAndGetBounds`)
+        if (curChar == U'\r')
+            continue;
+
         characterPos.x += fontSource.getKerning(prevChar, curChar, charSize, isBold);
         prevChar = curChar;
 

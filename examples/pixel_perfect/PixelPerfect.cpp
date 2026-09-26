@@ -106,7 +106,7 @@ int main()
     auto windowView = computePixelPerfectView(window.getSize().toVec2f(), resolution);
     auto worldView  = za::View::fromScreenSize(resolution);
 
-    auto rtGame = za::RenderTexture::create(resolution.toVec2u(), {.antiAliasingLevel = 0u, .smooth = false}).value();
+    auto rtGame = za::RenderTexture::create(resolution.toVec2u(), {.smooth = false, .sampleCount = 0u}).value();
 
     const auto smileyImage   = makeSmileyImage();
     const auto smileyTexture = za::Texture::loadFromImage(smileyImage, {.smooth = false}).value();

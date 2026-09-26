@@ -6,6 +6,8 @@
 
 #include "Zancle/Container/Vector.hpp"
 
+#include "Zancle/Base/IntTypes.hpp"
+
 #include "Zancle/Trait/IsAggregate.hpp"
 #include "Zancle/Trait/IsStandardLayout.hpp"
 #include "Zancle/Trait/IsTrivial.hpp"
@@ -16,8 +18,6 @@
 #include "Zancle/Trait/IsTriviallyDestructible.hpp"
 #include "Zancle/Trait/IsTriviallyMoveAssignable.hpp"
 #include "Zancle/Trait/IsTriviallyMoveConstructible.hpp"
-
-#include "Zancle/Base/IntTypes.hpp"
 
 
 TEST_CASE("[Graphics] za::Color")
@@ -274,6 +274,9 @@ TEST_CASE("[Graphics] za::Color")
 
         // Hue > 360 should wrap
         CHECK(za::Color::fromHSLA({480.f, 1.f, 0.5f}) == za::Color::fromHSLA({120.f, 1.f, 0.5f}));
+
+        // Tiny negative hue: `positiveRemainder` rounds to exactly 360, which must fold to 0
+        CHECK(za::Color::fromHSLA({-1e-7f, 1.f, 0.5f}) == za::Color::fromHSLA({0.f, 1.f, 0.5f}));
     }
 
     SECTION("Saturation and lightness clamping")

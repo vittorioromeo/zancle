@@ -110,8 +110,8 @@ struct ZA_GRAPHICS_API Sprite : TransformableMixin, GlobalAnchorPointMixin, Loca
 ///     .color       = {255u, 255u, 255u, 200u},
 /// };
 ///
-/// // Draw it. The texture is passed at draw time.
-/// window.draw(sprite, texture);
+/// // Draw it. The texture is passed at draw time via render states.
+/// window.draw(sprite, {.texture = &texture});
 /// \endcode
 ///
 /// \see `za::Texture`, `za::Transformable`, `za::RenderStates`

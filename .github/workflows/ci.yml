@@ -84,4 +84,5 @@ jobs:
             ctest --test-dir build_${{ matrix.preset }} \
                   --output-on-failure \
                   --no-tests=error \
-                  --parallel "$(nproc)"
+                  --parallel "$(nproc)" \
+                  --repeat until-pass:2

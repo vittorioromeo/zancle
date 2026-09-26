@@ -152,12 +152,12 @@ IncludeCategories:
   # Level 2: Math
   - Priority: 24
     Regex: '^\"Zancle\/Math\/'
-  # Level 1: Trait
+  # Level 1: Base
   - Priority: 25
-    Regex: '^\"Zancle\/Trait\/'
-  # Level 0: Base
-  - Priority: 26
     Regex: '^\"Zancle\/Base\/'
+  # Level 0: Trait
+  - Priority: 26
+    Regex: '^\"Zancle\/Trait\/'
   - Priority: 27
     Regex: '^\"ExampleUtils'
   - Priority: -100

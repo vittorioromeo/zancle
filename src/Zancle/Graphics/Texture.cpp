@@ -15,6 +15,7 @@
 #include "Zancle/GLUtils/Glad.hpp"
 #include "Zancle/GLUtils/TextureSaver.hpp"
 
+#include "Zancle/Graphics/Color.hpp"
 #include "Zancle/Graphics/GraphicsContext.hpp"
 #include "Zancle/Graphics/Image.hpp"
 #include "Zancle/Graphics/TextureWrapMode.hpp"
@@ -88,29 +89,40 @@ Texture::Texture(za::PassKey<Texture>&&, Vec2u size, unsigned int texture, bool 
 
 
 ////////////////////////////////////////////////////////////
-Texture::Texture(const Texture& rhs) :
-    m_isSmooth(rhs.m_isSmooth),
-    m_sRgb(rhs.m_sRgb),
-    m_wrapMode(rhs.m_wrapMode),
-    m_cacheId(TextureImpl::getUniqueId())
+Texture::Texture(const Texture& rhs) : m_cacheId(0u) // every member is overwritten by the move-assignment below
 {
-    za::Optional texture = create(rhs.getSize(), {.sRgb = rhs.isSrgb(), .smooth = rhs.isSmooth()});
+    za::Optional texture = create(rhs.getSize(),
+                                  {
+                                      .sRgb     = rhs.isSrgb(),
+                                      .smooth   = rhs.isSmooth(),
+                                      .wrapMode = rhs.getWrapMode(),
+                                  });
 
     if (!texture.hasValue())
     {
         priv::errMsg("Failed to copy texture, failed to create new texture");
-        return;
+        za::abort();
     }
 
     *this = ZA_MOVE(*texture);
 
     if (!update(rhs))
+    {
         priv::errMsg("Failed to copy texture, failed to update from new texture");
+        za::abort();
+    }
 }
 
 
 ////////////////////////////////////////////////////////////
 Texture::~Texture()
+{
+    destroyGlTexture();
+}
+
+
+////////////////////////////////////////////////////////////
+void Texture::destroyGlTexture()
 {
     // Destroy the OpenGL texture
     if (!m_texture)
@@ -155,13 +167,7 @@ Texture& Texture::operator=(Texture&& rhs) noexcept
         return *this;
 
     // Destroy the OpenGL texture
-    if (m_texture)
-    {
-        ZA_ASSERT(GraphicsContext::hasActiveThreadLocalGlContext());
-
-        const GLuint texture = m_texture;
-        glCheck(glDeleteTextures(1, &texture));
-    }
+    destroyGlTexture();
 
     // Move old to new.
     m_size          = za::exchange(rhs.m_size, {});
@@ -172,6 +178,12 @@ Texture& Texture::operator=(Texture&& rhs) noexcept
     m_fboAttachment = za::exchange(rhs.m_fboAttachment, false);
     m_hasMipmap     = za::exchange(rhs.m_hasMipmap, false);
     m_cacheId       = za::exchange(rhs.m_cacheId, 0u);
+
+    // Both textures' state was just replaced wholesale (`rhs` is now empty);
+    // bump on each so that any in-flight batched draw referencing either one
+    // is detected and flushed with an actionable error (mirrors `swap`).
+    ++m_destructiveGeneration;
+    ++rhs.m_destructiveGeneration;
 
     return *this;
 }
@@ -314,7 +326,10 @@ za::Optional<Texture> Texture::loadFromImage(const Image& image, const TextureLo
         const priv::TextureSaver save;
 
         // Copy the pixels to the texture
-        const za::U8* pixels = image.getPixelsPtr() + 4 * (rectangle.position.x + (size.x * rectangle.position.y));
+        const za::U8* pixels = image.getPixelsPtr() +
+                               4u * (static_cast<za::SizeT>(rectangle.position.x) +
+                                     static_cast<za::SizeT>(size.x) * static_cast<za::SizeT>(rectangle.position.y));
+
         glCheck(glBindTexture(GL_TEXTURE_2D, result->m_texture));
 
         glCheck(glPixelStorei(GL_UNPACK_ROW_LENGTH, size.x)); // restore after
@@ -343,6 +358,63 @@ Vec2u Texture::getSize() const
 
 
 ////////////////////////////////////////////////////////////
+bool Texture::clear()
+{
+    return clear(Color::Transparent);
+}
+
+
+////////////////////////////////////////////////////////////
+bool Texture::clear(const Color color)
+{
+    ZA_ASSERT(m_texture);
+    ZA_ASSERT(GraphicsContext::hasActiveThreadLocalGlContext());
+
+    // Clear on the GPU by attaching the texture to the scratch framebuffer
+    // (cheaper than uploading a same-size pixel buffer)
+    const auto frameBuffer = static_cast<GLuint>(WindowContext::getTransferScratchDrawFramebuffer());
+
+    if (frameBuffer == 0u)
+    {
+        priv::errMsg("Failed to clear texture, could not get scratch framebuffer");
+        return false;
+    }
+
+    {
+        const priv::FramebufferSaver    framebufferSaver;
+        const priv::ScissorDisableGuard scissorDisableGuard; // `glClearBufferfv` honors the scissor test
+
+        glCheck(glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer));
+        glCheck(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_texture, 0));
+
+        const float clearColor[4]{color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f};
+        glCheck(glClearBufferfv(GL_COLOR, 0, clearColor));
+
+        // Detach so the scratch framebuffer doesn't keep referencing the texture
+        glCheck(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0u, 0));
+    }
+
+    // Make sure that the current texture binding will be preserved
+    const priv::TextureSaver save;
+
+    glCheck(glBindTexture(GL_TEXTURE_2D, m_texture));
+    glCheck(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, m_isSmooth ? GL_LINEAR : GL_NEAREST));
+    m_hasMipmap = false;
+    m_cacheId   = TextureImpl::getUniqueId();
+
+    // Force an OpenGL flush, so that the texture data will appear updated
+    // in all contexts immediately (solves problems in multi-threaded apps)
+    glCheck(glFlush());
+
+    // Full-texture overwrite: every UV samples new content, so invalidate
+    // in-flight batched draws (see `update`)
+    ++m_destructiveGeneration;
+
+    return true;
+}
+
+
+////////////////////////////////////////////////////////////
 Image Texture::copyToImage() const
 {
     // Easy case: empty texture
@@ -354,7 +426,7 @@ Image Texture::copyToImage() const
     const priv::TextureSaver save;
 
     // Create an array of pixels
-    za::Vector<za::U8> pixels(m_size.x * m_size.y * 4);
+    za::Vector<za::U8> pixels(za::SizeT{m_size.x} * za::SizeT{m_size.y} * 4);
 
     // OpenGL ES doesn't have the glGetTexImage function, the only way to read
     // from a texture is to bind it to a FBO and use glReadPixels
@@ -388,12 +460,9 @@ Image Texture::copyToImage() const
 ////////////////////////////////////////////////////////////
 void Texture::update(const za::U8* pixels)
 {
-    // Update the whole texture
+    // Update the whole texture (the sub-rect overload detects the full-size
+    // update and bumps `m_destructiveGeneration`)
     update(pixels, m_size, {0, 0});
-
-    // Full-texture overwrite: every UV samples new content. (Sub-rect overloads are
-    // intentionally NOT bumped -- they support additive use cases like font atlases.)
-    ++m_destructiveGeneration;
 }
 
 
@@ -441,6 +510,8 @@ bool Texture::update(const Texture& texture, Vec2u dest)
 {
     ZA_ASSERT(dest.x + texture.m_size.x <= m_size.x && "Destination x coordinate is outside of texture");
     ZA_ASSERT(dest.y + texture.m_size.y <= m_size.y && "Destination y coordinate is outside of texture");
+
+    ZA_ASSERT(&texture != this && "Cannot update a texture from itself (GL framebuffer feedback loop)");
 
     ZA_ASSERT(m_texture);
     ZA_ASSERT(glCheck(glIsTexture(m_texture)));

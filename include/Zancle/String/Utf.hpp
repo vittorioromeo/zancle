@@ -6,13 +6,13 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
-#include "Zancle/Trait/IsIntegral.hpp"
-#include "Zancle/Trait/MakeUnsigned.hpp"
-#include "Zancle/Trait/RemoveCVRef.hpp"
-
 #include "Zancle/Base/IntTypes.hpp"
 #include "Zancle/Base/SizeT.hpp"
 #include "Zancle/Base/Unreachable.hpp"
+
+#include "Zancle/Trait/IsIntegral.hpp"
+#include "Zancle/Trait/MakeUnsigned.hpp"
+#include "Zancle/Trait/RemoveCVRef.hpp"
 
 
 ////////////////////////////////////////////////////////////

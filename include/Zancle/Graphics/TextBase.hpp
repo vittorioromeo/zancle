@@ -62,7 +62,8 @@ namespace za
 /// directly never needs the `.inl`.
 ///
 /// Derived classes must provide:
-/// - `const auto& getFontSource() const` -- returns Font& or GlyphMapping&
+/// - `const auto& getFontSource() const` -- returns the glyph/metrics provider
+///   (a `za::Font&` for `Text`; `GlyphMappedText` returns itself)
 /// - `unsigned int getCharacterSize() const`
 /// - `float getOutlineThickness() const`
 /// - `const Texture& getTexture() const`
@@ -501,9 +502,10 @@ protected:
 /// \li per-character position lookup (`findCharacterPos`).
 ///
 /// Concrete subclasses provide:
-/// \li `getFontSource()` -- returns either a `za::Font&` (legacy
-///     lazy-loading path) or a `za::GlyphMapping&` (precomputed
-///     path).
+/// \li `getFontSource()` -- returns the glyph/metrics provider: a
+///     `za::Font&` for `za::Text` (legacy lazy-loading path), or the
+///     `za::GlyphMappedText` itself (which forwards to its
+///     `za::GlyphMapping` and `za::FontFace`).
 /// \li `getCharacterSize()`, `getOutlineThickness()`, `isBold()`
 /// \li `getTexture()` -- the glyph atlas texture.
 ///

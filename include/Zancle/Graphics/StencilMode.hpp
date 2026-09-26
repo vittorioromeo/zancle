@@ -97,7 +97,7 @@ struct [[nodiscard]] ZA_GRAPHICS_API StencilMode
     StencilUpdateOperation stencilUpdateOperation
         : 3 {StencilUpdateOperation::Keep}; //!< The update operation to perform if the stencil test passes
 
-    bool stencilOnly : 1 {false}; //!< Whether we should update the color buffer in addition to the stencil buffer
+    bool stencilOnly : 1 {false}; //!< Whether we should update only the stencil buffer, leaving the color buffer untouched
 
     StencilValue stencilReference{0u}; //!< The reference value we're performing the stencil test with
 

@@ -92,7 +92,14 @@ constexpr unsigned int maxIncludeFilenameLength = 256;
         if (!includedFilename.empty())
         {
             // Build null-terminated filename for Path construction
-            ZA_ASSERT(includedFilename.size() < maxIncludeFilenameLength && "Include filename too long");
+            if (includedFilename.size() >= maxIncludeFilenameLength)
+            {
+                za::priv::errMsg("GLSL #include filename too long ({} characters, maximum is {})",
+                                 includedFilename.size(),
+                                 maxIncludeFilenameLength - 1);
+
+                return false;
+            }
 
             char filenameBuf[maxIncludeFilenameLength];
             ZA_MEMCPY(filenameBuf, includedFilename.data(), includedFilename.size());

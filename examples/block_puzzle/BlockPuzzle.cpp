@@ -555,7 +555,7 @@ class Game
 {
 private:
     ////////////////////////////////////////////////////////////
-    const unsigned int m_aaLevel = za::min(16u, za::RenderTexture::getMaximumAntiAliasingLevel());
+    const unsigned int m_aaLevel = za::min(16u, za::RenderTexture::getMaximumSampleCount());
 
     ////////////////////////////////////////////////////////////
     za::RenderWindow m_window = makeDPIScaledRenderWindow(
@@ -705,16 +705,16 @@ private:
     ////////////////////////////////////////////////////////////
     za::RenderTexture m_rtSpriteBg{
         za::RenderTexture::create((logicalResolution.toVec2f() * shadowTextureResMult).toVec2u(),
-                                  {.antiAliasingLevel = m_aaLevel, .smooth = true})
+                                  {.smooth = true, .sampleCount = m_aaLevel})
             .value()};
 
     za::RenderTexture m_rtSpriteBgTemp{
         za::RenderTexture::create((logicalResolution.toVec2f() * shadowTextureResMult).toVec2u(),
-                                  {.antiAliasingLevel = m_aaLevel, .smooth = true})
+                                  {.smooth = true, .sampleCount = m_aaLevel})
             .value()};
 
     za::RenderTexture m_rtGame{
-        za::RenderTexture::create(logicalResolution.toVec2u(), {.antiAliasingLevel = m_aaLevel, .smooth = true}).value()};
+        za::RenderTexture::create(logicalResolution.toVec2u(), {.smooth = true, .sampleCount = m_aaLevel}).value()};
 
     ////////////////////////////////////////////////////////////
     za::Texture m_txUndo        = za::Texture::create(logicalResolution.toVec2u(), {.smooth = true}).value();

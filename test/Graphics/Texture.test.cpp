@@ -17,15 +17,15 @@
 
 #include "Zancle/Geometry/Priv/Vec2Base.hpp"
 
+#include "Zancle/Base/IntTypes.hpp"
+#include "Zancle/Base/Macros.hpp"
+
 #include "Zancle/Trait/IsCopyAssignable.hpp"
 #include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsDefaultConstructible.hpp"
 #include "Zancle/Trait/IsNothrowMoveAssignable.hpp"
 #include "Zancle/Trait/IsNothrowMoveConstructible.hpp"
 #include "Zancle/Trait/IsNothrowSwappable.hpp"
-
-#include "Zancle/Base/IntTypes.hpp"
-#include "Zancle/Base/Macros.hpp"
 
 
 namespace
@@ -117,6 +117,24 @@ TEST_CASE("[Graphics] za::Texture" * tst::skip(skipDisplayTests))
         }
     }
 
+    SECTION("clear()")
+    {
+        auto texture = za::Texture::create({7, 5}).value();
+
+        REQUIRE(texture.clear());
+        const auto transparentImage = texture.copyToImage();
+
+        REQUIRE(texture.clear(za::Color::Red));
+        const auto redImage = texture.copyToImage();
+
+        for (unsigned int y = 0u; y < 5u; ++y)
+            for (unsigned int x = 0u; x < 7u; ++x)
+            {
+                CHECK(transparentImage.getPixel({x, y}) == za::Color::Transparent);
+                CHECK(redImage.getPixel({x, y}) == za::Color::Red);
+            }
+    }
+
     SECTION("loadFromFile()")
     {
         const auto texture = za::Texture::loadFromFile("zancle-logo-big.png").value();
@@ -184,12 +202,14 @@ TEST_CASE("[Graphics] za::Texture" * tst::skip(skipDisplayTests))
 
         auto texture = za::Texture::create({1, 2}).value();
         texture.update(red);
+        texture.setWrapMode(za::TextureWrapMode::Repeat);
 
         SECTION("Construction")
         {
             const za::Texture textureCopy(texture); // NOLINT(performance-unnecessary-copy-initialization)
             REQUIRE(textureCopy.getSize() == za::Vec2u{1, 2});
             CHECK(textureCopy.copyToImage().getPixel(za::Vec2u{0, 1}) == za::Color::Red);
+            CHECK(textureCopy.getWrapMode() == za::TextureWrapMode::Repeat);
         }
 
         SECTION("Assignment")
@@ -198,6 +218,7 @@ TEST_CASE("[Graphics] za::Texture" * tst::skip(skipDisplayTests))
             textureCopy             = texture;
             REQUIRE(textureCopy.getSize() == za::Vec2u{1, 2});
             CHECK(textureCopy.copyToImage().getPixel(za::Vec2u{0, 1}) == za::Color::Red);
+            CHECK(textureCopy.getWrapMode() == za::TextureWrapMode::Repeat);
         }
     }
 

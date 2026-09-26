@@ -41,15 +41,15 @@ SOFTWARE.
 */
 ////////////////////////////////////////////////////////////
 
-#include "Zancle/Trait/RemoveCVRef.hpp"
-#include "Zancle/Trait/RemoveReference.hpp"
-
-#include "Zancle/Base/DeclVal.hpp"
 #include "Zancle/Base/IndexSequence.hpp"
 #include "Zancle/Base/Macros.hpp"
 #include "Zancle/Base/MakeIndexSequence.hpp"
 #include "Zancle/Base/SizeT.hpp"
 #include "Zancle/Base/TypePackElement.hpp"
+
+#include "Zancle/Trait/DeclVal.hpp"
+#include "Zancle/Trait/RemoveCVRef.hpp"
+#include "Zancle/Trait/RemoveReference.hpp"
 
 
 namespace za::rfl::priv

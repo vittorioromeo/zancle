@@ -15,12 +15,12 @@
 
 #include "Zancle/Vocabulary/Optional.hpp"
 
+#include "Zancle/Base/IntTypes.hpp"
+
 #include "Zancle/Trait/IsTriviallyCopyAssignable.hpp"
 #include "Zancle/Trait/IsTriviallyCopyConstructible.hpp"
 #include "Zancle/Trait/IsTriviallyMoveAssignable.hpp"
 #include "Zancle/Trait/IsTriviallyMoveConstructible.hpp"
-
-#include "Zancle/Base/IntTypes.hpp"
 
 
 namespace

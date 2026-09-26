@@ -27,6 +27,7 @@
 ////////////////////////////////////////////////////////////
 namespace za
 {
+struct Color;
 class GlyphMappedText;
 class Image;
 class InputStream;
@@ -63,10 +64,11 @@ struct [[nodiscard]] TextureCreateSettings
 ////////////////////////////////////////////////////////////
 struct [[nodiscard]] TextureLoadSettings
 {
-    bool            sRgb     = false; //!< Whether the texture should be created in sRGB color space
-    Rect2i          area     = {};    //!< Sub-rectangle of the source image to load (`{}` = full image)
-    bool            smooth   = false; //!< Whether linear filtering should be enabled
+    bool            sRgb     = false;                  //!< Whether the texture should be created in sRGB color space
+    bool            smooth   = false;                  //!< Whether linear filtering should be enabled
     TextureWrapMode wrapMode = TextureWrapMode::Clamp; //!< Wrap mode used when sampling the texture
+
+    Rect2i area = {}; //!< Sub-rectangle of the source image to load (`{}` = full image)
 };
 
 ////////////////////////////////////////////////////////////
@@ -110,7 +112,8 @@ public:
     /// \brief Create an empty texture of the given size
     ///
     /// The contents of a freshly created texture are undefined.
-    /// Use `update` to upload pixel data afterwards.
+    /// Use `update` to upload pixel data, or `clear` to fill the
+    /// texture with a uniform color.
     ///
     /// \param size     Width and height of the texture
     /// \param settings Texture create settings (sRGB, smoothing, wrap mode)
@@ -124,9 +127,11 @@ public:
     /// \brief Load a texture from an image file on disk
     ///
     /// `settings.area` can be used to load only a sub-rectangle of
-    /// the source image. The default (empty) value loads the whole
-    /// image. If the `area` rectangle crosses the image bounds, it
-    /// is clipped to fit.
+    /// the source image. An `area` with a zero-sized dimension (the
+    /// default), or one that already covers the whole image, loads
+    /// the entire image. Otherwise the rectangle is clipped to the
+    /// image bounds (negative `position` components are treated as
+    /// `0`; `size` components must be positive, debug-asserted).
     ///
     /// The maximum size for a texture depends on the graphics
     /// driver and can be retrieved with `getMaximumSize`.
@@ -220,17 +225,41 @@ public:
     [[nodiscard]] Image copyToImage() const;
 
     ////////////////////////////////////////////////////////////
+    /// \brief Fill the whole texture with `Color::Transparent`
+    ///
+    /// Equivalent to `clear(Color::Transparent)`.
+    ///
+    /// \return `true` on success, `false` on failure
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] bool clear();
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Fill the whole texture with `color` on the GPU
+    ///
+    /// Every texel is overwritten: like a full-texture `update`,
+    /// this invalidates any generated mipmap and breaks in-flight
+    /// batched draws referencing this texture.
+    ///
+    /// \param color Fill color
+    ///
+    /// \return `true` on success, `false` on failure
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] bool clear(Color color);
+
+    ////////////////////////////////////////////////////////////
     /// \brief Update the whole texture from an array of pixels
     ///
     /// The pixel array is assumed to have the same size as
-    /// the `area` rectangle, and to contain 32-bits RGBA pixels.
+    /// the texture, and to contain 32-bits RGBA pixels.
     ///
     /// No additional check is performed on the size of the pixel
     /// array. Passing invalid arguments will lead to an undefined
     /// behavior.
     ///
-    /// This function does nothing if `pixels` is `nullptr`
-    /// or if the texture was not previously created.
+    /// `pixels` must not be `nullptr` (asserted in debug builds;
+    /// undefined behavior in release builds).
     ///
     /// \param pixels Array of pixels to copy to the texture
     ///
@@ -247,8 +276,8 @@ public:
     /// array or the bounds of the area to update. Passing invalid
     /// arguments will lead to an undefined behavior.
     ///
-    /// This function does nothing if `pixels` is null or if the
-    /// texture was not previously created.
+    /// `pixels` must not be `nullptr` (asserted in debug builds;
+    /// undefined behavior in release builds).
     ///
     /// \param pixels Array of pixels to copy to the texture
     /// \param size   Width and height of the pixel region contained in `pixels`
@@ -297,6 +326,9 @@ public:
     /// will lead to an undefined behavior.
     ///
     /// Must be called before `window.display()`.
+    ///
+    /// As a side effect, `window`'s OpenGL context is made current
+    /// and remains current after this function returns.
     ///
     /// This function does nothing if either the texture or the window
     /// was not previously created.
@@ -490,6 +522,16 @@ private:
     void invalidateMipmap();
 
     ////////////////////////////////////////////////////////////
+    /// \brief Destroy the underlying OpenGL texture, if any
+    ///
+    /// Deletes the GL texture on the shared context and unbinds
+    /// it from the current texture unit if it was bound. Used by
+    /// both the destructor and move assignment.
+    ///
+    ////////////////////////////////////////////////////////////
+    void destroyGlTexture();
+
+    ////////////////////////////////////////////////////////////
     // Member data
     ////////////////////////////////////////////////////////////
     Vec2u           m_size;            //!< Public texture size
@@ -586,7 +628,7 @@ ZA_GRAPHICS_API void swap(Texture& lhs, Texture& rhs) noexcept;
 /// // texture is passed to `draw` rather than stored on the sprite,
 /// // so the sprite cannot accidentally outlive the texture.
 /// const za::Sprite sprite{.textureRect = texture.getRect()};
-/// window.draw(sprite, texture);
+/// window.draw(sprite, {.texture = &texture});
 /// \endcode
 ///
 /// \code

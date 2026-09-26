@@ -284,8 +284,10 @@ private:
 /// requested, `GlyphMappedText` requires the caller to preload
 /// all glyphs into a `za::GlyphMapping` (via
 /// `za::FontFace::loadGlyphs`) up front. After that, drawing is
-/// reduced to laying out vertices over a known glyph table --
-/// no font lookups, no FreeType calls, no atlas updates.
+/// reduced to laying out vertices over a known glyph table -- no
+/// glyph rasterization and no atlas updates. (Kerning queries
+/// still go through `za::FontFace`: a kerning-cache miss performs
+/// two FreeType glyph loads to compute the pair's kerning.)
 ///
 /// Because the character size, the bold flag, and the outline
 /// thickness are baked into the `GlyphMapping` itself, those

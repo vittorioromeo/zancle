@@ -85,11 +85,11 @@ struct [[nodiscard]] ZA_GRAPHICS_API RenderStates
 /// constructed inline with C++20 designated initializers:
 ///
 /// \code
-/// // Default render states.
-/// window.draw(sprite, texture);
+/// // Texture via render states, defaults for everything else.
+/// window.draw(sprite, {.texture = &texture});
 ///
 /// // Custom shader, defaults for everything else.
-/// window.draw(sprite, texture, {.shader = &myShader});
+/// window.draw(sprite, {.texture = &texture, .shader = &myShader});
 ///
 /// // Custom view + custom blend mode.
 /// window.draw(shape, {.blendMode = za::BlendAdd, .view = myView});

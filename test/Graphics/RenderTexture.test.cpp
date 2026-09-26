@@ -7,6 +7,7 @@
 #include "Zancle/Graphics/RenderTexture.hpp"
 
 #include "Zancle/Graphics/Color.hpp"
+#include "Zancle/Graphics/DepthStencilFormat.hpp"
 #include "Zancle/Graphics/GraphicsContext.hpp"
 #include "Zancle/Graphics/Image.hpp"
 #include "Zancle/Graphics/PrimitiveType.hpp"
@@ -16,13 +17,13 @@
 
 #include "Zancle/Geometry/Priv/Vec2Base.hpp"
 
+#include "Zancle/Base/Macros.hpp"
+
 #include "Zancle/Trait/IsCopyAssignable.hpp"
 #include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsDefaultConstructible.hpp"
 #include "Zancle/Trait/IsNothrowMoveAssignable.hpp"
 #include "Zancle/Trait/IsNothrowMoveConstructible.hpp"
-
-#include "Zancle/Base/Macros.hpp"
 
 
 TEST_CASE("[Graphics] za::RenderTexture" * tst::skip(skipDisplayTests))
@@ -42,9 +43,10 @@ TEST_CASE("[Graphics] za::RenderTexture" * tst::skip(skipDisplayTests))
     {
         CHECK(!za::RenderTexture::create({1'000'000, 1'000'000}).hasValue());
 
-        CHECK(za::RenderTexture::create({100, 100}, {.depthBits = 8, .stencilBits = 0}).hasValue());
+        CHECK(za::RenderTexture::create({100, 100}, {.depthStencilFormat = za::DepthStencilFormat::Depth16}).hasValue());
+        CHECK(za::RenderTexture::create({100, 100}, {.depthStencilFormat = za::DepthStencilFormat::Depth24}).hasValue());
 
-        CHECK(za::RenderTexture::create({100, 100}, {.depthBits = 0, .stencilBits = 8}).hasValue());
+        CHECK(za::RenderTexture::create({100, 100}, {.depthStencilFormat = za::DepthStencilFormat::Stencil8}).hasValue());
 
         const auto renderTexture = za::RenderTexture::create({360, 480}).value();
         CHECK(renderTexture.getSize() == za::Vec2u{360, 480});
@@ -60,9 +62,9 @@ TEST_CASE("[Graphics] za::RenderTexture" * tst::skip(skipDisplayTests))
         CHECK(texture.getNativeHandle() != 0);
     }
 
-    SECTION("getMaximumAntiAliasingLevel()")
+    SECTION("getMaximumSampleCount()")
     {
-        CHECK(za::RenderTexture::getMaximumAntiAliasingLevel() <= 64);
+        CHECK(za::RenderTexture::getMaximumSampleCount() <= 64);
     }
 
     SECTION("Set/get smooth")
@@ -111,8 +113,7 @@ TEST_CASE("[Graphics] za::RenderTexture" * tst::skip(skipDisplayTests))
         SUBCASE("AA, SRGB")       { testAALevel = 4u; testSRGBCapable = true; }
         // clang-format on
 
-        auto renderTexture = za::RenderTexture::create({64, 64},
-                                                       {.antiAliasingLevel = testAALevel, .sRgbCapable = testSRGBCapable})
+        auto renderTexture = za::RenderTexture::create({64, 64}, {.sRgbCapable = testSRGBCapable, .sampleCount = testAALevel})
                                  .value();
 
         renderTexture.clear(za::Color::Green);
@@ -143,12 +144,11 @@ TEST_CASE("[Graphics] za::RenderTexture" * tst::skip(skipDisplayTests))
         auto image   = za::Image::create(size, za::Color::White).value();
         auto texture = za::Texture::loadFromImage(image).value();
 
-        auto baseRenderTexture = za::RenderTexture::create(size, {.antiAliasingLevel = testAALevel, .sRgbCapable = testSRGBCapable})
+        auto baseRenderTexture = za::RenderTexture::create(size, {.sRgbCapable = testSRGBCapable, .sampleCount = testAALevel})
                                      .value();
 
-        auto leftInnerRT = za::RenderTexture::create(size, {.antiAliasingLevel = testAALevel, .sRgbCapable = testSRGBCapable})
-                               .value();
-        auto rightInnerRT = za::RenderTexture::create(size, {.antiAliasingLevel = testAALevel, .sRgbCapable = testSRGBCapable})
+        auto leftInnerRT = za::RenderTexture::create(size, {.sRgbCapable = testSRGBCapable, .sampleCount = testAALevel}).value();
+        auto rightInnerRT = za::RenderTexture::create(size, {.sRgbCapable = testSRGBCapable, .sampleCount = testAALevel})
                                 .value();
 
         const za::Vertex leftVertexArray[6]{{{0.f, 0.f}, za::Color::White, {0.f, 0.f}},
@@ -210,11 +210,10 @@ TEST_CASE("[Graphics] za::RenderTexture" * tst::skip(skipDisplayTests))
         auto image   = za::Image::create(size, za::Color::White).value();
         auto texture = za::Texture::loadFromImage(image).value();
 
-        auto baseRenderTexture = za::RenderTexture::create(size, {.antiAliasingLevel = testAALevel, .sRgbCapable = testSRGBCapable})
+        auto baseRenderTexture = za::RenderTexture::create(size, {.sRgbCapable = testSRGBCapable, .sampleCount = testAALevel})
                                      .value();
 
-        auto leftInnerRT = za::RenderTexture::create(size, {.antiAliasingLevel = testAALevel, .sRgbCapable = testSRGBCapable})
-                               .value();
+        auto leftInnerRT = za::RenderTexture::create(size, {.sRgbCapable = testSRGBCapable, .sampleCount = testAALevel}).value();
 
         const za::Vertex leftVertexArray[6]{{{0.f, 0.f}, za::Color::Red, {0.f, 0.f}},
                                             {{halfWidth, 0.f}, za::Color::Red, {halfWidth, 0.f}},
@@ -252,10 +251,10 @@ TEST_CASE("[Graphics] za::RenderTexture" * tst::skip(skipDisplayTests))
 
     SECTION("Move assignment")
     {
-        auto rt0 = za::RenderTexture::create({100, 100}, {.depthBits = 8, .stencilBits = 8});
+        auto rt0 = za::RenderTexture::create({100, 100}, {.depthStencilFormat = za::DepthStencilFormat::Depth24Stencil8});
         CHECK(rt0.hasValue());
 
-        auto rt1 = za::RenderTexture::create({100, 100}, {.depthBits = 8, .stencilBits = 8});
+        auto rt1 = za::RenderTexture::create({100, 100}, {.depthStencilFormat = za::DepthStencilFormat::Depth24Stencil8});
         CHECK(rt1.hasValue());
 
         *rt0 = ZA_MOVE(*rt1);

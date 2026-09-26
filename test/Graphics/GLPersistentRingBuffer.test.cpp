@@ -12,15 +12,15 @@
 
 #include "Zancle/Window/WindowContext.hpp"
 
-#include "Zancle/Trait/IsCopyAssignable.hpp"
-#include "Zancle/Trait/IsCopyConstructible.hpp"
-#include "Zancle/Trait/IsNothrowMoveAssignable.hpp"
-#include "Zancle/Trait/IsNothrowMoveConstructible.hpp"
-
 #include "Zancle/Base/Macros.hpp"
 #include "Zancle/Base/Memcmp.hpp"
 #include "Zancle/Base/Memcpy.hpp"
 #include "Zancle/Base/SizeT.hpp"
+
+#include "Zancle/Trait/IsCopyAssignable.hpp"
+#include "Zancle/Trait/IsCopyConstructible.hpp"
+#include "Zancle/Trait/IsNothrowMoveAssignable.hpp"
+#include "Zancle/Trait/IsNothrowMoveConstructible.hpp"
 
 
 #ifndef ZA_OPENGL_ES
@@ -242,11 +242,9 @@ TEST_CASE("[GLUtils] za::GLPersistentRingBuffer" * tst::skip(skipDisplayTests))
     {
         ScopedRingBuffer<VBO> sb;
 
-        // Fill and commit a first batch. In a test environment the fence
-        // signals instantly, so the next beginWrite's reclaim pass will
-        // reset the cursors to 0; the point of this test is that rollback
-        // must never undo the commit, regardless of whether reclaim has
-        // run yet.
+        // Fill and commit a first batch. The point of this test is that
+        // rollback must never undo the commit: the next beginWrite lands
+        // exactly at the last commit boundary.
         (void)sb.buffer.beginWrite(sb.obj, 128u);
         sb.buffer.commit();
 
@@ -278,7 +276,7 @@ TEST_CASE("[GLUtils] za::GLPersistentRingBuffer" * tst::skip(skipDisplayTests))
         CHECK(offsetAfter == 0u);
     }
 
-    SECTION("commit + reclaim (opportunistic) lets the next beginWrite reuse the region from zero")
+    SECTION("reclaim frees markers but never resets the write cursor")
     {
         ScopedRingBuffer<VBO> sb;
 
@@ -288,11 +286,36 @@ TEST_CASE("[GLUtils] za::GLPersistentRingBuffer" * tst::skip(skipDisplayTests))
 
         ringDrainGLCommandQueue();
 
-        // reclaim() is non-blocking but with a drained pipeline the fence has signaled.
+        // reclaim() is non-blocking and only frees signaled markers; it must
+        // NOT reset the cursors -- owners like `PersistentGPUDrawableBatch`
+        // derive live offsets from the cursor and would desync (G-3).
         sb.buffer.reclaim();
 
         const auto offsetAfter = sb.buffer.beginWrite(sb.obj, 50u);
-        CHECK(offsetAfter == 0u);
+        CHECK(offsetAfter == 100u);
+    }
+
+    SECTION("drainIfWouldOverflow restarts from zero between streaming cycles")
+    {
+        ScopedRingBuffer<VBO> sb;
+
+        // Cycle 1: fill the buffer exactly and commit.
+        CHECK(sb.buffer.beginWrite(sb.obj, 128u) == 0u);
+        sb.buffer.commit();
+
+        ringDrainGLCommandQueue();
+
+        // Cycle 2: the pending write would overflow; with nothing staged the
+        // ring drains and restarts from the front instead of growing.
+        const auto capacityBefore = sb.buffer.capacity();
+        sb.buffer.drainIfWouldOverflow(128u);
+
+        CHECK(sb.buffer.beginWrite(sb.obj, 128u) == 0u);
+        CHECK(sb.buffer.capacity() == capacityBefore);
+
+        // Mid-cycle (uncommitted writes staged) it must be a no-op.
+        sb.buffer.drainIfWouldOverflow(1'000'000u);
+        CHECK(sb.buffer.beginWrite(sb.obj, 64u) == 128u);
     }
 
     SECTION("Multiple drain-commit cycles reuse the buffer from zero")

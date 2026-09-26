@@ -190,12 +190,12 @@ struct WindowSettings;
 /// \brief Create a render texture, clamping anti-aliasing to the supported maximum.
 ///
 /// Forwards to `za::RenderTexture::create` after clamping
-/// `rtCreateSettings.antiAliasingLevel` to the value reported by
-/// `za::RenderTexture::getMaximumAntiAliasingLevel`. A message is
+/// `rtCreateSettings.sampleCount` to the value reported by
+/// `za::RenderTexture::getMaximumSampleCount`. A message is
 /// printed when clamping occurs.
 ///
 /// \param resolution       Resolution of the render texture in pixels.
-/// \param rtCreateSettings Creation settings; `antiAliasingLevel` may be clamped.
+/// \param rtCreateSettings Creation settings; `sampleCount` may be clamped.
 ///
 /// \return The created render texture, or empty on failure.
 ///

@@ -44,9 +44,9 @@ int main()
 
     const za::Vec2u size{static_cast<unsigned int>(width), static_cast<unsigned int>(height)};
 
-    auto baseRenderTexture = za::RenderTexture::create(size, {.antiAliasingLevel = 0}).value();
+    auto baseRenderTexture = za::RenderTexture::create(size, {.sampleCount = 0}).value();
 
-    auto leftInnerRT = za::RenderTexture::create(size, {.antiAliasingLevel = 4}).value();
+    auto leftInnerRT = za::RenderTexture::create(size, {.sampleCount = 4}).value();
 
     const za::Vertex leftVertexArray[6]{{{0.f, 0.f}, za::Color::Red, {0.f, 0.f}},
                                         {{halfWidth, 0.f}, za::Color::Red, {halfWidth, 0.f}},

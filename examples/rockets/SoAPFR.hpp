@@ -4,14 +4,14 @@
 
 #include "Zancle/Container/Vector.hpp"
 
-#include "Zancle/Trait/IsMemberPointer.hpp"
-
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/IndexSequence.hpp"
 #include "Zancle/Base/Macros.hpp"
 #include "Zancle/Base/MakeIndexSequence.hpp"
 #include "Zancle/Base/SizeT.hpp"
 #include "Zancle/Base/TypePackElement.hpp"
+
+#include "Zancle/Trait/IsMemberPointer.hpp"
 
 
 namespace priv

@@ -23,12 +23,12 @@
 #include "Zancle/Vocabulary/FunctionRef.hpp"
 #include "Zancle/Vocabulary/Optional.hpp"
 
-#include "Zancle/Trait/IsSame.hpp"
-#include "Zancle/Trait/RemoveCVRef.hpp"
-
 #include "Zancle/Base/IntTypes.hpp"
 #include "Zancle/Base/Macros.hpp"
 #include "Zancle/Base/SizeT.hpp"
+
+#include "Zancle/Trait/IsSame.hpp"
+#include "Zancle/Trait/RemoveCVRef.hpp"
 
 #include <filesystem>
 #include <string>

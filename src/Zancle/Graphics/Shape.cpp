@@ -26,6 +26,7 @@ Shape::Shape(const Data& data) :
     m_textureRect{data.textureRect},
     m_outlineTextureRect{data.outlineTextureRect},
     m_outlineThickness{data.outlineThickness},
+    m_miterLimit{data.miterLimit},
     m_fillColor{data.fillColor},
     m_outlineColor{data.outlineColor},
     position{data.position},
@@ -116,6 +117,10 @@ void Shape::setOutlineThickness(float thickness)
 
     m_outlineThickness = thickness;
 
+    // Never updated with any geometry: nothing to rebuild.
+    if (m_verticesEndIndex == 0u)
+        return;
+
     const za::SizeT pointCount = m_verticesEndIndex - 2u;
 
     m_vertices.resize(pointCount + 2u); // +2 for center and repeated first point
@@ -133,6 +138,7 @@ void Shape::setMiterLimit(float miterLimit)
 
     m_miterLimit = miterLimit;
     updateOutline();
+    updateOutlineTexCoords();
 }
 
 
@@ -224,7 +230,10 @@ void Shape::updateOutline()
         return;
     }
 
-    const za::SizeT count = m_vertices.size() - 2u;
+    // Derive the perimeter count from the fill range, not from `m_vertices.size()`:
+    // when an outline already exists (e.g. `setMiterLimit` after `setOutlineThickness`),
+    // `m_vertices` also contains the old outline vertices.
+    const za::SizeT count = m_verticesEndIndex - 2u;
     m_vertices.resize(m_verticesEndIndex + (count + 1u) * 2u);
 
     ShapeUtils::updateOutlineFromTriangleFanFill(m_outlineThickness,

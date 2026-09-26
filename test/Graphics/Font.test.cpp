@@ -62,8 +62,6 @@ TEST_CASE("[Graphics] za::Font" * tst::skip(skipDisplayTests))
                 CHECK(font.getInfo().family == "Tuffy");
                 const auto& glyph = font.getGlyph(0x45, 16, false, /* outlineThickness */ 0.f);
                 CHECK(glyph.advance == 9);
-                CHECK(glyph.lsbDelta == 9);
-                CHECK(glyph.rsbDelta == 16);
                 CHECK(glyph.bounds == za::Rect2f({0, -12}, {8, 12}));
                 CHECK(glyph.textureRect == za::Rect2f({2, 2}, {8, 12}));
                 CHECK(font.hasGlyph(0x41));
@@ -99,8 +97,6 @@ TEST_CASE("[Graphics] za::Font" * tst::skip(skipDisplayTests))
             CHECK(font.getInfo().family == "Tuffy");
             const auto& glyph = font.getGlyph(0x45, 16, false, /* outlineThickness */ 0.f);
             CHECK(glyph.advance == 9);
-            CHECK(glyph.lsbDelta == 9);
-            CHECK(glyph.rsbDelta == 16);
             CHECK(glyph.bounds == za::Rect2f({0, -12}, {8, 12}));
             CHECK(glyph.textureRect == za::Rect2f({2, 2}, {8, 12}));
             CHECK(font.hasGlyph(0x41));
@@ -126,8 +122,6 @@ TEST_CASE("[Graphics] za::Font" * tst::skip(skipDisplayTests))
         CHECK(font.getInfo().family == "Tuffy");
         const auto& glyph = font.getGlyph(0x45, 16, false, /* outlineThickness */ 0.f);
         CHECK(glyph.advance == 9);
-        CHECK(glyph.lsbDelta == 9);
-        CHECK(glyph.rsbDelta == 16);
         CHECK(glyph.bounds == za::Rect2f({0, -12}, {8, 12}));
         CHECK(glyph.textureRect == za::Rect2f({2, 2}, {8, 12}));
         CHECK(font.hasGlyph(0x41));

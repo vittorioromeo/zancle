@@ -93,11 +93,13 @@ struct [[nodiscard]] ZA_GRAPHICS_API CurvedArrowShapeData : LocalAnchorPointMixi
     ///
     /// \par Cost
     /// **Vertex iteration, O(pointCount)** -- transforms
-    /// `2 * pointCount + 3` vertices (outer arc + inner arc + head)
-    /// and folds them into an AABB. Each iteration performs one
-    /// trig lookup and one point transform. Cost grows linearly
-    /// with `pointCount`; the default `pointCount = 30` means
-    /// 63 vertex transforms per call.
+    /// two vertices per rendered arc sample plus the three head
+    /// vertices (the sample count is sweep-scaled from `pointCount`,
+    /// matching the renderer) and folds them into an AABB. Each
+    /// iteration performs one trig lookup and one point transform.
+    /// Cost grows linearly with `pointCount`; the default
+    /// `pointCount = 30` means 63 vertex transforms per call at a
+    /// 90-degree sweep.
     ///
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::pure]] Rect2f getGlobalBounds() const noexcept;

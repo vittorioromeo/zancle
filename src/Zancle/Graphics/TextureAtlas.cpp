@@ -12,6 +12,8 @@
 #include "Zancle/Graphics/Texture.hpp"
 #include "Zancle/Graphics/TextureAtlasUtils.hpp"
 
+#include "Zancle/Err/Err.hpp"
+
 #include "Zancle/Geometry/Priv/Vec2Base.hpp"
 #include "Zancle/Geometry/Rect2.hpp"
 #include "Zancle/Geometry/RectPacker.hpp"
@@ -29,6 +31,11 @@ TextureAtlas::TextureAtlas(Texture&& atlasTexture) :
     m_atlasTexture(ZA_MOVE(atlasTexture)),
     m_rectPacker(m_atlasTexture.getSize())
 {
+    // The atlas owns the entire surface: clear it so that entry padding and
+    // uncovered regions hold transparent black instead of undefined contents
+    // (which linear filtering would blend into the entries' edges)
+    if (!m_atlasTexture.clear())
+        priv::errMsg("Failed to clear texture atlas texture on construction");
 }
 
 

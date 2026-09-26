@@ -411,7 +411,7 @@ Main::Main() :
     };
 }()),
     shaders(*shadersStorage),
-    aaLevel(za::min(16u, za::RenderTexture::getMaximumAntiAliasingLevel())),
+    aaLevel(za::min(16u, za::RenderTexture::getMaximumSampleCount())),
     gameStorage(new MainGameStorage{
         .profile =
             [&]
@@ -501,23 +501,23 @@ Main::Main() :
     listener(*listenerStorage),
     rtBackgroundStorage(new za::RenderTexture{
         za::RenderTexture::create(gameScreenSize.toVec2u(),
-                                  {.antiAliasingLevel = aaLevel, .smooth = true, .wrapMode = za::TextureWrapMode::Repeat})
+                                  {.smooth = true, .wrapMode = za::TextureWrapMode::Repeat, .sampleCount = aaLevel})
             .value()}),
     rtBackground(*rtBackgroundStorage),
     rtBackgroundProcessedStorage(new za::RenderTexture{
-        za::RenderTexture::create(gameScreenSize.toVec2u(), {.antiAliasingLevel = aaLevel, .smooth = true}).value()}),
+        za::RenderTexture::create(gameScreenSize.toVec2u(), {.smooth = true, .sampleCount = aaLevel}).value()}),
     rtBackgroundProcessed(*rtBackgroundProcessedStorage),
     rtImGuiStorage(new za::RenderTexture{
-        za::RenderTexture::create(window.getSize(), {.antiAliasingLevel = aaLevel, .smooth = true}).value()}),
+        za::RenderTexture::create(window.getSize(), {.smooth = true, .sampleCount = aaLevel}).value()}),
     rtImGui(*rtImGuiStorage),
     rtCloudMaskStorage(new za::RenderTexture{
-        za::RenderTexture::create(window.getSize(), {.antiAliasingLevel = aaLevel, .smooth = true}).value()}),
+        za::RenderTexture::create(window.getSize(), {.smooth = true, .sampleCount = aaLevel}).value()}),
     rtCloudMask(*rtCloudMaskStorage),
     rtCloudProcessedStorage(new za::RenderTexture{
-        za::RenderTexture::create(window.getSize(), {.antiAliasingLevel = aaLevel, .smooth = true}).value()}),
+        za::RenderTexture::create(window.getSize(), {.smooth = true, .sampleCount = aaLevel}).value()}),
     rtCloudProcessed(*rtCloudProcessedStorage),
     rtGameStorage(new za::RenderTexture{
-        za::RenderTexture::create(window.getSize(), {.antiAliasingLevel = aaLevel, .smooth = true}).value()}),
+        za::RenderTexture::create(window.getSize(), {.smooth = true, .sampleCount = aaLevel}).value()}),
     rtGame(*rtGameStorage),
     hexedCatRenderTexturesStorage(new MainRenderTextureVector{[this]
 {
@@ -526,7 +526,7 @@ Main::Main() :
 
     for (za::SizeT i = 0u; i < maxHexedCatRenderTextures; ++i)
         result.emplaceBack(
-            za::RenderTexture::create(hexedCatRenderTextureSize, {.antiAliasingLevel = aaLevel, .smooth = true}).value());
+            za::RenderTexture::create(hexedCatRenderTextureSize, {.smooth = true, .sampleCount = aaLevel}).value());
 
     return result;
 }()}),

@@ -33,22 +33,22 @@ struct [[nodiscard]] ZA_GRAPHICS_API RoundedRectangleShapeData : LocalAnchorPoin
     ZA_PRIV_DEFINE_SETTINGS_DATA_MEMBERS_TRANSFORMABLE;
     ZA_PRIV_DEFINE_SETTINGS_DATA_MEMBERS_SHAPE;
 
-    Vec2f        size{};                //!< Size of the rounded rectangle
-    float        cornerRadius{0.f};     //!< Radius of the corners of the rounded rectangle
-    unsigned int cornerPointCount{16u}; //!< Number of points used to draw the corners of the rounded rectangle
+    Vec2f size{};                       //!< Size of the rounded rectangle
+    float cornerRadius{0.f};            //!< Radius of the corners of the rounded rectangle
+    unsigned int cornerPointCount{16u}; //!< Number of points used to draw each corner of the rounded rectangle (must be >= 2)
 
 
     ////////////////////////////////////////////////////////////
     /// \brief `true` when the rounded rectangle would actually render anything.
     ///
     /// A rounded rectangle with non-positive `size.x` / `size.y`,
-    /// negative `cornerRadius`, or `cornerPointCount < 1` produces
+    /// negative `cornerRadius`, or `cornerPointCount < 2` produces
     /// no geometry and is treated as an empty shape.
     ///
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr bool hasVisibleGeometry() const noexcept
     {
-        return size.x > 0.f && size.y > 0.f && cornerRadius >= 0.f && cornerPointCount >= 1u;
+        return size.x > 0.f && size.y > 0.f && cornerRadius >= 0.f && cornerPointCount >= 2u;
     }
 
 

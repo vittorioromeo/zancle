@@ -36,9 +36,18 @@ namespace za
 /// `codePoints` / `codePointCount` pair specifies the explicit
 /// list of Unicode code points to load.
 ///
+/// The code point list must always include U+0020 (space): text
+/// layout unconditionally queries the space glyph to compute
+/// whitespace width. If strike-through text will be drawn,
+/// U+0078 ('x') is also required, as its bounds anchor the
+/// strike-through line. Querying a glyph missing from the
+/// mapping at draw time warns (once per code point) and renders
+/// the font's missing-glyph placeholder (see
+/// `GlyphMapping::getGlyph`).
+///
 /// The `ascii` and `latin1` static factories build common
 /// presets for the printable ASCII and Latin-1 Supplement
-/// ranges respectively.
+/// ranges respectively (both include U+0020 and U+0078).
 ///
 ////////////////////////////////////////////////////////////
 struct [[nodiscard]] GlyphLoadSettings
@@ -107,6 +116,10 @@ struct ZA_GRAPHICS_API GlyphMapping
     /// The characterSize/bold/outlineThickness params are baked in
     /// and only verified via debug asserts.
     ///
+    /// Querying a code point that was not loaded into the mapping
+    /// warns (once per code point) and returns the font's
+    /// missing-glyph placeholder (`.notdef`) instead.
+    ///
     ////////////////////////////////////////////////////////////
     [[nodiscard]] const Glyph& getGlyph(char32_t     codePoint,
                                         unsigned int theCharacterSize,
@@ -157,6 +170,11 @@ struct ZA_GRAPHICS_API GlyphMapping
     ////////////////////////////////////////////////////////////
     ankerl::unordered_dense::map<char32_t, Glyph> fillGlyphs;    //!< Map of code point → fill glyph (interior)
     ankerl::unordered_dense::map<char32_t, Glyph> outlineGlyphs; //!< Map of code point → outline glyph (border)
+
+    Glyph fallbackFillGlyph;    //!< Placeholder for unmapped code points (the font's `.notdef`)
+    Glyph fallbackOutlineGlyph; //!< Placeholder outline for unmapped code points (zero if no outline was loaded)
+
+    mutable ankerl::unordered_dense::set<char32_t> warnedMissingCodePoints; //!< Deduplicates missing-glyph warnings
 
     ////////////////////////////////////////////////////////////
     // Baked-in parameters

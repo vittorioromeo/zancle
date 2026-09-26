@@ -12,12 +12,12 @@
 
 #include "Zancle/Container/Vector.hpp"
 
-#include "Zancle/Trait/IsSame.hpp"
-
 #include "Zancle/Base/InitializerList.hpp"
 #include "Zancle/Base/PtrDiffT.hpp"
 #include "Zancle/Base/SizeT.hpp"
 #include "Zancle/Base/Swap.hpp"
+
+#include "Zancle/Trait/IsSame.hpp"
 
 
 namespace

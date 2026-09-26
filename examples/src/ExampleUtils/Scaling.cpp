@@ -190,15 +190,15 @@ za::Optional<za::RenderWindow> makeDPIScaledRenderWindow(const za::WindowSetting
 ////////////////////////////////////////////////////////////
 za::Optional<za::RenderTexture> makeAARenderTexture(const za::Vec2u resolution, za::RenderTextureCreateSettings rtCreateSettings)
 {
-    const auto maxAALevel = za::RenderTexture::getMaximumAntiAliasingLevel();
+    const auto maxAALevel = za::RenderTexture::getMaximumSampleCount();
 
-    if (rtCreateSettings.antiAliasingLevel > maxAALevel)
+    if (rtCreateSettings.sampleCount > maxAALevel)
     {
         za::printLn("Desired AA level {} higher than supported {}, falling back to maximum",
-                    rtCreateSettings.antiAliasingLevel,
+                    rtCreateSettings.sampleCount,
                     maxAALevel);
 
-        rtCreateSettings.antiAliasingLevel = maxAALevel;
+        rtCreateSettings.sampleCount = maxAALevel;
     }
 
     return za::RenderTexture::create(resolution.toVec2u(), rtCreateSettings);

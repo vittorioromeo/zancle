@@ -149,6 +149,17 @@ public:
     /// disables the outline.
     /// By default, the outline thickness is 0.
     ///
+    /// The outline is generated in the shape's **local** coordinate
+    /// system: its thickness scales with the shape's transform, and
+    /// a mirroring (negative) scale cannot flip the side it grows
+    /// on.
+    ///
+    /// Which side the outline grows on follows the winding of the
+    /// points: built-in shapes emit their perimeter clockwise in
+    /// screen space (y-down), so positive thickness draws the
+    /// outline on top of the fill; custom counter-clockwise
+    /// polygons grow outward instead.
+    ///
     /// \param thickness New outline thickness
     ///
     /// \see `getOutlineThickness`

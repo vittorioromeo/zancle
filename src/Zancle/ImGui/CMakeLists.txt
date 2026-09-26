@@ -14,7 +14,7 @@ target_link_libraries(zancle-imgui
 CPMAddPackage(
     NAME imgui
     GITHUB_REPOSITORY vittorioromeo/imgui
-    GIT_TAG 06698579fefcfb8f7e3bc8b01b9b4bf9da81aa5b
+    GIT_TAG 26485f3ed9c2a1b2bb9288bbc04cba5156844c70
     SYSTEM TRUE
 )
 

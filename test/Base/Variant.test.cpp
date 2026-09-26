@@ -2,6 +2,11 @@
 
 #include "Zancle/Vocabulary/Variant.hpp"
 
+#include "Zancle/Base/IndexSequence.hpp"
+#include "Zancle/Base/MakeIndexSequence.hpp"
+#include "Zancle/Base/SizeT.hpp"
+
+#include "Zancle/Trait/EnableTrivialRelocation.hpp"
 #include "Zancle/Trait/IsAggregate.hpp"
 #include "Zancle/Trait/IsAssignable.hpp"
 #include "Zancle/Trait/IsConstructible.hpp"
@@ -17,10 +22,6 @@
 #include "Zancle/Trait/IsTriviallyMoveConstructible.hpp"
 #include "Zancle/Trait/IsTriviallyRelocatable.hpp"
 #include "Zancle/Trait/RemoveCVRef.hpp"
-
-#include "Zancle/Base/IndexSequence.hpp"
-#include "Zancle/Base/MakeIndexSequence.hpp"
-#include "Zancle/Base/SizeT.hpp"
 
 
 namespace
@@ -48,7 +49,7 @@ struct NonTrivial
 ////////////////////////////////////////////////////////////
 struct NonTrivialButRelocatable
 {
-    using TriviallyRelocatableTag = NonTrivialButRelocatable;
+    ZA_ENABLE_TRIVIAL_RELOCATION;
 
     static inline int si{};
 

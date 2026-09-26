@@ -20,13 +20,6 @@
 ////////////////////////////////////////////////////////////
 // Forward declarations
 ////////////////////////////////////////////////////////////
-#ifdef ZA_SYSTEM_ANDROID
-namespace za::priv
-{
-class ResourceStream;
-}
-#endif
-
 namespace za
 {
 class FontFace;
@@ -172,10 +165,14 @@ public:
     /// \param bold             Retrieve the bold version or the regular one?
     /// \param outlineThickness Thickness of outline (when != 0 the glyph will not be filled)
     ///
-    /// \return The glyph corresponding to `codePoint` and `characterSize`
+    /// \return Copy of the glyph corresponding to `codePoint` and `characterSize`
+    ///
+    /// \note The glyph is returned by value: the font's internal glyph cache
+    /// can grow and relocate its entries on any later glyph load, so
+    /// references into it would not be stable.
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] const Glyph& getGlyph(char32_t codePoint, unsigned int characterSize, bool bold, float outlineThickness) const;
+    [[nodiscard]] Glyph getGlyph(char32_t codePoint, unsigned int characterSize, bool bold, float outlineThickness) const;
 
     ////////////////////////////////////////////////////////////
     /// \brief A fill glyph paired with its matching outline glyph
@@ -332,8 +329,10 @@ public:
     /// If this font owns its glyph atlas, the returned texture is
     /// that atlas. If a shared `za::TextureAtlas` was passed to the
     /// open function, the returned texture is the shared atlas
-    /// texture. The contents grow as more glyphs are rasterized on
-    /// demand.
+    /// texture. New glyph entries accumulate in the texture as they
+    /// are rasterized on demand, but the texture itself has a fixed
+    /// size (the font-owned fallback atlas is 1024x1024 and does
+    /// not grow).
     ///
     /// This accessor exists mostly for advanced uses (custom
     /// rendering, debugging, dumping the glyph atlas) -- regular
@@ -352,14 +351,6 @@ public:
     ////////////////////////////////////////////////////////////
     [[nodiscard]] const Texture& getTexture() const;
 
-private:
-    ////////////////////////////////////////////////////////////
-    /// \brief Open from stream and print errors with custom message
-    ///
-    ////////////////////////////////////////////////////////////
-    [[nodiscard]] static za::Optional<Font> openFromStreamImpl(InputStream& stream, TextureAtlas* textureAtlas, const char* type);
-
-public:
     ////////////////////////////////////////////////////////////
     /// \private
     ///

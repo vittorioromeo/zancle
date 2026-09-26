@@ -62,15 +62,51 @@
 namespace
 {
 ////////////////////////////////////////////////////////////
-[[gnu::always_inline]] inline void updateOutlineVerticesColorAndTextureRect(const auto&       descriptor,
-                                                                            za::Vertex* const outlineVertexPtr,
-                                                                            const za::SizeT   outlineVertexCount)
+// Finalize outline vertices that were generated in LOCAL space: map
+// `outlineTextureRect` over the outline's own local bounds (mirroring
+// `Shape::updateOutlineTexCoords`, which maps over the bounds of the outline
+// vertex range), then transform positions into world space and apply the
+// outline color. Generating outlines in local space keeps the thickness and
+// miters in local units (they scale with the shape's transform) and makes
+// mirrored transforms unable to flip the side the outline grows on --
+// matching the retained `za::Shape` pipeline exactly.
+[[gnu::always_inline]] inline void finalizeLocalOutlineVertices(
+    const auto&          descriptor,
+    const za::Transform& transform,
+    za::Vertex* const    outlineVertexPtr,
+    const za::SizeT      outlineVertexCount)
 {
+    ZA_ASSERT(outlineVertexCount > 0u);
+
     const za::Vertex* const end = outlineVertexPtr + outlineVertexCount;
+
+    // Outline-local bounds scan (retained parity: `Shape` maps outline UVs
+    // over the outline vertex range's own bounds, not the fill's)
+    za::Vec2f boundsMin = outlineVertexPtr[0].position;
+    za::Vec2f boundsMax = outlineVertexPtr[0].position;
+
+    for (const za::Vertex* vertex = outlineVertexPtr + 1; vertex != end; ++vertex)
+    {
+        boundsMin.x = ZA_MIN(boundsMin.x, vertex->position.x);
+        boundsMin.y = ZA_MIN(boundsMin.y, vertex->position.y);
+        boundsMax.x = ZA_MAX(boundsMax.x, vertex->position.x);
+        boundsMax.y = ZA_MAX(boundsMax.y, vertex->position.y);
+    }
+
+    const za::Vec2f boundsSize       = boundsMax - boundsMin;
+    const bool      degenerateBounds = boundsSize.x <= 0.f || boundsSize.y <= 0.f;
+
     for (za::Vertex* vertex = outlineVertexPtr; vertex != end; ++vertex)
     {
-        vertex->color     = descriptor.outlineColor;
-        vertex->texCoords = descriptor.outlineTextureRect.position; // TODO P1: review this logic
+        const za::Vec2f localPoint = vertex->position;
+
+        vertex->texCoords = degenerateBounds ? descriptor.outlineTextureRect.position
+                                             : descriptor.outlineTextureRect.position +
+                                                   descriptor.outlineTextureRect.size.componentWiseMul(
+                                                       (localPoint - boundsMin).componentWiseDiv(boundsSize));
+
+        vertex->position = transform.transformPoint(localPoint);
+        vertex->color    = descriptor.outlineColor;
     }
 }
 
@@ -194,6 +230,10 @@ void DrawableBatchImpl<TStorage>::add(const DrawVerticesSettings& settings)
         case PrimitiveType::TriangleFan:
         {
             ZA_ASSERT(vertexCount >= 3u);
+
+            if (vertexCount < 3u) // Release guard: `vertexCount - 2u` underflows below
+                return;
+
             numTrianglesInStripOrFan = static_cast<IndexType>(vertexCount - 2u);
             numIndicesToGenerate     = static_cast<za::SizeT>(numTrianglesInStripOrFan) * 3u;
             break;
@@ -274,6 +314,10 @@ void DrawableBatchImpl<TStorage>::add(const DrawIndexedVerticesSettings& setting
         case PrimitiveType::TriangleFan:
         {
             ZA_ASSERT(indexCount == 0u || indexCount >= 3u);
+
+            if (indexCount < 3u) // Release guard: `indexCount - 2u` underflows below
+                return;
+
             numTrianglesInStripOrFan = static_cast<IndexType>(indexCount - 2u);
             numIndicesToGenerate     = static_cast<za::SizeT>(numTrianglesInStripOrFan) * 3u;
             break;
@@ -481,50 +525,71 @@ BatchedGeometry DrawableBatchImpl<TStorage>::drawTriangleFanShapeFromPoints(
     m_storage.commitMoreVertices(fillVertexCount);
 
     //
-    // Update fill vertex positions and color, compute inside bounds
-    fillVertexPtr[1].position    = transform.transformPoint(pointFn(0u)); // first point
-    fillVertexPtr[1].color       = descriptor.fillColor;
-    za::Vec2f fillBoundsPosition = fillVertexPtr[1].position; // left and top
+    // Update fill vertex positions and color, compute LOCAL-space inside bounds.
+    // Texture coordinates must be derived from the untransformed (local) geometry so that
+    // the texture rotates/scales together with the shape (matching `Shape::updateTexCoords`
+    // and the batch ring path). Each vertex's local point is stashed in `texCoords` and
+    // remapped into the texture rect by the pass below.
+    const Vec2f firstLocalPoint = pointFn(0u);
 
-    float fillBoundsMaxX = fillVertexPtr[1].position.x; // right
-    float fillBoundsMaxY = fillVertexPtr[1].position.y; // bottom
+    fillVertexPtr[1].position  = transform.transformPoint(firstLocalPoint); // first point
+    fillVertexPtr[1].color     = descriptor.fillColor;
+    fillVertexPtr[1].texCoords = firstLocalPoint;
+
+    za::Vec2f fillBoundsPosition = firstLocalPoint; // left and top
+
+    float fillBoundsMaxX = firstLocalPoint.x; // right
+    float fillBoundsMaxY = firstLocalPoint.y; // bottom
 
     for (unsigned int i = 1u; i < nPoints; ++i)
     {
         Vertex& v = fillVertexPtr[1u + i];
 
-        v.position = transform.transformPoint(pointFn(i));
-        v.color    = descriptor.fillColor;
+        const Vec2f localPoint = pointFn(i);
 
-        fillBoundsPosition.x = ZA_MIN(fillBoundsPosition.x, v.position.x);
-        fillBoundsPosition.y = ZA_MIN(fillBoundsPosition.y, v.position.y);
+        v.position  = transform.transformPoint(localPoint);
+        v.color     = descriptor.fillColor;
+        v.texCoords = localPoint;
 
-        fillBoundsMaxX = ZA_MAX(fillBoundsMaxX, v.position.x);
-        fillBoundsMaxY = ZA_MAX(fillBoundsMaxY, v.position.y);
+        fillBoundsPosition.x = ZA_MIN(fillBoundsPosition.x, localPoint.x);
+        fillBoundsPosition.y = ZA_MIN(fillBoundsPosition.y, localPoint.y);
+
+        fillBoundsMaxX = ZA_MAX(fillBoundsMaxX, localPoint.x);
+        fillBoundsMaxY = ZA_MAX(fillBoundsMaxY, localPoint.y);
     }
 
     const za::Vec2f fillBoundsSize{fillBoundsMaxX - fillBoundsPosition.x, fillBoundsMaxY - fillBoundsPosition.y};
 
     // Fan apex: if the caller supplied a local apex (needed for non-convex shapes whose bbox
-    // center may lie outside the polygon), transform it alongside the geometry; otherwise fall
-    // back to the world-space bbox center (valid for convex/centrally-symmetric shapes).
-    fillVertexPtr[0].position            = (localApex != nullptr) ? transform.transformPoint(*localApex)
-                                                                  : fillBoundsPosition + fillBoundsSize / 2.f;
-    fillVertexPtr[0].color               = descriptor.fillColor;
-    fillVertexPtr[1u + nPoints].position = fillVertexPtr[1].position; // repeated first point
-    fillVertexPtr[1u + nPoints].color    = descriptor.fillColor;
+    // center may lie outside the polygon), use it; otherwise fall back to the local bbox
+    // center (valid for convex/centrally-symmetric shapes). Transformed alongside the geometry.
+    const Vec2f localApexPoint = (localApex != nullptr) ? *localApex : fillBoundsPosition + fillBoundsSize / 2.f;
+
+    fillVertexPtr[0].position  = transform.transformPoint(localApexPoint);
+    fillVertexPtr[0].color     = descriptor.fillColor;
+    fillVertexPtr[0].texCoords = localApexPoint;
+
+    fillVertexPtr[1u + nPoints].position  = fillVertexPtr[1].position; // repeated first point
+    fillVertexPtr[1u + nPoints].color     = descriptor.fillColor;
+    fillVertexPtr[1u + nPoints].texCoords = firstLocalPoint;
 
     //
-    // Update fill tex coords (if the shape's fill is visible)
-    if (fillBoundsSize.x > 0.f && fillBoundsSize.y > 0.f) [[likely]]
+    // Maps the stashed local-space points into the fill texture rect. Deferred
+    // into a lambda: when an outline is generated, the outline generation reads
+    // the stashed local points first, so the stash must stay alive until then.
+    const auto mapFillTexCoords =
+        [&descriptor, fillBoundsPosition, fillBoundsSize](Vertex* const baseVertexPtr, const za::SizeT count)
     {
-        const Vertex* end = fillVertexPtr + fillVertexCount;
-        for (Vertex* vertex = fillVertexPtr; vertex != end; ++vertex)
+        if (fillBoundsSize.x <= 0.f || fillBoundsSize.y <= 0.f) [[unlikely]]
+            return; // Degenerate fill: keep the deterministic stashed values
+
+        const Vertex* end = baseVertexPtr + count;
+        for (Vertex* vertex = baseVertexPtr; vertex != end; ++vertex)
         {
-            const Vec2f ratio = (vertex->position - fillBoundsPosition).componentWiseDiv(fillBoundsSize);
+            const Vec2f ratio = (vertex->texCoords - fillBoundsPosition).componentWiseDiv(fillBoundsSize);
             vertex->texCoords = descriptor.textureRect.position + descriptor.textureRect.size.componentWiseMul(ratio);
         }
-    }
+    };
 
     const za::SizeT fillIndexCount = 3u * (fillVertexCount - 2u);
 
@@ -538,7 +603,10 @@ BatchedGeometry DrawableBatchImpl<TStorage>::drawTriangleFanShapeFromPoints(
     //
     // Update outline if needed
     if (descriptor.outlineThickness == 0.f)
+    {
+        mapFillTexCoords(fillVertexPtr, fillVertexCount);
         return {.fill = {fillVertexPtr, fillVertexCount}, .outline = {}};
+    }
 
     const za::SizeT outlineVertexCount = (nPoints + 1u) * 2u;
 
@@ -547,16 +615,26 @@ BatchedGeometry DrawableBatchImpl<TStorage>::drawTriangleFanShapeFromPoints(
     Vertex* const outlineVertexPtr = m_storage.reserveMoreVertices(outlineVertexCount);
     m_storage.commitMoreVertices(outlineVertexCount);
 
-    // Cannot use `vertices` here as the earlier reserve may have invalidated the pointer
-    ShapeUtils::updateOutlineFromTriangleFanFill(descriptor.outlineThickness,
-                                                 outlineVertexPtr - fillVertexCount + 1u, // Skip the first vertex (center point)
-                                                 outlineVertexPtr,
-                                                 nPoints,
-                                                 descriptor.miterLimit);
+    // Cannot use `fillVertexPtr` here as the outline reserve may have invalidated the pointer
+    Vertex* const fillBasePtr = outlineVertexPtr - fillVertexCount;
+
+    // Generate the outline from the LOCAL-space fill perimeter (still stashed in
+    // the fill vertices' `texCoords`), writing LOCAL outline positions;
+    // `finalizeLocalOutlineVertices` maps UVs and transforms to world space below
+    ShapeUtils::updateOutlineImpl(descriptor.outlineThickness,
+                                  [fillPerimeterPtr = fillBasePtr + 1u] // Skip the first vertex (center point)
+                                  [[gnu::always_inline, gnu::flatten]] (const za::SizeT i)
+    { return fillPerimeterPtr[i].texCoords; },
+                                  outlineVertexPtr,
+                                  nPoints,
+                                  descriptor.miterLimit);
+
+    // The outline generation has consumed the stash: map the fill tex coords now
+    mapFillTexCoords(fillBasePtr, fillVertexCount);
 
     //
-    // Update outline colors and outline tex coords
-    updateOutlineVerticesColorAndTextureRect(descriptor, outlineVertexPtr, outlineVertexCount);
+    // Update outline colors, outline tex coords, and world-space positions
+    finalizeLocalOutlineVertices(descriptor, transform, outlineVertexPtr, outlineVertexCount);
 
     const za::SizeT outlineIndexCount = 3u * (outlineVertexCount - 2u);
 
@@ -795,29 +873,35 @@ BatchedGeometry DrawableBatchImpl<TStorage>::add(const CurvedArrowShapeData& sd)
         // the fill rather than growing the bounds.
         //
         // Order: outer arc (start -> end) -> head (outer barb, tip, inner barb) -> inner arc (end -> start).
+        // Perimeter points in LOCAL (ring-local) space, matching the fill's
+        // closed forms exactly; `finalizeLocalOutlineVertices` maps UVs and
+        // applies `fullTransform` afterwards
+        const Vec2f headLocalPoints[3] = {headAttachPointLocal + radialOutDir * (sd.headWidth / 2.f),      // outer barb
+                                          headAttachPointLocal + tangentDir * (sd.headLength * sweepSign), // tip
+                                          headAttachPointLocal - radialOutDir * (sd.headWidth / 2.f)};     // inner barb
+
         ShapeUtils::updateOutlineImpl(sd.outlineThickness,
                                       [&](const za::SizeT i)
         {
             // 1. Outer edge of the body (start to end).
             if (i < numArcPoints)
-                return bodyFillVertexPtr[2 * i + 0u].position;
+                return ShapeUtils::computeRingPointsFromAngleStep(i, startRadians, angleStep, sd.outerRadius, sd.innerRadius)
+                    .outerPoint;
 
-            // 2. Arrowhead vertices: outer barb (1) -> tip (0) -> inner barb (2).
+            // 2. Arrowhead vertices: outer barb -> tip -> inner barb.
             if (i < numArcPoints + 3u)
-            {
-                const unsigned int headLocal[3] = {1u, 0u, 2u};
-                return headFillVertexPtr[headLocal[i - numArcPoints]].position;
-            }
+                return headLocalPoints[i - numArcPoints];
 
             // 3. Inner edge of the body (end back to start).
             const auto innerIdx = 2u * numArcPoints + 2u - static_cast<za::SizeT>(i);
-            return bodyFillVertexPtr[2 * innerIdx + 1u].position;
+            return ShapeUtils::computeRingPointsFromAngleStep(innerIdx, startRadians, angleStep, sd.outerRadius, sd.innerRadius)
+                .innerPoint;
         },
                                       outlineVertexPtr,
                                       outlinePerimeterPointCount,
                                       sd.miterLimit);
 
-        updateOutlineVerticesColorAndTextureRect(sd, outlineVertexPtr, outlineVertexCount);
+        finalizeLocalOutlineVertices(sd, fullTransform, outlineVertexPtr, outlineVertexCount);
         m_storage.commitMoreVertices(outlineVertexCount);
 
         const za::SizeT outlineIndexCount = 3u * (outlineVertexCount - 2u); // Triangle strip indices
@@ -882,9 +966,10 @@ BatchedGeometry DrawableBatchImpl<TStorage>::add(const PieSliceShapeData& sdPieS
             .fillColor          = sdPieSlice.fillColor,
             .outlineColor       = sdPieSlice.outlineColor,
             .outlineThickness   = sdPieSlice.outlineThickness,
+            .miterLimit         = sdPieSlice.miterLimit,
             .radius             = sdPieSlice.radius,
             .startAngle         = sdPieSlice.startAngle,
-            .pointCount         = sdPieSlice.pointCount - 2u,
+            .pointCount         = za::max(3u, sdPieSlice.pointCount - 2u), // `CircleShapeData` requires >= 3
         });
 
     const float arcAngleStep = ShapeUtils::computePieSliceArcAngleStep(sdPieSlice.sweepAngle.asRadians(), sdPieSlice.pointCount);
@@ -1028,7 +1113,16 @@ BatchedGeometry DrawableBatchImpl<TStorage>::add(const RingShapeData& sdRing)
         {
             ZA_ASSERT_AND_ASSUME(i < nPoints);
             const za::SizeT walked = reverseWalk ? (nPoints - 1u - i) : i;
-            return fillVertexPtr[2 * walked + fillVertexIndexOffset].position;
+
+            // LOCAL-space boundary point (same closed form as the fill pass);
+            // `finalizeLocalOutlineVertices` transforms to world space afterwards
+            const auto ringPoints = ShapeUtils::computeRingPointsFromAngleStep(walked,
+                                                                               sdRing.startAngle.asRadians(),
+                                                                               angleStep,
+                                                                               sdRing.outerRadius,
+                                                                               sdRing.innerRadius);
+
+            return fillVertexIndexOffset == 0u ? ringPoints.outerPoint : ringPoints.innerPoint;
         };
 
         Vertex* const chosenOutlineVertexStart = chosenOutlineVertexPtr;
@@ -1060,8 +1154,8 @@ BatchedGeometry DrawableBatchImpl<TStorage>::add(const RingShapeData& sdRing)
                           /* reverseWalk */ true);
 
     //
-    // Update outline colors and outline tex coords
-    updateOutlineVerticesColorAndTextureRect(sdRing, outlineVertexPtr, totalOutlineVertices);
+    // Update outline colors, outline tex coords, and world-space positions
+    finalizeLocalOutlineVertices(sdRing, transform, outlineVertexPtr, totalOutlineVertices);
 
     m_storage.commitMoreVertices(totalOutlineVertices);
     m_storage.commitMoreIndices(totalOutlineIndices);
@@ -1091,10 +1185,11 @@ BatchedGeometry DrawableBatchImpl<TStorage>::add(const RingPieSliceShapeData& sd
             .fillColor          = sdRingPieSlice.fillColor,
             .outlineColor       = sdRingPieSlice.outlineColor,
             .outlineThickness   = sdRingPieSlice.outlineThickness,
+            .miterLimit         = sdRingPieSlice.miterLimit,
             .outerRadius        = sdRingPieSlice.outerRadius,
             .innerRadius        = sdRingPieSlice.innerRadius,
             .startAngle         = sdRingPieSlice.startAngle,
-            .pointCount         = sdRingPieSlice.pointCount - 1u,
+            .pointCount         = za::max(3u, sdRingPieSlice.pointCount - 1u), // `RingShapeData` requires >= 3
         });
 
     const auto transform = Transform::fromPositionScaleOriginRotation(sdRingPieSlice.position,
@@ -1124,9 +1219,7 @@ BatchedGeometry DrawableBatchImpl<TStorage>::add(const RingPieSliceShapeData& sd
     const za::SizeT fillVertexCount = 2u * numArcPoints;
 
     const za::SizeT numBoundaryPoints    = 2u * numArcPoints;
-    const za::SizeT totalOutlineVertices = (sdRingPieSlice.outlineThickness != 0.f && numArcPoints >= 3u)
-                                               ? (numBoundaryPoints + 1u) * 2u
-                                               : 0u;
+    const za::SizeT totalOutlineVertices = sdRingPieSlice.outlineThickness != 0.f ? (numBoundaryPoints + 1u) * 2u : 0u;
 
     const IndexType firstFillVertexIndex = m_storage.getNumVertices();
     Vertex* const   reservedVertexPtr    = m_storage.reserveMoreVertices(fillVertexCount + totalOutlineVertices);
@@ -1146,8 +1239,7 @@ BatchedGeometry DrawableBatchImpl<TStorage>::add(const RingPieSliceShapeData& sd
     m_storage.commitMoreVertices(fillVertexCount);
 
     //
-    // Generate fill indices
-    if (numArcPoints >= 3)
+    // Generate fill indices (`numArcPoints >= 3u` is guaranteed by the `za::max` above)
     {
         const za::SizeT numFillTriangles = (fillVertexCount - 2u); // A strip of `V` vertices has `V - 2` triangles
         const za::SizeT fillIndexCount   = numFillTriangles * 3u;
@@ -1161,7 +1253,7 @@ BatchedGeometry DrawableBatchImpl<TStorage>::add(const RingPieSliceShapeData& sd
 
     //
     // Update outline if needed
-    if (sdRingPieSlice.outlineThickness == 0.f || numArcPoints < 3)
+    if (sdRingPieSlice.outlineThickness == 0.f)
         return {.fill = {fillVertexPtr, fillVertexCount}, .outline = {}};
 
     const za::SizeT numOutlineTriangles = totalOutlineVertices - 2u;
@@ -1175,8 +1267,20 @@ BatchedGeometry DrawableBatchImpl<TStorage>::add(const RingPieSliceShapeData& sd
     const auto getBoundaryPoint = [&] [[gnu::always_inline, gnu::flatten]] (const za::SizeT i)
     {
         ZA_ASSERT_AND_ASSUME(i < numBoundaryPoints);
-        const auto fillVertexIdx = i < numArcPoints ? 2 * i : 2 * (2 * numArcPoints - 1 - i) + 1;
-        return fillVertexPtr[fillVertexIdx].position;
+
+        // LOCAL-space boundary point (same closed form as the fill pass): outer
+        // arc walked forward, then inner arc walked backward.
+        // `finalizeLocalOutlineVertices` transforms to world space afterwards.
+        const bool onOuterArc = i < numArcPoints;
+        const auto arcIndex   = onOuterArc ? i : (2u * numArcPoints - 1u - i);
+
+        const auto ringPoints = ShapeUtils::computeRingPointsFromAngleStep(arcIndex,
+                                                                           startRadians,
+                                                                           angleStep,
+                                                                           sdRingPieSlice.outerRadius,
+                                                                           sdRingPieSlice.innerRadius);
+
+        return onOuterArc ? ringPoints.outerPoint : ringPoints.innerPoint;
     };
 
     ShapeUtils::updateOutlineImpl(sdRingPieSlice.outlineThickness,
@@ -1192,8 +1296,8 @@ BatchedGeometry DrawableBatchImpl<TStorage>::add(const RingPieSliceShapeData& sd
         DrawableBatchUtils::appendTriangleStripIndices(outlineIndexPtr, firstOutlineVertexIndex, i);
 
     //
-    // Update outline colors and outline tex coords
-    updateOutlineVerticesColorAndTextureRect(sdRingPieSlice, outlineVertexPtr, totalOutlineVertices);
+    // Update outline colors, outline tex coords, and world-space positions
+    finalizeLocalOutlineVertices(sdRingPieSlice, transform, outlineVertexPtr, totalOutlineVertices);
 
     m_storage.commitMoreVertices(totalOutlineVertices);
     m_storage.commitMoreIndices(totalOutlineIndices);

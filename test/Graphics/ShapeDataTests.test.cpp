@@ -1004,6 +1004,8 @@ TEST_CASE("[Graphics] hasVisibleGeometry")
     SECTION("HeartShapeData visibility boundaries")
     {
         CHECK_FALSE(za::HeartShapeData{.size = {40.f, 30.f}, .pointCount = 2u}.hasVisibleGeometry());
+        CHECK_FALSE(za::HeartShapeData{.size = {40.f, 30.f}, .pointCount = 3u}.hasVisibleGeometry());
+        CHECK(za::HeartShapeData{.size = {40.f, 30.f}, .pointCount = 4u}.hasVisibleGeometry());
     }
 
     SECTION("RectangleShapeData visibility boundaries")
@@ -1015,6 +1017,7 @@ TEST_CASE("[Graphics] hasVisibleGeometry")
     SECTION("RoundedRectangleShapeData visibility boundaries")
     {
         CHECK_FALSE(za::RoundedRectangleShapeData{.size = {40.f, 30.f}, .cornerPointCount = 0u}.hasVisibleGeometry());
+        CHECK_FALSE(za::RoundedRectangleShapeData{.size = {40.f, 30.f}, .cornerPointCount = 1u}.hasVisibleGeometry());
         CHECK_FALSE(za::RoundedRectangleShapeData{.size = {40.f, 30.f}, .cornerRadius = -1.f}.hasVisibleGeometry());
     }
 

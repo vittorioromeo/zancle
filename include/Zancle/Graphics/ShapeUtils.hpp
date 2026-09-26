@@ -144,7 +144,7 @@ namespace za::ShapeUtils
     const za::SizeT index,
     const Vec2f     size) noexcept
 {
-    ZA_ASSERT_AND_ASSUME(index <= 4u);
+    ZA_ASSERT_AND_ASSUME(index < 4u);
 
     const Vec2f points[]{{0.f, 0.f}, {size.x, 0.f}, {size.x, size.y}, {0.f, size.y}};
     return points[index];
@@ -499,7 +499,8 @@ namespace za::ShapeUtils
 ///
 /// \param index         The index of the vertex to compute `(0 <= index < 12)`.
 /// \param size          Overall bounding size of the cross.
-/// \param armThickness  Thickness of the horizontal and vertical arms.
+/// \param armThickness  Thickness of the horizontal and vertical arms
+///                      (clamped to `min(size.x, size.y)`).
 ///
 /// \return The computed 2D position of the boundary vertex.
 ///
@@ -512,9 +513,14 @@ namespace za::ShapeUtils
     ZA_ASSERT_AND_ASSUME(index < 12u);
     ZA_ASSERT_AND_ASSUME(armThickness >= 0.f);
 
+    // Clamp the arm thickness to the smaller bounding dimension: beyond that, the inner
+    // corners would cross over and create a self-intersecting polygon escaping `size`.
+    // Clamping lets the shape cleanly degenerate into a full rectangle instead.
+    const float clampedThickness = ZA_MIN(armThickness, ZA_MIN(size.x, size.y));
+
     const float cx = size.x * 0.5f;
     const float cy = size.y * 0.5f;
-    const float h  = armThickness * 0.5f;
+    const float h  = clampedThickness * 0.5f;
 
     const Vec2f points[12u] = {
         {cx - h, 0.f},    //  0: top-left of top arm
@@ -739,11 +745,8 @@ namespace za::ShapeUtils
     const float offsets[4u] = {-sectorHalf, -toothHalfA, toothHalfA, sectorHalf};
     const float radii[4u]   = {innerRadius, outerRadius, outerRadius, innerRadius};
 
-    float       angle  = center + offsets[vertexKind];
+    const float angle  = center + offsets[vertexKind];
     const float radius = radii[vertexKind];
-
-    if (angle < 0.f)
-        angle += za::tau;
 
     const auto [sine, cosine] = za::sinCosLookup(za::positiveRemainder(angle, za::tau));
 

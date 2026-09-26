@@ -91,6 +91,12 @@ za::SizeT VBOHandle::uploadStreamingData(const void* const data, const za::SizeT
     glCheck(glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(byteCount), data, GL_STREAM_DRAW));
     return 0u;
 #else
+    // Streaming reuse: if the pending upload would not fit and no uploads
+    // are staged for the current draw, block until in-flight cycles complete
+    // and restart from the front of the buffer instead of growing it
+    // (`reclaim()`/overflow handling no longer reset the ring's cursors).
+    m_impl->persistentRingBuffer.drainIfWouldOverflow(byteCount);
+
     const auto byteOffset = m_impl->persistentRingBuffer.beginWrite(m_impl->vbo, byteCount);
 
     ZA_MEMCPY(static_cast<char*>(m_impl->persistentRingBuffer.data()) + byteOffset, data, byteCount);

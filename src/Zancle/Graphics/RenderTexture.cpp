@@ -13,6 +13,7 @@
 #include "Zancle/GLUtils/GLUtils.hpp"
 #include "Zancle/GLUtils/Glad.hpp"
 
+#include "Zancle/Graphics/DepthStencilFormat.hpp"
 #include "Zancle/Graphics/GraphicsContext.hpp"
 #include "Zancle/Graphics/RenderTarget.hpp"
 #include "Zancle/Graphics/RenderTextureCreateSettings.hpp"
@@ -37,19 +38,43 @@
 namespace
 {
 ////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline]] inline constexpr GLenum getGLInternalFormat(const bool stencil, const bool depth)
+[[nodiscard, gnu::always_inline]] inline constexpr GLenum getGLInternalFormat(const za::DepthStencilFormat format)
 {
-    if (stencil && depth)
-        return GL_DEPTH24_STENCIL8;
+    switch (format)
+    {
+        case za::DepthStencilFormat::Depth16:
+            return GL_DEPTH_COMPONENT16;
 
-    if (stencil)
-        return GL_STENCIL_INDEX8;
+        case za::DepthStencilFormat::Depth24:
+            return GL_DEPTH_COMPONENT24;
 
-    if (depth)
-        return GL_DEPTH_COMPONENT16;
+        case za::DepthStencilFormat::Stencil8:
+            return GL_STENCIL_INDEX8;
+
+        case za::DepthStencilFormat::Depth24Stencil8:
+            return GL_DEPTH24_STENCIL8;
+
+        case za::DepthStencilFormat::None:
+            break;
+    }
 
     ZA_ASSERT(false);
     return {};
+}
+
+
+////////////////////////////////////////////////////////////
+[[nodiscard, gnu::always_inline]] inline constexpr bool hasDepthComponent(const za::DepthStencilFormat format)
+{
+    return format == za::DepthStencilFormat::Depth16 || format == za::DepthStencilFormat::Depth24 ||
+           format == za::DepthStencilFormat::Depth24Stencil8;
+}
+
+
+////////////////////////////////////////////////////////////
+[[nodiscard, gnu::always_inline]] inline constexpr bool hasStencilComponent(const za::DepthStencilFormat format)
+{
+    return format == za::DepthStencilFormat::Stencil8 || format == za::DepthStencilFormat::Depth24Stencil8;
 }
 
 
@@ -309,38 +334,40 @@ public:
         sRgb = rtCreateSettings.sRgbCapable;
 
         // Check if the requested anti-aliasing level is supported
-        if (const auto samples = getMaximumAntiAliasingLevel(); rtCreateSettings.antiAliasingLevel > samples)
-            return fail("unsupported anti-aliasing level ",
-                        rtCreateSettings.antiAliasingLevel,
-                        ", maximum supported is ",
-                        samples);
+        if (const auto samples = getMaximumSampleCount(); rtCreateSettings.sampleCount > samples)
+            return fail("unsupported anti-aliasing level ", rtCreateSettings.sampleCount, ", maximum supported is ", samples);
 
         const auto bindRenderbufferAndSetFormat =
-            [&size](GLRenderBufferObject& rbo, const unsigned int antiAliasingLevel, const GLenum internalFormat)
+            [&size](GLRenderBufferObject& rbo, const unsigned int sampleCount, const GLenum internalFormat)
         {
             rbo.bind();
 
             glCheck(glRenderbufferStorageMultisample(GL_RENDERBUFFER,
-                                                     static_cast<GLsizei>(antiAliasingLevel),
+                                                     static_cast<GLsizei>(sampleCount),
                                                      internalFormat,
                                                      static_cast<GLsizei>(size.x),
                                                      static_cast<GLsizei>(size.y)));
         };
 
-        depth       = rtCreateSettings.depthBits != 0u;
-        stencil     = rtCreateSettings.stencilBits != 0u;
-        multisample = rtCreateSettings.antiAliasingLevel != 0u;
+        // `sampleCount` values of 0 and 1 both mean "multisampling
+        // disabled" (see `RenderTextureCreateSettings::sampleCount`);
+        // normalize so no 1-sample multisample storage is ever created.
+        const unsigned int sampleCount = rtCreateSettings.sampleCount <= 1u ? 0u : rtCreateSettings.sampleCount;
+
+        const DepthStencilFormat dsFormat = rtCreateSettings.depthStencilFormat;
+
+        depth       = hasDepthComponent(dsFormat);
+        stencil     = hasStencilComponent(dsFormat);
+        multisample = sampleCount != 0u;
 
         // Create the (possibly multisample) depth/stencil buffer if requested
-        if (stencil || depth)
+        if (dsFormat != DepthStencilFormat::None)
         {
             stencilDepthBuffer = tryCreateGLUniqueResource<GLRenderBufferObject>();
             if (!stencilDepthBuffer.hasValue())
                 return fail("failed to create the attached ", getBufferTypeStr(multisample, stencil, depth));
 
-            bindRenderbufferAndSetFormat(*stencilDepthBuffer,
-                                         rtCreateSettings.antiAliasingLevel,
-                                         getGLInternalFormat(stencil, depth));
+            bindRenderbufferAndSetFormat(*stencilDepthBuffer, sampleCount, getGLInternalFormat(dsFormat));
         }
 
         // Create the multisample color buffer if needed
@@ -350,7 +377,7 @@ public:
             if (!colorBuffer.hasValue())
                 return fail("failed to create the attached multisample color buffer");
 
-            bindRenderbufferAndSetFormat(*colorBuffer, rtCreateSettings.antiAliasingLevel, sRgb ? GL_SRGB8_ALPHA8 : GL_RGBA8);
+            bindRenderbufferAndSetFormat(*colorBuffer, sampleCount, sRgb ? GL_SRGB8_ALPHA8 : GL_RGBA8);
         }
 
         // Save the current bindings so we can restore them after we are done
@@ -502,7 +529,7 @@ za::Optional<RenderTexture> RenderTexture::create(const Vec2u size, const Render
 
 
 ////////////////////////////////////////////////////////////
-unsigned int RenderTexture::getMaximumAntiAliasingLevel()
+unsigned int RenderTexture::getMaximumSampleCount()
 {
     ZA_ASSERT(GraphicsContext::hasActiveThreadLocalGlContext());
     return static_cast<unsigned int>(priv::getGLInteger(GL_MAX_SAMPLES));

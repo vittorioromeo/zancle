@@ -41,13 +41,14 @@ struct [[nodiscard]] ZA_GRAPHICS_API HeartShapeData : LocalAnchorPointMixin, Glo
     /// \brief `true` when the heart would actually render anything.
     ///
     /// A heart with non-positive `size.x` / `size.y`, or
-    /// `pointCount < 3`, produces no geometry and is treated as an
-    /// empty shape.
+    /// `pointCount < 4`, produces no geometry and is treated as an
+    /// empty shape. (`ShapeUtils::computeHeartPoint` requires at
+    /// least 4 samples.)
     ///
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr bool hasVisibleGeometry() const noexcept
     {
-        return size.x > 0.f && size.y > 0.f && pointCount >= 3u;
+        return size.x > 0.f && size.y > 0.f && pointCount >= 4u;
     }
 
 

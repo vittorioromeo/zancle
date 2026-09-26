@@ -4,7 +4,7 @@
 
 #include "Zancle/Container/Vector.hpp"
 
-#include "Zancle/Base/DeclVal.hpp"
+#include "Zancle/Trait/DeclVal.hpp"
 
 
 namespace

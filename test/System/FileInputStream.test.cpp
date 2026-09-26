@@ -10,13 +10,13 @@
 #include "Zancle/String/String.hpp"
 #include "Zancle/String/StringView.hpp"
 
+#include "Zancle/Base/Macros.hpp"
+
 #include "Zancle/Trait/IsCopyAssignable.hpp"
 #include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsDefaultConstructible.hpp"
 #include "Zancle/Trait/IsNothrowMoveAssignable.hpp"
 #include "Zancle/Trait/IsNothrowMoveConstructible.hpp"
-
-#include "Zancle/Base/Macros.hpp"
 
 
 using za::testing::TemporaryFile;

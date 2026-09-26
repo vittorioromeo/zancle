@@ -27,7 +27,6 @@ namespace za
 class InputStream;
 class Path;
 class GlyphMappedText;
-class Text;
 class TextureAtlas;
 
 struct FontInfo;
@@ -251,7 +250,7 @@ public:
     /// returned `za::GlyphMapping` carries the index → glyph
     /// translation that the rendering path uses.
     ///
-    /// If `settings.outlineThickness > 0`, both the fill glyphs
+    /// If `settings.outlineThickness != 0`, both the fill glyphs
     /// and their matching outline glyphs are loaded.
     ///
     /// \param atlas    Atlas to upload the rasterized bitmaps into
@@ -286,7 +285,6 @@ private:
     ////////////////////////////////////////////////////////////
     // Lifetime tracking
     ////////////////////////////////////////////////////////////
-    ZA_DEFINE_LIFETIME_DEPENDEE(FontFace, Text);
     ZA_DEFINE_LIFETIME_DEPENDEE(FontFace, GlyphMappedText);
 };
 

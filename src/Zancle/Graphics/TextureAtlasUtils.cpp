@@ -41,7 +41,11 @@ za::Optional<Rect2f> TextureAtlasUtils::add(Texture& targetTexture, RectPacker& 
     // Reserve the full padded region so neighbouring entries are kept at
     // arm's length on every side, then upload the content offset by `padding`
     // so the same number of padding pixels sit between this entry and its
-    // top/left and bottom/right neighbours.
+    // top/left and bottom/right neighbours. The padding ring itself is never
+    // written: it relies on the atlas texture having been cleared up front
+    // (`TextureAtlas` does so on construction; a fresh texture's contents are
+    // otherwise undefined, and linear filtering would blend garbage into the
+    // entry's edges).
     const auto packedPosition = rectPacker.pack(size + padding * 2u);
 
     if (!packedPosition.hasValue())

@@ -225,8 +225,10 @@ struct [[nodiscard]] ZA_GRAPHICS_API View
         // 2. Map from NDC to [0, 1] space and flip Y
         const Vec2f relativePos = Vec2f(normalized.x + 1.f, 1.f - normalized.y) * 0.5f;
 
-        // 3. Map into viewport and finally scale up to target pixel size
-        return (relativePos.componentWiseMul(viewport.size) + viewport.position).componentWiseMul(targetSize);
+        // 3. Map into the same rounded pixel viewport that rendering uses
+        //    (see `computePixelViewport`), so results match the rasterized output
+        const Rect2i pixelViewport = computePixelViewport(targetSize);
+        return pixelViewport.position.toVec2f() + relativePos.componentWiseMul(pixelViewport.size.toVec2f());
     }
 
 
@@ -271,16 +273,19 @@ struct [[nodiscard]] ZA_GRAPHICS_API View
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] Vec2f screenToWorld(const Vec2f point, const Vec2f targetSize) const
     {
-        // 1. Normalize window pixels to [0, 1]
-        const Vec2f windowNorm = point.componentWiseDiv(targetSize);
+        // 1. Localize to the same rounded pixel viewport that rendering uses
+        //    (see `computePixelViewport`), so results match the rasterized output
+        const Rect2i pixelViewport = computePixelViewport(targetSize);
 
-        // 2. Localize to the viewport rectangle
-        const Vec2f relativePos = (windowNorm - viewport.position).componentWiseDiv(viewport.size);
+        ZA_ASSERT(pixelViewport.size.x != 0 && "viewport pixel width must be non-zero");
+        ZA_ASSERT(pixelViewport.size.y != 0 && "viewport pixel height must be non-zero");
 
-        // 3. Map from [0, 1] space back to NDC [-1, 1] space and flip Y
+        const Vec2f relativePos = (point - pixelViewport.position.toVec2f()).componentWiseDiv(pixelViewport.size.toVec2f());
+
+        // 2. Map from [0, 1] space back to NDC [-1, 1] space and flip Y
         const Vec2f normalized = relativePos.componentWiseMul({2.f, -2.f}) + Vec2f{-1.f, 1.f};
 
-        // 4. Transform using the inverse
+        // 3. Transform using the inverse
         return getInverseTransform().transformPoint(normalized);
     }
 
@@ -375,9 +380,11 @@ struct [[nodiscard]] ZA_GRAPHICS_API View
 ///
 /// The scissor rectangle allows for specifying regions of the
 /// render target to which modifications can be made by draw
-/// and clear operations. Only pixels that are within the region
-/// will be able to be modified. Pixels outside of the region will
-/// not be modified by draw or clear operations.
+/// operations. Only pixels that are within the region will be
+/// modified by draws. Note that clear operations are *not*
+/// scissored: the renderer deliberately disables scissor testing
+/// before every clear, so `clear`/`clearStencil` always affect
+/// the entire render target.
 ///
 /// Certain effects can be created by either using the viewport or
 /// scissor rectangle. While the results appear identical, there

@@ -147,8 +147,6 @@ public:
     ////////////////////////////////////////////////////////////
     /// \brief Set the character size
     ///
-    /// The default size is 30.
-    ///
     /// Note that if the used font is a bitmap font, it is not
     /// scalable, thus not all requested sizes will be available
     /// to use. This needs to be taken into consideration when
@@ -251,7 +249,7 @@ private:
     // Member data
     ////////////////////////////////////////////////////////////
     const Font*  m_font{};                //!< Font used to display the string
-    unsigned int m_characterSize{30u};    //!< Base size of characters, in pixels
+    unsigned int m_characterSize{};       //!< Base size of characters, in pixels
     float        m_outlineThickness{0.f}; //!< Thickness of the text's outline
     bool         m_bold{false};           //!< Bold characters
 

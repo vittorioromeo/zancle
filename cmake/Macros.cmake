@@ -639,6 +639,17 @@ function(zancle_add_test target)
                  WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR})
         set_tests_properties(${target} PROPERTIES
             ENVIRONMENT "LSAN_OPTIONS=suppressions=${PROJECT_SOURCE_DIR}/lsan_suppressions.txt")
+
+        # Tests that create a graphics/window context initialize SDL's video
+        # (x11) subsystem. Initializing x11 from several processes at once is
+        # racy under a headless Xvfb -- it intermittently fails with
+        # "`SDL_Init` failed: x11 not available" and aborts the test. Give all
+        # such tests a shared CTest resource lock so `ctest --parallel` never
+        # runs two of them at the same time, while non-display tests keep
+        # running concurrently.
+        if(${target} STREQUAL "test-zancle-graphics" OR ${target} STREQUAL "test-zancle-window")
+            set_tests_properties(${target} PROPERTIES RESOURCE_LOCK "display")
+        endif()
     endif()
 endfunction()
 

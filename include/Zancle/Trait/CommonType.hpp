@@ -49,11 +49,10 @@ struct CommonTypeImpl : __builtin_common_type<CommonType, TypeIdentityImpl, Empt
 ////////////////////////////////////////////////////////////
     #include "Zancle/Trait/Conditional.hpp"
     #include "Zancle/Trait/Decay.hpp"
+    #include "Zancle/Trait/DeclVal.hpp"
     #include "Zancle/Trait/IsSame.hpp"
     #include "Zancle/Trait/RemoveCVRef.hpp"
     #include "Zancle/Trait/VoidT.hpp"
-
-    #include "Zancle/Base/DeclVal.hpp"
 
 
 namespace za::priv

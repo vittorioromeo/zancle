@@ -8,11 +8,11 @@
 
 #include "Zancle/Container/Vector.hpp"
 
-#include "Zancle/Trait/IsConstructible.hpp"
-#include "Zancle/Trait/IsTriviallyRelocatable.hpp"
-
 #include "Zancle/Base/IntTypes.hpp"
 #include "Zancle/Base/PtrDiffT.hpp"
+
+#include "Zancle/Trait/IsConstructible.hpp"
+#include "Zancle/Trait/IsTriviallyRelocatable.hpp"
 
 
 namespace

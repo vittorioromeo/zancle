@@ -9,11 +9,11 @@
 #include "Zancle/String/String.hpp"
 #include "Zancle/String/ToChars.hpp"
 
-#include "Zancle/Trait/IsFloatingPoint.hpp"
-#include "Zancle/Trait/IsIntegral.hpp"
-
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/SizeT.hpp"
+
+#include "Zancle/Trait/IsFloatingPoint.hpp"
+#include "Zancle/Trait/IsIntegral.hpp"
 
 
 namespace za

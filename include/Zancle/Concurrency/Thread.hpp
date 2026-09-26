@@ -9,13 +9,13 @@
 
 #include "Zancle/Config.hpp"
 
-#include "Zancle/Trait/IsSame.hpp"
-#include "Zancle/Trait/RemoveCVRef.hpp"
-
 #include "Zancle/Base/FwdStdAlignedNewDelete.hpp"
 #include "Zancle/Base/IntTypes.hpp"
 #include "Zancle/Base/PlacementNew.hpp"
 #include "Zancle/Base/SizeT.hpp"
+
+#include "Zancle/Trait/IsSame.hpp"
+#include "Zancle/Trait/RemoveCVRef.hpp"
 
 
 ////////////////////////////////////////////////////////////

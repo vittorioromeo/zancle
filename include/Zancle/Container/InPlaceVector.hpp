@@ -8,15 +8,15 @@
 ////////////////////////////////////////////////////////////
 #include "Zancle/Container/Priv/VectorUtils.hpp"
 
-#include "Zancle/Trait/Conditional.hpp"
-#include "Zancle/Trait/IsTriviallyDestructible.hpp"
-#include "Zancle/Trait/IsTriviallyRelocatable.hpp"
-
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/InitializerList.hpp" // IWYU pragma: keep
 #include "Zancle/Base/PlacementNew.hpp"
 #include "Zancle/Base/PtrDiffT.hpp"
 #include "Zancle/Base/SizeT.hpp"
+
+#include "Zancle/Trait/EnableTrivialRelocation.hpp"
+#include "Zancle/Trait/IsTriviallyDestructible.hpp"
+#include "Zancle/Trait/IsTriviallyRelocatable.hpp"
 
 
 namespace za
@@ -47,9 +47,8 @@ private:
 
 
 public:
-    // TODO P0: add trivial reloc macro
     ////////////////////////////////////////////////////////////
-    using TriviallyRelocatableTag = Conditional<ZA_IS_TRIVIALLY_RELOCATABLE(TItem), InPlaceVector, void>;
+    ZA_ENABLE_TRIVIAL_RELOCATION_IF(ZA_IS_TRIVIALLY_RELOCATABLE(TItem));
 
 
     ////////////////////////////////////////////////////////////

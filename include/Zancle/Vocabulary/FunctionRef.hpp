@@ -6,15 +6,15 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/Macros.hpp"
+
 #include "Zancle/Trait/IsFunction.hpp"
 #include "Zancle/Trait/IsInvocableR.hpp"
 #include "Zancle/Trait/IsPointer.hpp"
 #include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/RemoveCVRef.hpp"
 #include "Zancle/Trait/RemoveReference.hpp"
-
-#include "Zancle/Base/Assert.hpp"
-#include "Zancle/Base/Macros.hpp"
 
 
 namespace za

@@ -10,8 +10,6 @@
 
 #include "Zancle/Math/MinMaxMacros.hpp"
 
-#include "Zancle/Trait/IsTriviallyDestructible.hpp"
-
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/AssertAndAssume.hpp"
 #include "Zancle/Base/InitializerList.hpp" // IWYU pragma: keep
@@ -19,6 +17,10 @@
 #include "Zancle/Base/PtrDiffT.hpp"
 #include "Zancle/Base/SizeT.hpp"
 #include "Zancle/Base/Swap.hpp"
+
+#include "Zancle/Trait/EnableTrivialRelocation.hpp"
+#include "Zancle/Trait/IsTriviallyDestructible.hpp"
+#include "Zancle/Trait/IsTriviallyRelocatable.hpp"
 
 
 namespace za
@@ -33,9 +35,12 @@ namespace za
 /// below the threshold.
 ///
 /// Implementation note: `m_heapData == nullptr` encodes "currently
-/// inline", which lets `SmallVector` remain trivially relocatable --
-/// after a `memcpy`, the recomputed inline-storage pointer still
-/// addresses the new object's own buffer.
+/// inline" -- after a `memcpy`, the recomputed inline-storage pointer
+/// still addresses the new object's own buffer. This makes the pointer
+/// bookkeeping relocation-safe, but `SmallVector` is only trivially
+/// relocatable when `TItem` itself is, because in inline mode the
+/// elements are stored inside the object and a `memcpy` would bypass
+/// their move constructors.
 ///
 ////////////////////////////////////////////////////////////
 template <typename TItem, SizeT N>
@@ -137,7 +142,13 @@ private:
 
 public:
     ////////////////////////////////////////////////////////////
-    using TriviallyRelocatableTag = SmallVector;
+    // Trivially relocatable only when `TItem` is: in inline mode the
+    // elements live inside the object, so a `memcpy` of the `SmallVector`
+    // byte-copies them without running their move constructors -- which is
+    // only valid for trivially relocatable elements. The `nullptr`-means-
+    // inline bookkeeping survives the `memcpy` regardless (it is recomputed
+    // from the new `this`), so that is not the constraint here.
+    ZA_ENABLE_TRIVIAL_RELOCATION_IF(ZA_IS_TRIVIALLY_RELOCATABLE(TItem));
 
 
     ////////////////////////////////////////////////////////////
@@ -332,12 +343,21 @@ public:
 
 
     ////////////////////////////////////////////////////////////
+    /// \warning When growing, `args...` must not reference an element of
+    ///          `*this`: the growth may reallocate (and, when escaping the
+    ///          inline buffer, relocate) before constructing the new
+    ///          elements, leaving such a reference dangling. Debug-asserted.
+    ///
+    ////////////////////////////////////////////////////////////
     [[gnu::always_inline]] void resize(const SizeT newSize, auto&&... args)
     {
         const auto oldSize = m_size;
 
         if (newSize > oldSize)
         {
+            // See \warning above: fill args must not alias existing elements.
+            ZA_ASSERT((priv::VectorUtils::isOutsideStorage(data(), data() + m_size, &args) && ...));
+
             reserve(newSize);
 
             TItem* const d = data();

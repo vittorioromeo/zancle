@@ -2,6 +2,7 @@
 
 #include "Zancle/Vocabulary/Optional.hpp"
 
+#include "Zancle/Trait/EnableTrivialRelocation.hpp"
 #include "Zancle/Trait/IsCopyAssignable.hpp"
 #include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsMoveAssignable.hpp"
@@ -67,7 +68,7 @@ struct NonTrivial
 ////////////////////////////////////////////////////////////
 struct NonTrivialButRelocatable
 {
-    using TriviallyRelocatableTag = NonTrivialButRelocatable;
+    ZA_ENABLE_TRIVIAL_RELOCATION;
 
     static inline int si{};
 
