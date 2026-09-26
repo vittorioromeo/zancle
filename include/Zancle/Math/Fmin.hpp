@@ -15,7 +15,8 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_FMIN(...)  ::std::fmin(__VA_ARGS__)
+    // `::std::fmin` has `float` overloads: convert like `__builtin_fmin`, which only takes `double`
+    #define ZA_MATH_FMIN(x, y) ::std::fmin(static_cast<double>(x), static_cast<double>(y))
     #define ZA_MATH_FMINF(...) ::std::fminf(__VA_ARGS__)
     #define ZA_MATH_FMINL(...) ::std::fminl(__VA_ARGS__)
 #endif

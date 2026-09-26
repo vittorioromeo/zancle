@@ -15,7 +15,8 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_RINT(...)  ::std::rint(__VA_ARGS__)
+    // `::std::rint` has `float` overloads: convert like `__builtin_rint`, which only takes `double`
+    #define ZA_MATH_RINT(x)    ::std::rint(static_cast<double>(x))
     #define ZA_MATH_RINTF(...) ::std::rintf(__VA_ARGS__)
     #define ZA_MATH_RINTL(...) ::std::rintl(__VA_ARGS__)
 #endif

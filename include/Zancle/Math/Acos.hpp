@@ -15,7 +15,8 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_ACOS(...)  ::std::acos(__VA_ARGS__)
+    // `::std::acos` has `float` overloads: convert like `__builtin_acos`, which only takes `double`
+    #define ZA_MATH_ACOS(x)    ::std::acos(static_cast<double>(x))
     #define ZA_MATH_ACOSF(...) ::std::acosf(__VA_ARGS__)
     #define ZA_MATH_ACOSL(...) ::std::acosl(__VA_ARGS__)
 #endif

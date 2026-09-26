@@ -15,7 +15,8 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_TAN(...)  ::std::tan(__VA_ARGS__)
+    // `::std::tan` has `float` overloads: convert like `__builtin_tan`, which only takes `double`
+    #define ZA_MATH_TAN(x)    ::std::tan(static_cast<double>(x))
     #define ZA_MATH_TANF(...) ::std::tanf(__VA_ARGS__)
     #define ZA_MATH_TANL(...) ::std::tanl(__VA_ARGS__)
 #endif

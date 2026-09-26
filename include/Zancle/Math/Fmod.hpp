@@ -15,7 +15,8 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_FMOD(...)  ::std::fmod(__VA_ARGS__)
+    // `::std::fmod` has `float` overloads: convert like `__builtin_fmod`, which only takes `double`
+    #define ZA_MATH_FMOD(x, y) ::std::fmod(static_cast<double>(x), static_cast<double>(y))
     #define ZA_MATH_FMODF(...) ::std::fmodf(__VA_ARGS__)
     #define ZA_MATH_FMODL(...) ::std::fmodl(__VA_ARGS__)
 #endif

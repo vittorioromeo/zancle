@@ -17,9 +17,10 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_FREXP(...)  ::std::frexp(__VA_ARGS__)
-    #define ZA_MATH_FREXPF(...) ::std::frexpf(__VA_ARGS__)
-    #define ZA_MATH_FREXPL(...) ::std::frexpl(__VA_ARGS__)
+    // `::std::frexp` has `float` overloads: convert like `__builtin_frexp`, which only takes `double`
+    #define ZA_MATH_FREXP(x, exp) ::std::frexp(static_cast<double>(x), exp)
+    #define ZA_MATH_FREXPF(...)   ::std::frexpf(__VA_ARGS__)
+    #define ZA_MATH_FREXPL(...)   ::std::frexpl(__VA_ARGS__)
 #endif
 
 

@@ -15,7 +15,8 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_POW(...)  ::std::pow(__VA_ARGS__)
+    // `::std::pow` has `float` overloads: convert like `__builtin_pow`, which only takes `double`
+    #define ZA_MATH_POW(x, y) ::std::pow(static_cast<double>(x), static_cast<double>(y))
     #define ZA_MATH_POWF(...) ::std::powf(__VA_ARGS__)
     #define ZA_MATH_POWL(...) ::std::powl(__VA_ARGS__)
 #endif

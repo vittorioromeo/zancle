@@ -15,7 +15,8 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_COSH(...)  ::std::cosh(__VA_ARGS__)
+    // `::std::cosh` has `float` overloads: convert like `__builtin_cosh`, which only takes `double`
+    #define ZA_MATH_COSH(x)    ::std::cosh(static_cast<double>(x))
     #define ZA_MATH_COSHF(...) ::std::coshf(__VA_ARGS__)
     #define ZA_MATH_COSHL(...) ::std::coshl(__VA_ARGS__)
 #endif

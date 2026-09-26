@@ -15,7 +15,8 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_LOG(...)  ::std::log(__VA_ARGS__)
+    // `::std::log` has `float` overloads: convert like `__builtin_log`, which only takes `double`
+    #define ZA_MATH_LOG(x)    ::std::log(static_cast<double>(x))
     #define ZA_MATH_LOGF(...) ::std::logf(__VA_ARGS__)
     #define ZA_MATH_LOGL(...) ::std::logl(__VA_ARGS__)
 #endif

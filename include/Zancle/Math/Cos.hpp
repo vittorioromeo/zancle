@@ -15,7 +15,8 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_COS(...)  ::std::cos(__VA_ARGS__)
+    // `::std::cos` has `float` overloads: convert like `__builtin_cos`, which only takes `double`
+    #define ZA_MATH_COS(x)    ::std::cos(static_cast<double>(x))
     #define ZA_MATH_COSF(...) ::std::cosf(__VA_ARGS__)
     #define ZA_MATH_COSL(...) ::std::cosl(__VA_ARGS__)
 #endif

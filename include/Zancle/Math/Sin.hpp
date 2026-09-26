@@ -15,7 +15,8 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_SIN(...)  ::std::sin(__VA_ARGS__)
+    // `::std::sin` has `float` overloads: convert like `__builtin_sin`, which only takes `double`
+    #define ZA_MATH_SIN(x)    ::std::sin(static_cast<double>(x))
     #define ZA_MATH_SINF(...) ::std::sinf(__VA_ARGS__)
     #define ZA_MATH_SINL(...) ::std::sinl(__VA_ARGS__)
 #endif

@@ -15,7 +15,8 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_ASIN(...)  ::std::asin(__VA_ARGS__)
+    // `::std::asin` has `float` overloads: convert like `__builtin_asin`, which only takes `double`
+    #define ZA_MATH_ASIN(x)    ::std::asin(static_cast<double>(x))
     #define ZA_MATH_ASINF(...) ::std::asinf(__VA_ARGS__)
     #define ZA_MATH_ASINL(...) ::std::asinl(__VA_ARGS__)
 #endif

@@ -17,9 +17,10 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_LDEXP(...)  ::std::ldexp(__VA_ARGS__)
-    #define ZA_MATH_LDEXPF(...) ::std::ldexpf(__VA_ARGS__)
-    #define ZA_MATH_LDEXPL(...) ::std::ldexpl(__VA_ARGS__)
+    // `::std::ldexp` has `float` overloads: convert like `__builtin_ldexp`, which only takes `double`
+    #define ZA_MATH_LDEXP(x, exp) ::std::ldexp(static_cast<double>(x), exp)
+    #define ZA_MATH_LDEXPF(...)   ::std::ldexpf(__VA_ARGS__)
+    #define ZA_MATH_LDEXPL(...)   ::std::ldexpl(__VA_ARGS__)
 #endif
 
 

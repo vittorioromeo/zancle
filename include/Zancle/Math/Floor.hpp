@@ -15,7 +15,8 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_FLOOR(...)  ::std::floor(__VA_ARGS__)
+    // `::std::floor` has `float` overloads: convert like `__builtin_floor`, which only takes `double`
+    #define ZA_MATH_FLOOR(x)    ::std::floor(static_cast<double>(x))
     #define ZA_MATH_FLOORF(...) ::std::floorf(__VA_ARGS__)
     #define ZA_MATH_FLOORL(...) ::std::floorl(__VA_ARGS__)
 #endif

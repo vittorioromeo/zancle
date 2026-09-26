@@ -15,7 +15,8 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_FABS(...)  ::std::fabs(__VA_ARGS__)
+    // `::std::fabs` has `float` overloads: convert like `__builtin_fabs`, which only takes `double`
+    #define ZA_MATH_FABS(x)    ::std::fabs(static_cast<double>(x))
     #define ZA_MATH_FABSF(...) ::std::fabsf(__VA_ARGS__)
     #define ZA_MATH_FABSL(...) ::std::fabsl(__VA_ARGS__)
 #endif

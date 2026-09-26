@@ -15,7 +15,8 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_ATAN2(...)  ::std::atan2(__VA_ARGS__)
+    // `::std::atan2` has `float` overloads: convert like `__builtin_atan2`, which only takes `double`
+    #define ZA_MATH_ATAN2(x, y) ::std::atan2(static_cast<double>(x), static_cast<double>(y))
     #define ZA_MATH_ATAN2F(...) ::std::atan2f(__VA_ARGS__)
     #define ZA_MATH_ATAN2L(...) ::std::atan2l(__VA_ARGS__)
 #endif

@@ -15,7 +15,8 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_CEIL(...)  ::std::ceil(__VA_ARGS__)
+    // `::std::ceil` has `float` overloads: convert like `__builtin_ceil`, which only takes `double`
+    #define ZA_MATH_CEIL(x)    ::std::ceil(static_cast<double>(x))
     #define ZA_MATH_CEILF(...) ::std::ceilf(__VA_ARGS__)
     #define ZA_MATH_CEILL(...) ::std::ceill(__VA_ARGS__)
 #endif

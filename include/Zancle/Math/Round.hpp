@@ -15,7 +15,8 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_ROUND(...)  ::std::round(__VA_ARGS__)
+    // `::std::round` has `float` overloads: convert like `__builtin_round`, which only takes `double`
+    #define ZA_MATH_ROUND(x)    ::std::round(static_cast<double>(x))
     #define ZA_MATH_ROUNDF(...) ::std::roundf(__VA_ARGS__)
     #define ZA_MATH_ROUNDL(...) ::std::roundl(__VA_ARGS__)
 #endif

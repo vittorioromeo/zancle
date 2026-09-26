@@ -15,7 +15,8 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_EXP(...)  ::std::exp(__VA_ARGS__)
+    // `::std::exp` has `float` overloads: convert like `__builtin_exp`, which only takes `double`
+    #define ZA_MATH_EXP(x)    ::std::exp(static_cast<double>(x))
     #define ZA_MATH_EXPF(...) ::std::expf(__VA_ARGS__)
     #define ZA_MATH_EXPL(...) ::std::expl(__VA_ARGS__)
 #endif

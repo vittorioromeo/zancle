@@ -15,7 +15,8 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_FMAX(...)  ::std::fmax(__VA_ARGS__)
+    // `::std::fmax` has `float` overloads: convert like `__builtin_fmax`, which only takes `double`
+    #define ZA_MATH_FMAX(x, y) ::std::fmax(static_cast<double>(x), static_cast<double>(y))
     #define ZA_MATH_FMAXF(...) ::std::fmaxf(__VA_ARGS__)
     #define ZA_MATH_FMAXL(...) ::std::fmaxl(__VA_ARGS__)
 #endif

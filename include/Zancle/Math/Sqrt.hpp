@@ -15,7 +15,8 @@
 #else
     #include <cmath> // IWYU pragma: keep
 
-    #define ZA_MATH_SQRT(...)  ::std::sqrt(__VA_ARGS__)
+    // `::std::sqrt` has `float` overloads: convert like `__builtin_sqrt`, which only takes `double`
+    #define ZA_MATH_SQRT(x)    ::std::sqrt(static_cast<double>(x))
     #define ZA_MATH_SQRTF(...) ::std::sqrtf(__VA_ARGS__)
     #define ZA_MATH_SQRTL(...) ::std::sqrtl(__VA_ARGS__)
 #endif
