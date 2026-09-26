@@ -40,7 +40,7 @@ namespace za::ShapeUtils
 /// \return The computed 2D position.
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] inline constexpr Vec2f computeEllipsePointFromAngleStep(
+[[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr Vec2f computeEllipsePointFromAngleStep(
     const za::SizeT index,
     const float     startRadians,
     const float     angleStep,
@@ -72,7 +72,7 @@ namespace za::ShapeUtils
 /// \return The computed 2D position.
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] inline constexpr Vec2f computeEllipsePoint(
+[[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr Vec2f computeEllipsePoint(
     const za::SizeT    index,
     const float        startRadians,
     const unsigned int pointCount,
@@ -95,7 +95,7 @@ namespace za::ShapeUtils
 /// \return The computed 2D position.
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] inline constexpr Vec2f computeCirclePointFromAngleStep(
+[[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr Vec2f computeCirclePointFromAngleStep(
     const za::SizeT index,
     const float     startRadians,
     const float     angleStep,
@@ -117,7 +117,7 @@ namespace za::ShapeUtils
 /// \return The computed 2D position.
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] inline constexpr Vec2f computeCirclePoint(
+[[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr Vec2f computeCirclePoint(
     const za::SizeT    index,
     const float        startRadians,
     const unsigned int pointCount,
@@ -167,7 +167,7 @@ namespace za::ShapeUtils
 /// \return The computed 2D position of the boundary vertex.
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] inline constexpr Vec2f computeRoundedRectanglePoint(
+[[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr Vec2f computeRoundedRectanglePoint(
     const za::SizeT    index,
     const Vec2f        size,
     const float        cornerRadius,
@@ -308,7 +308,7 @@ namespace za::ShapeUtils
 /// \see computePieSlicePoint
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] inline constexpr Vec2f computePieSlicePointFromArcAngleStep(
+[[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr Vec2f computePieSlicePointFromArcAngleStep(
     const za::SizeT index,
     const float     radius,
     const float     arcAngleStep,
@@ -375,7 +375,7 @@ namespace za::ShapeUtils
 /// \see computeCirclePoint
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] inline constexpr Vec2f computePieSlicePoint(
+[[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr Vec2f computePieSlicePoint(
     const za::SizeT    index,
     const float        radius,
     const float        startAngle,
@@ -393,7 +393,7 @@ namespace za::ShapeUtils
 /// \see computeStarPoint
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] inline constexpr Vec2f computeStarPointFromAngleStep(
+[[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr Vec2f computeStarPointFromAngleStep(
     const za::SizeT index,
     const float     angleStep,
     const float     outerRadius,
@@ -437,7 +437,7 @@ namespace za::ShapeUtils
 /// \return The computed 2D position of the vertex.
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] inline constexpr Vec2f computeStarPoint(
+[[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr Vec2f computeStarPoint(
     const za::SizeT    index,
     const unsigned int pointCount,
     const float        outerRadius,
@@ -455,7 +455,7 @@ namespace za::ShapeUtils
 /// \brief Computes the outer and inner points of a ring.
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] inline constexpr auto computeRingPointsFromAngleStep(
+[[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr auto computeRingPointsFromAngleStep(
     const za::SizeT index,
     const float     startRadians,
     const float     angleStep,
@@ -661,7 +661,7 @@ namespace za::ShapeUtils
 /// \return The computed 2D position of the boundary vertex.
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] inline constexpr Vec2f computeHeartPoint(
+[[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr Vec2f computeHeartPoint(
     const za::SizeT    index,
     const unsigned int pointCount,
     const Vec2f        size) noexcept
@@ -715,7 +715,7 @@ namespace za::ShapeUtils
 /// \return The computed 2D position of the boundary vertex.
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] inline constexpr Vec2f computeCogPoint(
+[[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr Vec2f computeCogPoint(
     const za::SizeT    index,
     const unsigned int toothCount,
     const float        outerRadius,

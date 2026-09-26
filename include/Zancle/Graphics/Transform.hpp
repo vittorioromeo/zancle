@@ -139,7 +139,7 @@ struct [[nodiscard]] Transform
     /// \return Transform that applies the requested translation, rotation, and scaling
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] static constexpr Transform fromPositionScaleOriginRotation(
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] static constexpr Transform fromPositionScaleOriginRotation(
         const Vec2f position,
         const Vec2f scale,
         const Vec2f origin,

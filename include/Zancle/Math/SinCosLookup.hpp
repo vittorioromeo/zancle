@@ -57,7 +57,7 @@ namespace za
 /// \param radians Angle in radians. Must be in the range `[0, 2*Pi]`.
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] inline constexpr float sinLookup(const float radians) noexcept
+[[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr float sinLookup(const float radians) noexcept
 {
     ZA_ASSERT_AND_ASSUME(radians >= 0.f && radians <= tau);
 
@@ -78,7 +78,7 @@ namespace za
 /// \param radians Angle in radians. Must be in the range `[0, 2*Pi]`.
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] inline constexpr float cosLookup(const float radians) noexcept
+[[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr float cosLookup(const float radians) noexcept
 {
     ZA_ASSERT_AND_ASSUME(radians >= 0.f && radians <= tau);
 
@@ -99,7 +99,7 @@ namespace za
 /// \param radians Angle in radians. Must be in the range `[0, 2*Pi]`.
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] inline constexpr auto sinCosLookup(const float radians) noexcept
+[[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr auto sinCosLookup(const float radians) noexcept
 {
     ZA_ASSERT_AND_ASSUME(radians >= 0.f && radians <= tau);
 
