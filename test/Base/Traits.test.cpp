@@ -7,7 +7,9 @@
 #include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsEnum.hpp"
 #include "Zancle/Trait/IsFloatingPoint.hpp"
+#include "Zancle/Trait/IsFunction.hpp"
 #include "Zancle/Trait/IsIntegral.hpp"
+#include "Zancle/Trait/IsInvocableR.hpp"
 #include "Zancle/Trait/IsMemberPointer.hpp"
 #include "Zancle/Trait/IsMoveAssignable.hpp"
 #include "Zancle/Trait/IsMoveConstructible.hpp"
@@ -28,6 +30,7 @@
 #include "Zancle/Trait/IsUnsigned.hpp"
 #include "Zancle/Trait/IsVoid.hpp"
 #include "Zancle/Trait/MakeUnsigned.hpp"
+#include "Zancle/Trait/ReferenceConvertsFromTemporary.hpp"
 #include "Zancle/Trait/RegularizeVoid.hpp"
 #include "Zancle/Trait/RemoveCVRef.hpp"
 #include "Zancle/Trait/RemoveReference.hpp"
@@ -383,6 +386,42 @@ static_assert(za::isPointer<int* const>);
 static_assert(za::isPointer<int* const volatile>);
 static_assert(!za::isPointer<int>);
 static_assert(!za::isPointer<int TraitsTest::Custom0::*>);
+
+static_assert(za::isFunction<void()>);
+static_assert(za::isFunction<int(int, float)>);
+static_assert(za::isFunction<void() noexcept>);
+static_assert(za::isFunction<void(...)>);
+static_assert(za::isFunction<void() const&>); // abominable function type
+static_assert(!za::isFunction<void (*)()>);
+static_assert(!za::isFunction<void (&)()>);
+static_assert(!za::isFunction<void (TraitsTest::Custom0::*)()>);
+static_assert(!za::isFunction<int>);
+static_assert(!za::isFunction<const int>);
+static_assert(!za::isFunction<int&>);
+static_assert(!za::isFunction<void>);
+static_assert(!za::isFunction<int[3]>);
+static_assert(!za::isFunction<TraitsTest::Custom0>);
+static_assert(!za::isFunction<decltype([] {})>);
+
+static_assert(za::referenceConvertsFromTemporary<const int&, int>);   // prvalue: materialized as a temporary
+static_assert(za::referenceConvertsFromTemporary<int&&, int>);        // prvalue: materialized as a temporary
+static_assert(za::referenceConvertsFromTemporary<const int&, long&>); // conversion creates a temporary
+static_assert(za::referenceConvertsFromTemporary<const TraitsTest::B&, TraitsTest::D>);
+static_assert(!za::referenceConvertsFromTemporary<const int&, int&>); // binds directly
+static_assert(!za::referenceConvertsFromTemporary<int&&, int&&>);     // binds directly to the xvalue
+static_assert(!za::referenceConvertsFromTemporary<const TraitsTest::B&, TraitsTest::D&>); // derived-to-base
+static_assert(!za::referenceConvertsFromTemporary<int, int>);                             // not a reference
+static_assert(!za::referenceConvertsFromTemporary<int&, long&>);                          // not convertible at all
+
+static_assert(za::isInvocableR<int (*)(), int>);
+static_assert(za::isInvocableR<int (*)(), long>);
+static_assert(za::isInvocableR<int (*)(), void>);
+static_assert(za::isInvocableR<int (*)(), const void>);
+static_assert(za::isInvocableR<int& (*)(), const int&>);
+static_assert(!za::isInvocableR<int (*)(), const int&>);   // would dangle
+static_assert(!za::isInvocableR<long& (*)(), const int&>); // would dangle (converted temporary)
+static_assert(!za::isInvocableR<int (*)(int), int>);       // wrong arguments
+static_assert(!za::isInvocableR<int, int>);                // not callable
 
 static_assert(za::isMemberPointer<int TraitsTest::Custom0::*>);
 static_assert(za::isMemberPointer<int TraitsTest::Custom0::* const>);

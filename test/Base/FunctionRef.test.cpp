@@ -41,6 +41,34 @@ void freeFunctionVoid(int& out)
 
 
 ////////////////////////////////////////////////////////////
+long lastLong = 0;
+
+void freeFunctionTakingLong(const long x)
+{
+    lastLong = x;
+}
+
+
+////////////////////////////////////////////////////////////
+int globalValue = 7;
+
+int& freeFunctionReturningRef()
+{
+    return globalValue;
+}
+
+
+////////////////////////////////////////////////////////////
+[[gnu::noinline]] void clobberStack()
+{
+    volatile char buffer[256];
+
+    for (volatile char& c : buffer)
+        c = static_cast<char>(0xAB);
+}
+
+
+////////////////////////////////////////////////////////////
 struct CallableConst
 {
     int value;
@@ -446,6 +474,39 @@ TEST_CASE("[Base] za::FunctionRef - construction is constrained to matching call
     {
         CHECK(overloadedOnSignature([](int x) { return x + 1; }) == 2);
         CHECK(overloadedOnSignature([](const char* s) { return static_cast<int>(s[0]); }) == 'a' + 100);
+    }
+
+    SECTION("Function pointer with a compatible signature is stored by value")
+    {
+        // Regression: used to reference the (destroyed) temporary function pointer
+        const za::FunctionRef<void(int)> f{&freeFunctionTakingLong};
+        clobberStack();
+
+        f(5);
+        CHECK(lastLong == 5);
+    }
+
+    SECTION("Function lvalues with a compatible signature")
+    {
+        const za::FunctionRef<void(int)> f{freeFunctionTakingLong};
+        f(6);
+        CHECK(lastLong == 6);
+
+        const za::FunctionRef<void(int)> g{freeFunctionWithArg}; // result discarded
+        g(1);
+
+        const za::FunctionRef<long(int)> h{freeFunctionWithArg};
+        CHECK(h(1) == freeFunctionWithArg(1));
+    }
+
+    SECTION("Reference results must not bind to temporaries")
+    {
+        // A by-value result would dangle once returned as a reference
+        STATIC_CHECK(!ZA_IS_CONVERTIBLE(decltype([] { return 0; }), za::FunctionRef<const int&()>));
+        STATIC_CHECK(!ZA_IS_CONVERTIBLE(decltype(&freeFunction), za::FunctionRef<const int&()>));
+
+        const za::FunctionRef<const int&()> f{&freeFunctionReturningRef};
+        CHECK(&f() == &globalValue);
     }
 }
 

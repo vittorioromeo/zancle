@@ -6,7 +6,9 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/Trait/IsFunction.hpp"
 #include "Zancle/Trait/IsInvocableR.hpp"
+#include "Zancle/Trait/IsPointer.hpp"
 #include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/RemoveCVRef.hpp"
 #include "Zancle/Trait/RemoveReference.hpp"
@@ -69,17 +71,45 @@ public:
 
 
     ////////////////////////////////////////////////////////////
+    /// \brief Construct from a function pointer (or function) with a compatible signature
+    ///
+    /// The pointer is stored by value, like with an exact signature,
+    /// rather than referenced (which would dangle once the pointer
+    /// temporary is destroyed). Must be non-null.
+    ///
+    ////////////////////////////////////////////////////////////
+    template <typename TFnReturn, typename... TFnArgs>
+        requires za::isInvocableR<TFnReturn (*&)(TFnArgs...), TReturn, Ts...>
+    [[nodiscard, gnu::always_inline]] FunctionRef(TFnReturn (*fn)(TFnArgs...)) noexcept :
+        m_obj{reinterpret_cast<void*>(fn)},
+        m_thunk{[](void* o, Ts&&... args) -> TReturn
+    {
+        const auto typedFn = reinterpret_cast<TFnReturn (*)(TFnArgs...)>(o);
+
+        if constexpr (ZA_IS_SAME(TReturn, void))
+            typedFn(ZA_FORWARD(args)...); // Discard any result
+        else
+            return typedFn(ZA_FORWARD(args)...);
+    }}
+    {
+        ZA_ASSERT(fn != nullptr);
+    }
+
+
+    ////////////////////////////////////////////////////////////
     /// \brief Construct from any callable object (lambda, functor, ...)
     ///
     /// The callable is referenced, not copied. Its lifetime must
     /// extend across any subsequent calls to `operator()`. Only
     /// participates in overload resolution if the callable is
     /// invocable with the signature's arguments and return type.
+    /// Functions and function pointers use the constructors above.
     ///
     ////////////////////////////////////////////////////////////
     template <typename TFFwd>
         requires(!za::isSame<za::RemoveCVRefIndirect<TFFwd>, FunctionRef> &&
-                 !za::isSame<za::RemoveCVRefIndirect<TFFwd>, FnPtrType> && za::isInvocableR<TFFwd&, TReturn, Ts...>)
+                 !za::isPointer<za::RemoveCVRefIndirect<TFFwd>> && !za::isFunction<za::RemoveCVRefIndirect<TFFwd>> &&
+                 za::isInvocableR<TFFwd&, TReturn, Ts...>)
     [[nodiscard, gnu::always_inline]] FunctionRef(TFFwd&& f) noexcept :
         m_obj{const_cast<void*>(static_cast<const void*>(&f))},
         m_thunk{[](void* o, Ts&&... args) -> TReturn
