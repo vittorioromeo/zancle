@@ -1017,14 +1017,16 @@ bool Main::checkComboEnd(const float deltaTimeMs, int& xCombo, Countdown& xCombo
 ////////////////////////////////////////////////////////////
 void Main::turnBubbleInto(Bubble& bubble, const BubbleType newType)
 {
+    // Drop the credit of a bomb's creator along with the bomb, whatever it turns into: otherwise
+    // the next bomb in this slot (e.g. after recycling) would pay out to the wrong cat
+    if (bubble.type == BubbleType::Bomb)
+        bombStorage->bombIdxToCatIdx.erase(static_cast<za::SizeT>(&bubble - pt->bubbles.data()));
+
     bubble.type               = newType;
     bubble.absorptionProgress = 0.f;
 
     if (newType == BubbleType::Normal)
     {
-        if (bubble.type == BubbleType::Bomb)
-            bombStorage->bombIdxToCatIdx.erase(static_cast<za::SizeT>(&bubble - pt->bubbles.data()));
-
         bubble.rotation = 0.f;
         bubble.torque   = 0.f;
         bubble.hueMod   = 0.f;
