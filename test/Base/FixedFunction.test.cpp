@@ -138,6 +138,29 @@ TEST_CASE("[Base] Base/FixedFunction.hpp")
         CHECK(ff() == 21);
     }
 
+    SECTION("Construction from a const lvalue callable copies it")
+    {
+        Counters c;
+
+        {
+            const LifecycleTracker tracker(c, 5);
+            FF                     ff(tracker);
+
+            CHECK(c.copies == 1);
+            CHECK(c.moves == 0);
+            CHECK(ff() == 5);
+        }
+
+        CHECK(c.alive() == 0);
+
+        // The stored copy is not const, so a mutable lambda remains callable
+        const auto counter = [n = 0]() mutable { return ++n; };
+        FF         ff(counter);
+
+        CHECK(ff() == 1);
+        CHECK(ff() == 2);
+    }
+
     SECTION("Stateful callable - construction and destruction")
     {
         Counters c;

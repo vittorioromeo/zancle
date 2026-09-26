@@ -6,10 +6,8 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
-#include "Zancle/Trait/IsRvalueReference.hpp"
 #include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/RemoveCVRef.hpp"
-#include "Zancle/Trait/RemoveReference.hpp"
 
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/Launder.hpp"
@@ -87,21 +85,23 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    /// \brief Construct from a callable; stored in internal storage via move construct (rejects unmovable callables)
+    /// \brief Construct from a callable, stored (decayed) in internal storage by copy or move
     ///
     ////////////////////////////////////////////////////////////
     template <typename TFFwd>
         requires(!za::isSame<za::RemoveCVRefIndirect<TFFwd>, FixedFunction>)
     [[nodiscard]] FixedFunction(TFFwd&& f) : FixedFunction()
     {
-        using UnrefType = ZA_REMOVE_REFERENCE(TFFwd);
+        using StoredType = ZA_REMOVE_CVREF(TFFwd);
 
-        static_assert(sizeof(UnrefType) <= TStorageSize);
-        static_assert(alignof(UnrefType) <= alignof(MaxAlignT));
+        static_assert(sizeof(StoredType) <= TStorageSize);
+        static_assert(alignof(StoredType) <= alignof(MaxAlignT));
+
+        ZA_PLACEMENT_NEW(objStorage) StoredType(ZA_FORWARD(f));
 
         // NOLINTNEXTLINE(readability-non-const-parameter)
         m_methodPtr = [](char* s, FnPtrType, Ts... xs) -> RetType
-        { return ZA_LAUNDER_CAST(UnrefType*, s)->operator()(ZA_FORWARD(xs)...); };
+        { return ZA_LAUNDER_CAST(StoredType*, s)->operator()(ZA_FORWARD(xs)...); };
 
         // NOLINTNEXTLINE(readability-non-const-parameter)
         m_allocPtr = [](char* s, void* o, const Operation operation)
@@ -109,23 +109,21 @@ public:
             if (operation == Operation::Destroy)
             {
                 ZA_ASSERT(s != nullptr);
-                ZA_LAUNDER_CAST(UnrefType*, s)->~UnrefType();
+                ZA_LAUNDER_CAST(StoredType*, s)->~StoredType();
             }
             else if (operation == Operation::MoveConstruct)
             {
                 ZA_ASSERT(o != nullptr);
-                ZA_PLACEMENT_NEW(s) UnrefType(ZA_MOVE(*static_cast<UnrefType*>(o)));
+                ZA_PLACEMENT_NEW(s) StoredType(ZA_MOVE(*static_cast<StoredType*>(o)));
             }
             else
             {
                 ZA_ASSERT(operation == Operation::CopyConstruct);
 
                 ZA_ASSERT(o != nullptr);
-                ZA_PLACEMENT_NEW(s) UnrefType(*static_cast<const UnrefType*>(o));
+                ZA_PLACEMENT_NEW(s) StoredType(*static_cast<const StoredType*>(o));
             }
         };
-
-        m_allocPtr(objStorage, &f, ZA_IS_RVALUE_REFERENCE(TFFwd&&) ? Operation::MoveConstruct : Operation::CopyConstruct);
     }
 
 
