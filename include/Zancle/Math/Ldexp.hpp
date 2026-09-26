@@ -15,6 +15,8 @@
     #define ZA_MATH_LDEXPF(...) __builtin_ldexpf(__VA_ARGS__)
     #define ZA_MATH_LDEXPL(...) __builtin_ldexpl(__VA_ARGS__)
 #else
+    #include <cmath> // IWYU pragma: keep
+
     #define ZA_MATH_LDEXP(...)  ::std::ldexp(__VA_ARGS__)
     #define ZA_MATH_LDEXPF(...) ::std::ldexpf(__VA_ARGS__)
     #define ZA_MATH_LDEXPL(...) ::std::ldexpl(__VA_ARGS__)
