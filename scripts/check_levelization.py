@@ -45,9 +45,9 @@ UTILITY_LEVELS = {
     # Level 2
     "Math":        2,
     # Level 1
-    "Trait":       1,
+    "Base":        1,
     # Level 0
-    "Base":        0,
+    "Trait":       0,
 }
 
 # Multimedia / framework modules. Outside the strict utility hierarchy --
