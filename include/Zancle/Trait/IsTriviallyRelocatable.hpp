@@ -6,11 +6,11 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/IsTriviallyCopyable.hpp"
+#include "Zancle/Trait/RemoveCV.hpp"
 
 
-namespace za::priv
-{
 #if __has_builtin(__builtin_is_cpp_trivially_relocatable)
 
     ////////////////////////////////////////////////////////////
@@ -29,28 +29,21 @@ namespace za::priv
 #endif
 
 
-////////////////////////////////////////////////////////////
-template <typename T>
-inline consteval bool hasEnabledTrivialRelocation()
-{
-    if constexpr (requires { T::enableTrivialRelocation; })
-    {
-        return T::enableTrivialRelocation;
-    }
-    else
-    {
-        return false;
-    }
-}
-
-} // namespace za::priv
-
-
 namespace za
 {
 ////////////////////////////////////////////////////////////
+/// \brief Opt-in customization point for trivial relocation
+///
+/// `true` if `T` declares a `TriviallyRelocatableTag` member alias
+/// naming `T` itself. Requiring the alias to name the declaring
+/// class prevents derived classes (which inherit the alias) from
+/// silently inheriting the opt-in. Can also be explicitly specialized.
+///
+////////////////////////////////////////////////////////////
 template <typename T>
-inline constexpr bool enableTrivialRelocation = priv::hasEnabledTrivialRelocation<T>();
+inline constexpr bool enableTrivialRelocation = requires {
+    requires ZA_IS_SAME(typename T::TriviallyRelocatableTag, ZA_REMOVE_CV(T));
+};
 
 } // namespace za
 
@@ -87,10 +80,31 @@ inline constexpr bool isTriviallyRelocatable = ZA_IS_TRIVIALLY_RELOCATABLE(T);
 ///   (`__builtin_is_cpp_trivially_relocatable` or
 ///   `__is_trivially_relocatable`)
 /// - it is trivially copyable
-/// - it opts in by declaring an `enum : bool { enableTrivialRelocation = true }`
+/// - it opts in by declaring `using TriviallyRelocatableTag = T;`
+///   (or by specializing `za::enableTrivialRelocation<T>`)
 ///
-/// User code can opt in by adding the `enableTrivialRelocation` enum
+/// User code can opt in by adding the `TriviallyRelocatableTag` alias
 /// to a class, e.g. when the class manages a heap buffer in a way
-/// that survives a `memcpy` (`Vector` itself is the canonical example).
+/// that survives a `memcpy` (`Vector` itself is the canonical example):
+///
+/// \code
+/// class Vector
+/// {
+/// public:
+///     using TriviallyRelocatableTag = Vector;
+///     // ...
+/// };
+/// \endcode
+///
+/// Conditional opt-in (e.g. for wrappers) names `void` when disabled:
+///
+/// \code
+/// using TriviallyRelocatableTag = Conditional<ZA_IS_TRIVIALLY_RELOCATABLE(T), Optional, void>;
+/// \endcode
+///
+/// The opt-in is intentionally *not* inherited: a class deriving from
+/// an opted-in class must opt in again, as it may add members (e.g.
+/// self-pointers) that do not survive a `memcpy`. Likewise, it is not
+/// propagated to classes that merely contain opted-in members.
 ///
 ////////////////////////////////////////////////////////////

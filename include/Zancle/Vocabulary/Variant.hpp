@@ -149,10 +149,7 @@ private:
 
 public:
     ////////////////////////////////////////////////////////////
-    enum : bool
-    {
-        enableTrivialRelocation = (ZA_IS_TRIVIALLY_RELOCATABLE(Alternatives) && ...)
-    };
+    using TriviallyRelocatableTag = Conditional<(ZA_IS_TRIVIALLY_RELOCATABLE(Alternatives) && ...), Variant, void>;
 
 
     ////////////////////////////////////////////////////////////

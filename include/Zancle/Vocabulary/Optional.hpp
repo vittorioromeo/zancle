@@ -6,6 +6,7 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/Trait/Conditional.hpp"
 #include "Zancle/Trait/IsCopyAssignable.hpp"
 #include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsMoveAssignable.hpp"
@@ -110,10 +111,7 @@ class [[nodiscard]] Optional
 {
 public:
     ////////////////////////////////////////////////////////////
-    enum : bool
-    {
-        enableTrivialRelocation = ZA_IS_TRIVIALLY_RELOCATABLE(T)
-    };
+    using TriviallyRelocatableTag = Conditional<ZA_IS_TRIVIALLY_RELOCATABLE(T), Optional, void>;
 
 
     ////////////////////////////////////////////////////////////

@@ -64,10 +64,7 @@ struct NonTrivial
 ////////////////////////////////////////////////////////////
 struct NonTrivialButRelocatable
 {
-    enum : bool
-    {
-        enableTrivialRelocation = true
-    };
+    using TriviallyRelocatableTag = NonTrivialButRelocatable;
 
     static inline int si{};
 

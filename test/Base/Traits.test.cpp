@@ -1,4 +1,5 @@
 #include "Zancle/Trait/CommonType.hpp"
+#include "Zancle/Trait/Conditional.hpp"
 #include "Zancle/Trait/Decay.hpp"
 #include "Zancle/Trait/IsBaseOf.hpp"
 #include "Zancle/Trait/IsEnum.hpp"
@@ -208,10 +209,7 @@ static_assert(ZA_IS_TRIVIALLY_RELOCATABLE(TraitsTest::Custom2));
 
 struct Custom3
 {
-    enum : bool
-    {
-        enableTrivialRelocation = true
-    };
+    using TriviallyRelocatableTag = Custom3;
 
     ~Custom3() // NOLINT(modernize-use-equals-default)
     {
@@ -219,5 +217,33 @@ struct Custom3
 };
 
 static_assert(ZA_IS_TRIVIALLY_RELOCATABLE(Custom3));
+static_assert(ZA_IS_TRIVIALLY_RELOCATABLE(const Custom3));
+
+
+////////////////////////////////////////////////////////////
+// Opt-in is not inherited: derived classes may add members that do not survive a `memcpy`
+struct DerivedFromCustom3 : Custom3
+{
+    int  x{};
+    int* self{&x};
+};
+
+static_assert(!ZA_IS_TRIVIALLY_RELOCATABLE(DerivedFromCustom3));
+
+
+////////////////////////////////////////////////////////////
+template <bool Enable>
+struct ConditionallyRelocatable
+{
+    using TriviallyRelocatableTag = za::Conditional<Enable, ConditionallyRelocatable, void>;
+
+    ~ConditionallyRelocatable() // NOLINT(modernize-use-equals-default)
+    {
+    }
+};
+
+static_assert(ZA_IS_TRIVIALLY_RELOCATABLE(ConditionallyRelocatable<true>));
+static_assert(!ZA_IS_TRIVIALLY_RELOCATABLE(ConditionallyRelocatable<false>));
+static_assert(!ZA_IS_TRIVIALLY_RELOCATABLE(int&) || ZA_IS_TRIVIALLY_RELOCATABLE(int&)); // must compile
 
 } // namespace

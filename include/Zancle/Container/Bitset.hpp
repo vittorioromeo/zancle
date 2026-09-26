@@ -59,10 +59,7 @@ class [[nodiscard]] Bitset
 
 public:
     ////////////////////////////////////////////////////////////
-    enum : bool
-    {
-        enableTrivialRelocation = true
-    };
+    using TriviallyRelocatableTag = Bitset;
 
 
     ////////////////////////////////////////////////////////////

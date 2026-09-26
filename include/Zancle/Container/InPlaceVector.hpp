@@ -8,6 +8,7 @@
 ////////////////////////////////////////////////////////////
 #include "Zancle/Container/Priv/VectorUtils.hpp"
 
+#include "Zancle/Trait/Conditional.hpp"
 #include "Zancle/Trait/IsTriviallyDestructible.hpp"
 #include "Zancle/Trait/IsTriviallyRelocatable.hpp"
 
@@ -48,10 +49,7 @@ private:
 public:
     // TODO P0: add trivial reloc macro
     ////////////////////////////////////////////////////////////
-    enum : bool
-    {
-        enableTrivialRelocation = ZA_IS_TRIVIALLY_RELOCATABLE(TItem)
-    };
+    using TriviallyRelocatableTag = Conditional<ZA_IS_TRIVIALLY_RELOCATABLE(TItem), InPlaceVector, void>;
 
 
     ////////////////////////////////////////////////////////////

@@ -280,10 +280,7 @@ private:
 
 public:
     ////////////////////////////////////////////////////////////
-    enum : bool
-    {
-        enableTrivialRelocation = true
-    };
+    using TriviallyRelocatableTag = ChunkedVector;
 
 
     ////////////////////////////////////////////////////////////

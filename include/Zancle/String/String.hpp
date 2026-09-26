@@ -36,10 +36,7 @@ class [[nodiscard]] String : public FmtAppendMixin
 {
 public:
     ////////////////////////////////////////////////////////////
-    enum : bool
-    {
-        enableTrivialRelocation = true
-    };
+    using TriviallyRelocatableTag = String;
 
 
     ////////////////////////////////////////////////////////////
