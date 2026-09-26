@@ -6,8 +6,10 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/Trait/Conditional.hpp"
 #include "Zancle/Trait/IsBaseOf.hpp"
 #include "Zancle/Trait/IsSame.hpp"
+#include "Zancle/Trait/IsTriviallyRelocatable.hpp"
 
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/TrivialAbi.hpp"
@@ -48,7 +50,10 @@ struct ZA_TRIVIAL_ABI UniquePtrDefaultDeleter
 ///
 /// `UniquePtr` is annotated with `ZA_TRIVIAL_ABI` so it is
 /// passed in registers like a raw pointer when ABI rules allow, and
-/// is always trivially relocatable.
+/// is trivially relocatable whenever its deleter is.
+///
+/// As with `std::unique_ptr`, the deleter is only invoked on non-null
+/// pointers.
 ///
 /// Move-only: copy construction and copy assignment are deleted.
 ///
@@ -64,7 +69,7 @@ private:
 
 public:
     ////////////////////////////////////////////////////////////
-    using TriviallyRelocatableTag = UniquePtr;
+    using TriviallyRelocatableTag = Conditional<ZA_IS_TRIVIALLY_RELOCATABLE(TDeleter), UniquePtr, void>;
 
 
     ////////////////////////////////////////////////////////////
@@ -111,7 +116,8 @@ public:
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline]] constexpr ~UniquePtr() noexcept
     {
-        static_cast<TDeleter*>(this)->operator()(m_ptr);
+        if (m_ptr != nullptr)
+            static_cast<TDeleter*>(this)->operator()(m_ptr);
     }
 
 
@@ -216,7 +222,8 @@ public:
     {
         T* const oldPtr = m_ptr;
         m_ptr           = ptr;
-        static_cast<TDeleter*>(this)->operator()(oldPtr);
+        if (oldPtr != nullptr)
+            static_cast<TDeleter*>(this)->operator()(oldPtr);
     }
 
 

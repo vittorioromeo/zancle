@@ -55,6 +55,37 @@ struct ObservingDeleter
     }
 };
 
+////////////////////////////////////////////////////////////
+// Deleter that counts its invocations (including with null pointers)
+struct CountingDeleter
+{
+    static inline int calls{};
+
+    void operator()(int* const ptr) const noexcept
+    {
+        ++calls;
+        delete ptr;
+    }
+};
+
+
+////////////////////////////////////////////////////////////
+// Deleter that is not trivially relocatable
+struct NonRelocatableDeleter
+{
+    NonRelocatableDeleter() = default;
+
+    // NOLINTNEXTLINE(modernize-use-equals-default)
+    NonRelocatableDeleter(const NonRelocatableDeleter&)
+    {
+    }
+
+    void operator()(int* const ptr) const noexcept
+    {
+        delete ptr;
+    }
+};
+
 } // namespace UniquePtrTest
 } // namespace
 
@@ -78,6 +109,29 @@ TEST_CASE("[Base] Base/UniquePtr.hpp")
         STATIC_CHECK(!ZA_IS_TRIVIALLY_ASSIGNABLE(za::UniquePtr<int>, za::UniquePtr<int>));
 
         STATIC_CHECK(ZA_IS_TRIVIALLY_RELOCATABLE(za::UniquePtr<int>));
+
+        using NonRelocatablePtr = za::UniquePtr<int, NonRelocatableDeleter>;
+        STATIC_CHECK(!ZA_IS_TRIVIALLY_RELOCATABLE(NonRelocatablePtr));
+    }
+
+    SECTION("The deleter is only invoked on non-null pointers")
+    {
+        CountingDeleter::calls = 0;
+
+        {
+            za::UniquePtr<int, CountingDeleter> p;
+            p.reset();
+        }
+
+        CHECK(CountingDeleter::calls == 0);
+
+        {
+            za::UniquePtr<int, CountingDeleter> p{new int{1}};
+            p.reset(new int{2});
+            CHECK(CountingDeleter::calls == 1);
+        }
+
+        CHECK(CountingDeleter::calls == 2);
     }
 
     SECTION("Self move-assignment keeps the owned object")
