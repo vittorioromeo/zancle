@@ -20,6 +20,19 @@
 namespace za::priv
 {
 ////////////////////////////////////////////////////////////
+// Unsigned integer type with the smallest rank of at least `unsigned long long`
+// having the same `sizeof` as `T`: 16-byte enumerations (e.g. `enum class E : __int128`)
+// map to `unsigned __int128`, as with Clang's `__make_unsigned`
+    #ifdef __SIZEOF_INT128__
+template <typename T>
+using UnsignedLongLongOrWider = Conditional<sizeof(T) == sizeof(unsigned long long), unsigned long long, __uint128_t>;
+    #else
+template <typename T>
+using UnsignedLongLongOrWider = unsigned long long;
+    #endif
+
+
+////////////////////////////////////////////////////////////
 // Unsigned integer type with the smallest rank having the same `sizeof` as `T`
 template <typename T>
 using UnsignedOfSameSize = Conditional<
@@ -29,7 +42,7 @@ using UnsignedOfSameSize = Conditional<
                 unsigned short,
                 Conditional<sizeof(T) == sizeof(unsigned int),
                             unsigned int,
-                            Conditional<sizeof(T) == sizeof(unsigned long), unsigned long, unsigned long long>>>>;
+                            Conditional<sizeof(T) == sizeof(unsigned long), unsigned long, UnsignedLongLongOrWider<T>>>>>;
 
 
 ////////////////////////////////////////////////////////////

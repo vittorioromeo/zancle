@@ -10,13 +10,29 @@
 
 #else
 
+////////////////////////////////////////////////////////////
+// Headers
+////////////////////////////////////////////////////////////
+    #include "Zancle/Trait/IsSame.hpp"
+
+
 namespace za::priv
 {
 ////////////////////////////////////////////////////////////
 // cv-qualifiers are handled via partial specializations rather than builtins,
-// as GCC rejects builtin type traits in function signatures (e.g. `requires`)
+// as GCC rejects builtin type traits in function signatures (e.g. `requires`).
+//
+// The vendor-extension `__float128` is treated like an extended floating-point
+// type, as Clang's `__is_floating_point` does (the standard leaves this to the
+// implementation). It is handled by the primary template rather than by an
+// explicit specialization, as it may be the same type as `_Float128` or
+// `long double` on some targets.
 // clang-format off
+    #ifdef __SIZEOF_FLOAT128__
+template <typename T> inline constexpr bool isFloatingPointImpl                   = ZA_IS_SAME(T, __float128);
+    #else
 template <typename T> inline constexpr bool isFloatingPointImpl                   = false;
+    #endif
 template <typename T> inline constexpr bool isFloatingPointImpl<const T>          = isFloatingPointImpl<T>;
 template <typename T> inline constexpr bool isFloatingPointImpl<volatile T>       = isFloatingPointImpl<T>;
 template <typename T> inline constexpr bool isFloatingPointImpl<const volatile T> = isFloatingPointImpl<T>;
