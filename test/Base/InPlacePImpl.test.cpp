@@ -2,6 +2,8 @@
 
 #include "Zancle/Vocabulary/InPlacePImpl.hpp"
 
+#include "Zancle/Base/MaxAlignT.hpp"
+
 
 namespace
 {
@@ -41,6 +43,18 @@ TEST_CASE("[Base] Base/InPlacePImpl.hpp")
 {
     using namespace InPlacePImplTest;
     using PImpl = za::InPlacePImpl<Impl, sizeof(Impl)>;
+
+    SECTION("Alignment")
+    {
+        STATIC_CHECK(alignof(PImpl) == alignof(za::MaxAlignT));
+
+        using TightPImpl = za::InPlacePImpl<Impl, sizeof(Impl), alignof(Impl)>;
+        STATIC_CHECK(alignof(TightPImpl) == alignof(Impl));
+        STATIC_CHECK(sizeof(TightPImpl) == sizeof(Impl));
+
+        const TightPImpl p{3};
+        CHECK(p->value == 3);
+    }
 
     SECTION("Construction forwards arguments to the implementation")
     {

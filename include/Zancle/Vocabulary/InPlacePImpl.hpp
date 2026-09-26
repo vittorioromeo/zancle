@@ -25,16 +25,22 @@ namespace za
 /// allocation: the user includes a forward declaration of `T` in the
 /// header and only the source file needs to see the full definition.
 ///
-/// `BufferSize` must be at least `sizeof(T)`. A static assertion in the
-/// constructor verifies that this holds and that `T`'s alignment does
-/// not exceed the maximum fundamental alignment.
+/// `BufferSize` must be at least `sizeof(T)`, and `Alignment` at least
+/// `alignof(T)`: static assertions in the constructor verify both.
+/// `Alignment` defaults to the maximum fundamental alignment; passing
+/// `alignof(T)` instead avoids padding in the owning class.
+///
+/// As with any PImpl, `T` must be complete wherever `InPlacePImpl`'s
+/// special members are instantiated: the owning class must declare its
+/// destructor (and any other special members it provides) in the header
+/// and define them in the source file, where `T` is complete.
 ///
 ////////////////////////////////////////////////////////////
-template <typename T, decltype(sizeof(int)) BufferSize>
+template <typename T, decltype(sizeof(int)) BufferSize, decltype(sizeof(int)) Alignment = alignof(MaxAlignT)>
 class InPlacePImpl
 {
 private:
-    alignas(MaxAlignT) char m_buffer[BufferSize]; //!< Raw aligned storage for the implementation type
+    alignas(Alignment) char m_buffer[BufferSize]; //!< Raw aligned storage for the implementation type
 
 public:
     ////////////////////////////////////////////////////////////
@@ -91,7 +97,7 @@ public:
     [[nodiscard, gnu::always_inline]] explicit InPlacePImpl(Args&&... args)
     {
         static_assert(sizeof(T) <= BufferSize);
-        static_assert(alignof(T) <= alignof(MaxAlignT));
+        static_assert(alignof(T) <= Alignment);
 
         ZA_PLACEMENT_NEW(m_buffer) T(static_cast<Args&&>(args)...);
     }
