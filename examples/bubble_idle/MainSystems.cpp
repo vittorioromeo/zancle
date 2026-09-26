@@ -398,11 +398,8 @@ void Main::gameLoopUpdateBubbles(const float deltaTimeMs)
         if (bubble.velocity.lengthSquared() > maxVelocityMagnitude * maxVelocityMagnitude)
             bubble.velocity = bubble.velocity.normalized() * maxVelocityMagnitude;
 
-        bubble.rotation += deltaTimeMs * bubble.torque;
-
-        // Keep long-lived spinning bubbles' angles small (Star/Nova bubbles use `rotation` as absorption progress)
-        if (bubble.type != BubbleType::Star && bubble.type != BubbleType::Nova)
-            bubble.rotation = za::remainder(bubble.rotation, za::tau);
+        // Keep long-lived spinning bubbles' angles small
+        bubble.rotation = za::remainder(bubble.rotation + deltaTimeMs * bubble.torque, za::tau);
 
         if (bubble.type == BubbleType::Star || bubble.type == BubbleType::Nova)
             bubble.hueMod += deltaTimeMs * 0.125f;
@@ -1877,16 +1874,17 @@ void Main::gameLoopUpdateCatActionWizard(const float deltaTimeMs, Cat& cat)
 
     Bubble* starBubble = nullptr;
 
-    const auto findRotatedStarBubble = [&](Bubble& bubble) // TODO P0: change this to something sensible
+    // Prefer finishing a star that is already being absorbed
+    const auto findStarBubbleBeingAbsorbed = [&](Bubble& bubble)
     {
-        if ((bubble.type != BubbleType::Star && bubble.type != BubbleType::Nova) || bubble.rotation == 0.f)
+        if ((bubble.type != BubbleType::Star && bubble.type != BubbleType::Nova) || bubble.absorptionProgress == 0.f)
             return ControlFlow::Continue;
 
         starBubble = &bubble;
         return ControlFlow::Break;
     };
 
-    forEachBubbleInRadius({cx, cy}, range, findRotatedStarBubble);
+    forEachBubbleInRadius({cx, cy}, range, findStarBubbleBeingAbsorbed);
 
     if (starBubble == nullptr)
         starBubble = pickRandomBubbleInRadiusMatching({cx, cy}, range, [&](Bubble& bubble) {
@@ -1902,10 +1900,11 @@ void Main::gameLoopUpdateCatActionWizard(const float deltaTimeMs, Cat& cat)
     cat.pawOpacity  = 255.f;
     cat.pawRotation = (bubble.position - cat.position).angle() + za::degrees(45);
 
-    bubble.rotation += deltaTimeMs * 0.025f; // TODO P0: change this to something sensible
+    bubble.rotation += deltaTimeMs * 0.025f; // Visual: spin the star up while it is being absorbed
+    bubble.absorptionProgress += deltaTimeMs * 0.025f;
     spawnParticlesWithHue(230.f, 1, bubble.position, ParticleType::Star, 0.5f, 0.35f);
 
-    if (bubble.rotation >= za::tau)
+    if (bubble.absorptionProgress >= za::tau)
     {
         const auto wisdomReward = pt->getComputedRewardByBubbleType(bubble.type);
 
@@ -3154,9 +3153,10 @@ void Main::gameLoopUpdateShrines(const float deltaTimeMs)
                     if (rngFast.getF(0.f, 1.f) > 0.85f)
                         spawnParticlesWithHue(230.f, 1, bubble.position, ParticleType::Star, 0.5f, 0.35f);
 
-                    bubble.rotation += deltaTimeMs * 0.025f;
+                    bubble.rotation += deltaTimeMs * 0.025f; // Visual: spin the star up while it is being absorbed
+                    bubble.absorptionProgress += deltaTimeMs * 0.025f;
 
-                    if (bubble.rotation >= za::tau)
+                    if (bubble.absorptionProgress >= za::tau)
                     {
                         sounds.absorb.settings.position = {bubble.position.x, bubble.position.y};
                         playSound(sounds.absorb, /* maxOverlap */ 1u);

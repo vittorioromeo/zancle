@@ -16,9 +16,13 @@ struct [[nodiscard]] Bubble
     za::Vec2f velocity;
 
     float radius;
-    float rotation;
+    float rotation; // Purely visual
     float torque;
     float hueMod;
+
+    // Star/Nova absorption progress, advanced by cats and Magic shrines: the
+    // bubble is absorbed when it reaches `tau`. Reset on every type change.
+    float absorptionProgress = 0.f;
 
     Countdown repelledCountdown;
     Countdown attractedCountdown;

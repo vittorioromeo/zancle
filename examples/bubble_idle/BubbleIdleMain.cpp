@@ -1017,7 +1017,8 @@ bool Main::checkComboEnd(const float deltaTimeMs, int& xCombo, Countdown& xCombo
 ////////////////////////////////////////////////////////////
 void Main::turnBubbleInto(Bubble& bubble, const BubbleType newType)
 {
-    bubble.type = newType;
+    bubble.type               = newType;
+    bubble.absorptionProgress = 0.f;
 
     if (newType == BubbleType::Normal)
     {
