@@ -175,4 +175,75 @@ TEMPLATE_TEST_CASE("[System] za::Rect2", "", int, float)
         doTest({0.5f, 1.f}, {0, -500});
         doTest({1.f, 1.f}, {-500, -500});
     }
+
+    SECTION("Named anchor points match `getAnchorPoint`")
+    {
+        // Odd sizes exercise the truncation of integral halves
+        constexpr za::Rect2<TestType> r({1, 2}, {7, 9});
+
+        STATIC_CHECK(r.getTopLeft() == r.getAnchorPoint({0.f, 0.f}));
+        STATIC_CHECK(r.getTopCenter() == r.getAnchorPoint({0.5f, 0.f}));
+        STATIC_CHECK(r.getTopRight() == r.getAnchorPoint({1.f, 0.f}));
+        STATIC_CHECK(r.getCenterLeft() == r.getAnchorPoint({0.f, 0.5f}));
+        STATIC_CHECK(r.getCenter() == r.getAnchorPoint({0.5f, 0.5f}));
+        STATIC_CHECK(r.getCenterRight() == r.getAnchorPoint({1.f, 0.5f}));
+        STATIC_CHECK(r.getBottomLeft() == r.getAnchorPoint({0.f, 1.f}));
+        STATIC_CHECK(r.getBottomCenter() == r.getAnchorPoint({0.5f, 1.f}));
+        STATIC_CHECK(r.getBottomRight() == r.getAnchorPoint({1.f, 1.f}));
+
+        STATIC_CHECK(r.getTopLeft() == za::Vec2<TestType>{r.getLeft(), r.getTop()});
+        STATIC_CHECK(r.getBottomRight() == za::Vec2<TestType>{r.getRight(), r.getBottom()});
+    }
+
+    SECTION("Named anchor setters round-trip")
+    {
+        constexpr za::Vec2<TestType> target{100, 200};
+
+#define ZA_PRIV_CHECK_ANCHOR_ROUNDTRIP(setter, getter, factors)       \
+    do                                                                \
+    {                                                                 \
+        za::Rect2<TestType> r({1, 2}, {7, 9});                        \
+        r.setter(target);                                             \
+        CHECK(r.getter() == target);                                  \
+        CHECK(r.size == za::Vec2<TestType>{7, 9});                    \
+                                                                      \
+        za::Rect2<TestType> r2({1, 2}, {7, 9});                       \
+        r2.setAnchorPoint(factors, target);                           \
+        CHECK(r2.position == r.position);                             \
+    } while (false)
+
+        ZA_PRIV_CHECK_ANCHOR_ROUNDTRIP(setTopLeft, getTopLeft, za::Vec2f(0.f, 0.f));
+        ZA_PRIV_CHECK_ANCHOR_ROUNDTRIP(setTopCenter, getTopCenter, za::Vec2f(0.5f, 0.f));
+        ZA_PRIV_CHECK_ANCHOR_ROUNDTRIP(setTopRight, getTopRight, za::Vec2f(1.f, 0.f));
+        ZA_PRIV_CHECK_ANCHOR_ROUNDTRIP(setCenterLeft, getCenterLeft, za::Vec2f(0.f, 0.5f));
+        ZA_PRIV_CHECK_ANCHOR_ROUNDTRIP(setCenter, getCenter, za::Vec2f(0.5f, 0.5f));
+        ZA_PRIV_CHECK_ANCHOR_ROUNDTRIP(setCenterRight, getCenterRight, za::Vec2f(1.f, 0.5f));
+        ZA_PRIV_CHECK_ANCHOR_ROUNDTRIP(setBottomLeft, getBottomLeft, za::Vec2f(0.f, 1.f));
+        ZA_PRIV_CHECK_ANCHOR_ROUNDTRIP(setBottomCenter, getBottomCenter, za::Vec2f(0.5f, 1.f));
+        ZA_PRIV_CHECK_ANCHOR_ROUNDTRIP(setBottomRight, getBottomRight, za::Vec2f(1.f, 1.f));
+
+#undef ZA_PRIV_CHECK_ANCHOR_ROUNDTRIP
+    }
+}
+
+
+TEST_CASE("[System] za::Rect2 anchor point precision")
+{
+    SECTION("Rect2<double> does not round-trip through float")
+    {
+        constexpr za::Rect2<double> r({0.0, 0.0}, {1.0 / 3.0, 100'000'000.1});
+
+        STATIC_CHECK(r.getCenter() == za::Vec2<double>{r.size.x / 2.0, r.size.y / 2.0});
+        STATIC_CHECK(r.getAnchorPoint({0.5f, 0.5f}) == r.getCenter());
+        STATIC_CHECK(r.getAnchorPointOffset({1.f, 1.f}) == -r.size);
+    }
+
+    SECTION("Large integral sizes are exact")
+    {
+        // Not representable exactly as `float`
+        constexpr za::Rect2uz r({0u, 0u}, {67'108'868u, 16'777'217u});
+
+        STATIC_CHECK(r.getBottomRight() == za::Vec2uz{r.getRight(), r.getBottom()});
+        STATIC_CHECK(r.getCenter() == za::Vec2uz{33'554'434u, 8'388'608u});
+    }
 }

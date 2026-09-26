@@ -10,6 +10,7 @@
 
 #include "Zancle/Math/MinMaxMacros.hpp"
 
+#include "Zancle/Trait/IsFloatingPoint.hpp"
 #include "Zancle/Trait/IsSame.hpp"
 
 #include "Zancle/Base/SizeT.hpp"
@@ -117,81 +118,77 @@ public:
     /// `factors` are normalized in the range `[0, 1]`: `(0, 0)` is the top-left,
     /// `(1, 1)` is the bottom-right, `(0.5, 0.5)` is the center.
     ///
+    /// For integral `T`, the scaled size is computed in `float` and truncated,
+    /// so it is exact only for sizes up to `2^24`. Prefer the named anchor
+    /// getters (e.g. `getCenter()`), which are always exact and cheaper.
+    ///
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr Vec2<T> getAnchorPoint(const Vec2f factors) const
     {
-        if constexpr (ZA_IS_SAME(T, float))
-        {
-            return position + size.componentWiseMul(factors);
-        }
-        else
-        {
-            return position + size.toVec2f().componentWiseMul(factors).template to<Vec2<T>>();
-        }
+        return position + getScaledSize(factors);
     }
 
 
     ////////////////////////////////////////////////////////////
-#define ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(name, ...)                                          \
-    /** \brief Get the position of the name anchor point */                                   \
+#define ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(name, offsetX, offsetY)                             \
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr Vec2<T> name() const \
     {                                                                                         \
-        return getAnchorPoint(__VA_ARGS__);                                                   \
+        return {position.x + (offsetX), position.y + (offsetY)};                              \
     }
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the world position of the top-left anchor point
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(getTopLeft, {0.f, 0.f});
+    ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(getTopLeft, T{0}, T{0})
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the world position of the top-center anchor point
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(getTopCenter, {0.5f, 0.f});
+    ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(getTopCenter, half(size.x), T{0})
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the world position of the top-right anchor point
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(getTopRight, {1.f, 0.f});
+    ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(getTopRight, size.x, T{0})
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the world position of the center-left anchor point
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(getCenterLeft, {0.f, 0.5f});
+    ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(getCenterLeft, T{0}, half(size.y))
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the world position of the center anchor point
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(getCenter, {0.5f, 0.5f});
+    ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(getCenter, half(size.x), half(size.y))
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the world position of the center-right anchor point
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(getCenterRight, {1.f, 0.5f});
+    ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(getCenterRight, size.x, half(size.y))
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the world position of the bottom-left anchor point
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(getBottomLeft, {0.f, 1.f});
+    ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(getBottomLeft, T{0}, size.y)
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the world position of the bottom-center anchor point
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(getBottomCenter, {0.5f, 1.f});
+    ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(getBottomCenter, half(size.x), size.y)
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the world position of the bottom-right anchor point
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(getBottomRight, {1.f, 1.f});
+    ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER(getBottomRight, size.x, size.y)
 
 #undef ZA_PRIV_DEFINE_RECT_ANCHOR_GETTER
 
@@ -204,7 +201,7 @@ public:
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr Vec2<T> getAnchorPointOffset(const Vec2f factors) const
     {
-        return -(size.toVec2f().componentWiseMul(factors).template to<Vec2<T>>());
+        return -getScaledSize(factors);
     }
 
 
@@ -254,71 +251,70 @@ public:
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline, gnu::flatten]] constexpr void setAnchorPoint(const Vec2f factors, const Vec2<T> newPosition)
     {
-        position = newPosition + getAnchorPointOffset(factors);
+        position = newPosition - getScaledSize(factors);
     }
 
 
     ////////////////////////////////////////////////////////////
-#define ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(name, ...)                               \
-    /** \brief Set the position based on the name anchor point */                  \
+#define ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(name, offsetX, offsetY)                  \
     [[gnu::always_inline, gnu::flatten]] constexpr void name(const Vec2<T> newPos) \
     {                                                                              \
-        return setAnchorPoint(__VA_ARGS__, newPos);                                \
+        position = {newPos.x - (offsetX), newPos.y - (offsetY)};                   \
     }
 
     ////////////////////////////////////////////////////////////
     /// \brief Move the rectangle so that the top-left anchor lands on `newPos`
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(setTopLeft, {0.f, 0.f});
+    ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(setTopLeft, T{0}, T{0})
 
     ////////////////////////////////////////////////////////////
     /// \brief Move the rectangle so that the top-center anchor lands on `newPos`
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(setTopCenter, {0.5f, 0.f});
+    ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(setTopCenter, half(size.x), T{0})
 
     ////////////////////////////////////////////////////////////
     /// \brief Move the rectangle so that the top-right anchor lands on `newPos`
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(setTopRight, {1.f, 0.f});
+    ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(setTopRight, size.x, T{0})
 
     ////////////////////////////////////////////////////////////
     /// \brief Move the rectangle so that the center-left anchor lands on `newPos`
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(setCenterLeft, {0.f, 0.5f});
+    ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(setCenterLeft, T{0}, half(size.y))
 
     ////////////////////////////////////////////////////////////
     /// \brief Move the rectangle so that the center anchor lands on `newPos`
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(setCenter, {0.5f, 0.5f});
+    ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(setCenter, half(size.x), half(size.y))
 
     ////////////////////////////////////////////////////////////
     /// \brief Move the rectangle so that the center-right anchor lands on `newPos`
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(setCenterRight, {1.f, 0.5f});
+    ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(setCenterRight, size.x, half(size.y))
 
     ////////////////////////////////////////////////////////////
     /// \brief Move the rectangle so that the bottom-left anchor lands on `newPos`
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(setBottomLeft, {0.f, 1.f});
+    ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(setBottomLeft, T{0}, size.y)
 
     ////////////////////////////////////////////////////////////
     /// \brief Move the rectangle so that the bottom-center anchor lands on `newPos`
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(setBottomCenter, {0.5f, 1.f});
+    ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(setBottomCenter, half(size.x), size.y)
 
     ////////////////////////////////////////////////////////////
     /// \brief Move the rectangle so that the bottom-right anchor lands on `newPos`
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(setBottomRight, {1.f, 1.f});
+    ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER(setBottomRight, size.x, size.y)
 
 #undef ZA_PRIV_DEFINE_RECT_ANCHOR_SETTER
 
@@ -368,6 +364,37 @@ public:
     ////////////////////////////////////////////////////////////
     Vec2<T> position; //!< Position of the top-left corner of the rectangle
     Vec2<T> size;     //!< Size of the rectangle
+
+
+private:
+    ////////////////////////////////////////////////////////////
+    /// \brief Half of `value`: exact for floating-point `T`, truncated towards zero for integral `T`
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] static constexpr T half(const T value)
+    {
+        if constexpr (ZA_IS_FLOATING_POINT(T))
+            return value * T{0.5};
+        else
+            return value / T{2};
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    /// \brief `size` scaled component-wise by `factors`
+    ///
+    /// Computed natively for floating-point `T`, and in `float` (then truncated) for integral `T`.
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr Vec2<T> getScaledSize(const Vec2f factors) const
+    {
+        if constexpr (ZA_IS_SAME(T, float))
+            return size.componentWiseMul(factors);
+        else if constexpr (ZA_IS_FLOATING_POINT(T))
+            return size.componentWiseMul(factors.template to<Vec2<T>>());
+        else
+            return size.toVec2f().componentWiseMul(factors).template to<Vec2<T>>();
+    }
 };
 
 // Aliases for the most common types
