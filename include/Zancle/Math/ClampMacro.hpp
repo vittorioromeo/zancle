@@ -6,7 +6,8 @@
 ////////////////////////////////////////////////////////////
 /// \brief Macro form of `za::clamp` for use in headers that cannot include `Clamp.hpp`
 ///
-/// Beware of multiple-evaluation: each argument is evaluated up to twice.
+/// Beware of multiple-evaluation: `value` is evaluated up to three times,
+/// `minValue` and `maxValue` up to twice.
 ///
 ////////////////////////////////////////////////////////////
 #define ZA_CLAMP(value, minValue, maxValue) \

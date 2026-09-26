@@ -30,6 +30,6 @@ inline constexpr float tau = pi * 2.f;
 /// \brief √2 (square root of 2)
 ///
 ////////////////////////////////////////////////////////////
-inline constexpr float sqrt2 = 2.f * 0.707106781186547524401f;
+inline constexpr float sqrt2 = 1.414213562373095048802f;
 
 } // namespace za
