@@ -13,7 +13,8 @@
 
 #include <cstdio>
 
-#if !defined(ZA_SYSTEM_EMSCRIPTEN) && defined(__EXCEPTIONS)
+// `_CPPUNWIND` is MSVC's equivalent of the standard `__cpp_exceptions`
+#if !defined(ZA_SYSTEM_EMSCRIPTEN) && (defined(__cpp_exceptions) || defined(_CPPUNWIND))
     #define ZA_OPTIONAL_USE_EXCEPTIONS
 #endif
 
