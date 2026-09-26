@@ -349,7 +349,8 @@ public:
         m_index{static_cast<DiscriminatorType>(I)}
     {
         ZA_VARIANT_STATIC_ASSERT_INDEX_VALIDITY(I);
-        ZA_PLACEMENT_NEW(m_buffer) ZA_VARIANT_NTH_TYPE(I){static_cast<Args&&>(args)...};
+        // Parentheses (like `Optional`): no narrowing errors, and no initializer-list constructor hijacking
+        ZA_PLACEMENT_NEW(m_buffer) ZA_VARIANT_NTH_TYPE(I)(static_cast<Args&&>(args)...);
     }
 
 
@@ -534,7 +535,7 @@ public:
 
         destroyCurrent();
 
-        ZA_PLACEMENT_NEW(m_buffer) Type{static_cast<T&&>(x)};
+        ZA_PLACEMENT_NEW(m_buffer) Type(static_cast<T&&>(x));
         m_index = indexOf<Type>;
 
         return *this;

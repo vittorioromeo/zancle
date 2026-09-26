@@ -3,6 +3,7 @@
 #include "Zancle/Vocabulary/Variant.hpp"
 
 #include "Zancle/Base/IndexSequence.hpp"
+#include "Zancle/Base/InitializerList.hpp"
 #include "Zancle/Base/MakeIndexSequence.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
@@ -567,5 +568,41 @@ TEST_CASE("[Base] Base/Variant.hpp")
         copy = V{za::inPlaceIndex<0>, 7};
         CHECK(copy.hasIndex(0));
         CHECK(copy.getByIndex<0>() == 7);
+    }
+
+    SECTION("Alternatives are constructed with parentheses, like Optional")
+    {
+        struct ListOrPair
+        {
+            int kind;
+
+            ListOrPair(za::InitializerList<int>) : kind{0}
+            {
+            }
+
+            ListOrPair(int, int) : kind{1}
+            {
+            }
+        };
+
+        struct Aggregate
+        {
+            int   i;
+            float f;
+        };
+
+        // Not hijacked by the initializer-list constructor
+        const za::Variant<ListOrPair, int> v0{za::inPlaceIndex<0>, 3, 4};
+        CHECK(v0.as<ListOrPair>().kind == 1);
+
+        // No narrowing error
+        const double                  d = 1.5;
+        const za::Variant<float, int> v1{za::inPlaceIndex<0>, d};
+        CHECK(v1.as<float>() == 1.5f);
+
+        // Aggregates still work (parenthesized aggregate initialization)
+        const za::Variant<Aggregate, int> v2{za::inPlaceIndex<0>, 1, 2.f};
+        CHECK(v2.as<Aggregate>().i == 1);
+        CHECK(v2.as<Aggregate>().f == 2.f);
     }
 }
