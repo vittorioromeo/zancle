@@ -17,7 +17,7 @@ namespace
 {
     SinTable table{};
 
-    for (U32 i = 0u; i < sinTableSize; ++i)
+    for (U32 i = 0u; i < sinTableSize + sinTableQuarter; ++i)
         table.data[i] = sinTableEntry(i);
 
     return table;

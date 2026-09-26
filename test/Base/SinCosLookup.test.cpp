@@ -85,7 +85,7 @@ TEST_CASE("[Base] Base/SinCosLookup.hpp")
     {
         int incorrectCount = 0;
 
-        for (za::U32 i = 0u; i < za::priv::sinTableSize; ++i)
+        for (za::U32 i = 0u; i < za::priv::sinTableSize + za::priv::sinTableQuarter; ++i)
         {
             if (i % za::priv::sinTableQuarter == 0u)
                 continue; // `sin` of the `double` nearest to `pi` is not exactly zero: checked below
