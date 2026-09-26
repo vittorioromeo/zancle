@@ -4,7 +4,6 @@ set -euo pipefail
 files=$(find ./src ./include ./test ./examples \
     -type f \( -name '*.hpp' -o -name '*.cpp' -o -name '*.inl' \) \
     ! -name 'PrecomputedQuadIndices.inl' \
-    ! -name 'SinCosLookupTable.inl' \
     ! -name 'AnkerlUnorderedDense.hpp')
 
 total=$(echo "$files" | wc -l)
