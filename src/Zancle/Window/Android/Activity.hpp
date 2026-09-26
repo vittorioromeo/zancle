@@ -8,8 +8,7 @@
 ////////////////////////////////////////////////////////////
 #include "Zancle/Config.hpp"
 
-#include "Zancle/GLUtils/EGL/EGLContext.hpp"
-
+#include "Zancle/Window/EGL/EGLContext.hpp"
 #include "Zancle/Window/Event.hpp"
 
 #include "Zancle/Container/EnumArray.hpp"

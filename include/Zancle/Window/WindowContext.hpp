@@ -22,8 +22,6 @@ namespace za::priv
 {
 class EglContext;
 class GlContext;
-class GLContextSaver;
-class GLSharedContextGuard;
 class JoystickManager;
 class SDLGlContext;
 class SDLLayer;
@@ -183,30 +181,27 @@ private:
     /// Friend declarations
     ///
     ////////////////////////////////////////////////////////////
-    friend priv::EglContext; // for `setActiveThreadLocalGlContext` and `cleanupUnsharedFrameBuffers`
-    friend priv::GlContext;  // for `onGlContextDestroyed` and `getActiveThreadLocalGlContextPtr`
-    friend priv::GLContextSaver; // for `setActiveThreadLocalGlContext`, `getActiveThreadLocalGlContextPtr`, and `disableSharedGlContext`
-    friend priv::GLSharedContextGuard; // for `setActiveThreadLocalGlContextToSharedContext`
-    friend priv::SDLGlContext;         // for `cleanupUnsharedFrameBuffers`
-    friend priv::JoystickManager;      // for `getSDLLayer`
-    friend priv::SDLWindowImpl;        // for `getJoystickManager` and `getSDLLayer`
-    friend Clipboard;                  // for `getSDLLayer`
-    friend Cursor;                     // for `getSDLLayer`
-    friend GLVAOGroup;                 // for `[un]registerUnsharedVAO`
-    friend GraphicsContext;            // for `setActiveThreadLocalGlContext`
-    friend Joystick;                   // for `getJoystickManager`
-    friend Keyboard;                   // for `getSDLLayer`
-    friend Mouse;                      // for `getSDLLayer`
-    friend RenderTarget;               // for `getActiveThreadLocalGlContextId`
-    friend RenderTexture;              // for `[un]registerUnsharedFrameBuffer`
-    friend Sensor;                     // for `getSensorManager`
-    friend Shader;                     // for `hasActiveThreadLocalGlContext`
-    friend TestContext;                // for `createGlContext`
-    friend Texture;                    // for `hasActiveThreadLocalGlContext`
-    friend Touch;                      // for `getSDLLayer`
-    friend VertexBuffer;               // for `hasActiveThreadLocalGlContext`
-    friend VideoModeUtils;             // for `getSDLLayer`
-    friend Window;                     // for `createGlContext`
+    friend priv::EglContext;      // for `setActiveThreadLocalGlContext` and `cleanupUnsharedFrameBuffers`
+    friend priv::SDLGlContext;    // for `cleanupUnsharedFrameBuffers`
+    friend priv::JoystickManager; // for `getSDLLayer`
+    friend priv::SDLWindowImpl;   // for `getJoystickManager` and `getSDLLayer`
+    friend Clipboard;             // for `getSDLLayer`
+    friend Cursor;                // for `getSDLLayer`
+    friend GLVAOGroup;            // for `[un]registerUnsharedVAO`
+    friend GraphicsContext;       // for `setActiveThreadLocalGlContext`
+    friend Joystick;              // for `getJoystickManager`
+    friend Keyboard;              // for `getSDLLayer`
+    friend Mouse;                 // for `getSDLLayer`
+    friend RenderTarget;          // for `getActiveThreadLocalGlContextId`
+    friend RenderTexture;         // for `[un]registerUnsharedFrameBuffer`
+    friend Sensor;                // for `getSensorManager`
+    friend Shader;                // for `hasActiveThreadLocalGlContext`
+    friend TestContext;           // for `createGlContext`
+    friend Texture;               // for `hasActiveThreadLocalGlContext`
+    friend Touch;                 // for `getSDLLayer`
+    friend VertexBuffer;          // for `hasActiveThreadLocalGlContext`
+    friend VideoModeUtils;        // for `getSDLLayer`
+    friend Window;                // for `createGlContext`
     friend WindowContextImpl;
 
     ////////////////////////////////////////////////////////////
@@ -286,15 +281,6 @@ private:
     ///
     ////////////////////////////////////////////////////////////
     static void unregisterUnsharedVAO(unsigned int glContextId, unsigned int vaoId);
-
-    ////////////////////////////////////////////////////////////
-    /// \brief Notify the context tracker that an OpenGL context is being destroyed
-    ///
-    /// Cleans up any unshared FBOs / VAOs registered against
-    /// the given context.
-    ///
-    ////////////////////////////////////////////////////////////
-    static void onGlContextDestroyed(priv::GlContext& glContext);
 
     ////////////////////////////////////////////////////////////
     /// \brief Check whether the given OpenGL context is the global shared context

@@ -83,6 +83,8 @@ elseif(ZA_OS_ANDROID)
     set(PLATFORM_SRC
         ${SRCROOT}/Android/SensorImpl.cpp
         ${SRCROOT}/Android/SensorImpl.hpp
+        ${SRCROOT}/EGL/EGLContext.cpp
+        ${SRCROOT}/EGL/EGLContext.hpp
     )
 endif()
 

@@ -5,7 +5,7 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
-#include "Zancle/GLUtils/EGL/EGLContext.hpp"
+#include "Zancle/Window/EGL/EGLContext.hpp"
 
 #include "Zancle/GLUtils/EGL/EGLCheck.hpp"
 #include "Zancle/GLUtils/EGL/EGLGlad.hpp"

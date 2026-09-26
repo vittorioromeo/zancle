@@ -6,6 +6,8 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/GLUtils/Export.hpp"
+
 #include "Zancle/Window/ContextSettings.hpp"
 
 
@@ -31,14 +33,14 @@ namespace za::priv
 /// assigned by `WindowContext` for cross-context bookkeeping.
 ///
 ////////////////////////////////////////////////////////////
-class [[nodiscard]] GlContext
+class [[nodiscard]] ZA_GLUTILS_API GlContext
 {
 public:
     ////////////////////////////////////////////////////////////
     /// \brief Destructor
     ///
-    /// Notifies `WindowContext` that this context is going away so
-    /// that any associated bookkeeping can be cleaned up.
+    /// If this context is active on the calling thread, the shared
+    /// context is activated in its place.
     ///
     ////////////////////////////////////////////////////////////
     virtual ~GlContext();
@@ -61,6 +63,14 @@ public:
     ///
     ////////////////////////////////////////////////////////////
     [[nodiscard]] const ContextSettings& getSettings() const;
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Get the unique numeric ID assigned to this context
+    ///
+    /// \return The ID supplied to the constructor by `WindowContext`
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] unsigned int getId() const;
 
     ////////////////////////////////////////////////////////////
     /// \brief Present the rendered contents of the context (swap buffers)
@@ -112,6 +122,80 @@ public:
     ////////////////////////////////////////////////////////////
     [[nodiscard]] bool initialize(const GlContext& sharedGlContext, const ContextSettings& requestedSettings);
 
+    ////////////////////////////////////////////////////////////
+    /// \brief Get the address of an OpenGL function
+    ///
+    /// \param name Name of the function to get the address of
+    ///
+    /// \return Address of the OpenGL function, `nullptr` on failure
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] virtual GlFunctionPointer getFunction(const char* name) const = 0;
+
+    ////////////////////////////////////////////////////////////
+    // Thread-local tracking of the active context
+    //
+    // Each thread has at most one active context. Deactivating a context other
+    // than the shared one falls back to the shared context, which is owned by
+    // `WindowContext` and registered via `setSharedGlContext`.
+    ////////////////////////////////////////////////////////////
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Register the shared context (`nullptr` to unregister it)
+    ///
+    /// Unregistering also forgets the calling thread's active context, if it is the shared one.
+    ///
+    ////////////////////////////////////////////////////////////
+    static void setSharedGlContext(GlContext* sharedGlContext) noexcept;
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Return the context active on the calling thread, or `nullptr` if none is active
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] static GlContext* getActiveThreadLocalGlContextPtr() noexcept;
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Return the ID of the context active on the calling thread, or `0` if none is active
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] static unsigned int getActiveThreadLocalGlContextId() noexcept;
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Check whether a context is active on the calling thread
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] static bool hasActiveThreadLocalGlContext() noexcept;
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Check whether the context active on the calling thread is the shared context
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] static bool isActiveGlContextSharedContext() noexcept;
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Activate or deactivate `glContext` on the calling thread
+    ///
+    /// \return `true` on success, `false` otherwise
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] static bool setActiveThreadLocalGlContext(GlContext& glContext, bool active);
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Activate the shared context on the calling thread
+    ///
+    /// \return `true` on success, `false` otherwise
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] static bool setActiveThreadLocalGlContextToSharedContext();
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Deactivate the shared context, which must be active on the calling thread
+    ///
+    /// \return `true` on success, `false` otherwise
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] static bool disableSharedGlContext();
+
 protected:
     ////////////////////////////////////////////////////////////
     /// \brief Construct a context with a numeric ID and initial settings
@@ -135,14 +219,6 @@ protected:
     ///
     ////////////////////////////////////////////////////////////
     [[nodiscard]] virtual bool makeCurrent(bool activate) = 0;
-
-    ////////////////////////////////////////////////////////////
-    /// \brief Get the unique numeric ID assigned to this context
-    ///
-    /// \return The ID supplied to the constructor by `WindowContext`
-    ///
-    ////////////////////////////////////////////////////////////
-    [[nodiscard]] unsigned int getId() const;
 
     ////////////////////////////////////////////////////////////
     // Member data

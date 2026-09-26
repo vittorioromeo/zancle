@@ -6,21 +6,12 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "../src/Zancle/GLUtils/GlContext.hpp" // IWYU pragma: keep
+
 #include "Zancle/Window/ContextSettings.hpp"
 #include "Zancle/Window/WindowContext.hpp"
 
 #include "Zancle/Err/Err.hpp"
-
-
-////////////////////////////////////////////////////////////
-// Forces visibility of `priv::GlContext`'s protected `getId()` so this
-// helper can return its context's id. `WindowContext` already declares
-// `friend TestContext;` (a forward-decl in the global namespace) for
-// `createGlContext` access.
-////////////////////////////////////////////////////////////
-#define protected public
-#include "../src/Zancle/GLUtils/GlContext.hpp" // IWYU pragma: keep
-#undef protected
 
 
 ////////////////////////////////////////////////////////////

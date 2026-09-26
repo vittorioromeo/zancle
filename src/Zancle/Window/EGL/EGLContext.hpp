@@ -87,7 +87,7 @@ public:
     /// \return Address of the OpenGL function, or `nullptr` on failure
     ///
     ////////////////////////////////////////////////////////////
-    GlFunctionPointer getFunction(const char* name) const;
+    [[nodiscard]] GlFunctionPointer getFunction(const char* name) const override;
 
     ////////////////////////////////////////////////////////////
     /// \brief Activate or deactivate the context as the current rendering target

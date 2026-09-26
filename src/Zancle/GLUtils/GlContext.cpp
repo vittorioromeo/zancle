@@ -14,8 +14,6 @@
 #include "Zancle/GLUtils/Glad.hpp"
 
 #include "Zancle/Window/ContextSettings.hpp"
-#include "Zancle/Window/SDLGlContext.hpp"
-#include "Zancle/Window/WindowContext.hpp"
 
 #include "Zancle/Err/Err.hpp"
 
@@ -23,12 +21,148 @@
 #include "Zancle/Base/Strstr.hpp"
 
 
+namespace
+{
+////////////////////////////////////////////////////////////
+thread_local constinit struct
+{
+    unsigned int         id{0u};
+    za::priv::GlContext* ptr{nullptr};
+} activeGlContext;
+
+
+////////////////////////////////////////////////////////////
+constinit za::priv::GlContext* sharedGlContextPtr{nullptr}; //!< Owned by `WindowContext`
+
+} // namespace
+
+
 namespace za::priv
 {
 ////////////////////////////////////////////////////////////
 GlContext::~GlContext()
 {
-    WindowContext::onGlContextDestroyed(*this);
+    // If this context is not the active one on this thread, don't do anything
+    if (m_id != activeGlContext.id)
+        return;
+
+    if (!setActiveThreadLocalGlContextToSharedContext())
+    {
+        errMsg("Failed to enable shared GL context in `GlContext::~GlContext`");
+        ZA_ASSERT(false);
+    }
+}
+
+
+////////////////////////////////////////////////////////////
+void GlContext::setSharedGlContext(GlContext* const sharedGlContext) noexcept
+{
+    if (sharedGlContext == nullptr && activeGlContext.ptr == sharedGlContextPtr)
+        activeGlContext = {};
+
+    sharedGlContextPtr = sharedGlContext;
+}
+
+
+////////////////////////////////////////////////////////////
+GlContext* GlContext::getActiveThreadLocalGlContextPtr() noexcept
+{
+    return activeGlContext.ptr;
+}
+
+
+////////////////////////////////////////////////////////////
+unsigned int GlContext::getActiveThreadLocalGlContextId() noexcept
+{
+    return activeGlContext.id;
+}
+
+
+////////////////////////////////////////////////////////////
+bool GlContext::hasActiveThreadLocalGlContext() noexcept
+{
+    return activeGlContext.id != 0u && activeGlContext.ptr != nullptr;
+}
+
+
+////////////////////////////////////////////////////////////
+bool GlContext::isActiveGlContextSharedContext() noexcept
+{
+    return activeGlContext.ptr != nullptr && activeGlContext.ptr == sharedGlContextPtr;
+}
+
+
+////////////////////////////////////////////////////////////
+bool GlContext::setActiveThreadLocalGlContext(GlContext& glContext, const bool active)
+{
+    // If `glContext` is already the active one on this thread, don't do anything
+    if (active && glContext.m_id == activeGlContext.id)
+    {
+        ZA_ASSERT(activeGlContext.ptr == &glContext);
+        return true;
+    }
+
+    // If `glContext` is not the active one on this thread, don't do anything
+    if (!active && glContext.m_id != activeGlContext.id)
+    {
+        ZA_ASSERT(activeGlContext.ptr != &glContext);
+        return true;
+    }
+
+    // Activate/deactivate the context
+    if (!glContext.makeCurrent(active))
+    {
+        errMsg("`glContext.makeCurrent` failure in `GlContext::setActiveThreadLocalGlContext`");
+        return false;
+    }
+
+    if (&glContext == sharedGlContextPtr)
+    {
+        ZA_ASSERT(active);
+
+        activeGlContext.id  = glContext.m_id;
+        activeGlContext.ptr = &glContext;
+    }
+    else
+    {
+        // Revert to shared context if `glContext` is disabled
+        ZA_ASSERT(active || sharedGlContextPtr != nullptr);
+
+        activeGlContext.id  = active ? glContext.m_id : sharedGlContextPtr->m_id;
+        activeGlContext.ptr = active ? &glContext : sharedGlContextPtr;
+    }
+
+    return true;
+}
+
+
+////////////////////////////////////////////////////////////
+bool GlContext::setActiveThreadLocalGlContextToSharedContext()
+{
+    if (sharedGlContextPtr == nullptr) [[unlikely]]
+    {
+        errMsg("No shared GL context -- is a `za::WindowContext` installed?");
+        return false;
+    }
+
+    return setActiveThreadLocalGlContext(*sharedGlContextPtr, true);
+}
+
+
+////////////////////////////////////////////////////////////
+bool GlContext::disableSharedGlContext()
+{
+    ZA_ASSERT(hasActiveThreadLocalGlContext());
+    ZA_ASSERT(isActiveGlContextSharedContext());
+
+    if (!sharedGlContextPtr->makeCurrent(false))
+    {
+        errMsg("Could not disable shared GL context in `GlContext::disableSharedGlContext()`");
+        return false;
+    }
+
+    activeGlContext = {};
+    return true;
 }
 
 
@@ -55,15 +189,12 @@ GlContext::GlContext(unsigned int id, const ContextSettings& contextSettings) : 
 ////////////////////////////////////////////////////////////
 bool GlContext::initialize(const GlContext& sharedGlContext, const ContextSettings& requestedSettings)
 {
-    ZA_ASSERT(WindowContext::getActiveThreadLocalGlContextPtr() == this);
-
-    const auto& derivedSharedGlContext = static_cast<const SDLGlContext&>(sharedGlContext);
+    ZA_ASSERT(getActiveThreadLocalGlContextPtr() == this);
 
     // Try the new way first
-    auto glGetIntegervFunc = reinterpret_cast<glGetIntegervFuncType>(
-        derivedSharedGlContext.getFunction("glGetIntegerv"));
+    auto glGetIntegervFunc = reinterpret_cast<glGetIntegervFuncType>(sharedGlContext.getFunction("glGetIntegerv"));
 
-    auto glGetErrorFunc = reinterpret_cast<glGetErrorFuncType>(derivedSharedGlContext.getFunction("glGetError"));
+    auto glGetErrorFunc = reinterpret_cast<glGetErrorFuncType>(sharedGlContext.getFunction("glGetError"));
 
     if (!glGetIntegervFunc || !glGetErrorFunc)
     {
@@ -110,8 +241,8 @@ bool GlContext::initialize(const GlContext& sharedGlContext, const ContextSettin
 
         m_settings.attributeFlags |= ContextSettings::Attribute::Core;
 
-        if (auto glGetStringiFunc = reinterpret_cast<glGetStringiFuncType>(derivedSharedGlContext.getFunction("glGetStr"
-                                                                                                              "ingi")))
+        if (auto glGetStringiFunc = reinterpret_cast<glGetStringiFuncType>(sharedGlContext.getFunction("glGetStr"
+                                                                                                       "ingi")))
         {
             int numExtensions = 0;
             glCheckIgnoreWithFunc(glGetErrorFunc, glGetIntegervFunc(GL_NUM_EXTENSIONS, &numExtensions));

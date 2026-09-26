@@ -35,8 +35,6 @@ elseif(ZA_OS_ANDROID)
     set(PLATFORM_SRC
         ${SRCROOT}/EGL/EGLCheck.cpp
         ${SRCROOT}/EGL/EGLCheck.hpp
-        ${SRCROOT}/EGL/EGLContext.cpp
-        ${SRCROOT}/EGL/EGLContext.hpp
     )
 endif()
 

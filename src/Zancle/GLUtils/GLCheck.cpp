@@ -7,9 +7,8 @@
 ////////////////////////////////////////////////////////////
 #include "Zancle/GLUtils/GLCheck.hpp"
 
+#include "Zancle/GLUtils/GlContext.hpp"
 #include "Zancle/GLUtils/Glad.hpp"
-
-#include "Zancle/Window/WindowContext.hpp"
 
 #include "Zancle/Err/Err.hpp"
 
@@ -23,7 +22,7 @@ namespace za::priv
 ////////////////////////////////////////////////////////////
 void glCheckError(const unsigned int openGlError, const char* const file, const unsigned int line, const char* const expression)
 {
-    if (!WindowContext::hasActiveThreadLocalGlContext())
+    if (!GlContext::hasActiveThreadLocalGlContext())
     {
         errMsg(
             "An internal OpenGL call failed in {}({}).\nExpression:\n   {}\nNo active OpenGL context on calling "

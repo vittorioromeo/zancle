@@ -67,7 +67,7 @@ public:
     SDLGlContext& operator=(SDLGlContext&&) = delete;
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] GlFunctionPointer getFunction(const char* name) const;
+    [[nodiscard]] GlFunctionPointer getFunction(const char* name) const override;
 
     ////////////////////////////////////////////////////////////
     [[nodiscard]] SDL_Window* getSDLWindow() const noexcept;

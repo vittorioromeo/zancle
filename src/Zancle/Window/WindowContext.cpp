@@ -98,14 +98,6 @@ namespace
 
 
 ////////////////////////////////////////////////////////////
-thread_local constinit struct
-{
-    unsigned int     id{0u};
-    priv::GlContext* ptr{nullptr};
-} activeGlContext;
-
-
-////////////////////////////////////////////////////////////
 struct UnsharedContextResources
 {
     ////////////////////////////////////////////////////////////
@@ -577,6 +569,14 @@ constinit za::Atomic<unsigned int>        windowContextRC{0u};
 
 
 ////////////////////////////////////////////////////////////
+void uninstall()
+{
+    installedWindowContext.reset();
+    priv::GlContext::setSharedGlContext(nullptr);
+}
+
+
+////////////////////////////////////////////////////////////
 WindowContextImpl& ensureInstalled()
 {
     if (!installedWindowContext.hasValue()) [[unlikely]]
@@ -611,6 +611,7 @@ za::Optional<WindowContext> WindowContext::create()
     //
     // Install window context
     auto& wc = installedWindowContext.emplace(/* id */ 1u, /* shared */ nullptr, sharedContextSettings);
+    priv::GlContext::setSharedGlContext(&wc.sharedGlContext);
 
     //
     // Define fatal signal handlers for the user that will display a stack trace
@@ -622,7 +623,7 @@ za::Optional<WindowContext> WindowContext::create()
 
     if (!setActiveThreadLocalGlContextToSharedContext())
     {
-        installedWindowContext.reset();
+        uninstall();
         return fail("could not enable shared context");
     }
 
@@ -632,7 +633,7 @@ za::Optional<WindowContext> WindowContext::create()
     // Try to initialize shared GL context
     if (!wc.sharedGlContext.initialize(wc.sharedGlContext, sharedContextSettings))
     {
-        installedWindowContext.reset();
+        uninstall();
         return fail("could not initialize shared context");
     }
 
@@ -652,7 +653,7 @@ za::Optional<WindowContext> WindowContext::create()
 
     if ((majorVersion < 1) || ((majorVersion == 1) && (minorVersion < 1)))
     {
-        installedWindowContext.reset();
+        uninstall();
         return fail("support for OpenGL 1.1 or greater required, ensure hardware acceleration is enabled");
     }
 #else
@@ -702,7 +703,7 @@ WindowContext::~WindowContext()
     disableSharedGlContext();
     ZA_ASSERT(!hasActiveThreadLocalGlContext());
 
-    installedWindowContext.reset();
+    uninstall();
 }
 
 
@@ -794,7 +795,7 @@ void WindowContext::cleanupUnsharedFrameBuffers(priv::GlContext& glContext)
 priv::GlContext* WindowContext::getActiveThreadLocalGlContextPtr()
 {
     ensureInstalled();
-    return activeGlContext.ptr;
+    return priv::GlContext::getActiveThreadLocalGlContextPtr();
 }
 
 
@@ -823,7 +824,7 @@ priv::SensorManager& WindowContext::getSensorManager()
 unsigned int WindowContext::getActiveThreadLocalGlContextId()
 {
     ensureInstalled();
-    return activeGlContext.id;
+    return priv::GlContext::getActiveThreadLocalGlContextId();
 }
 
 
@@ -838,77 +839,23 @@ void WindowContext::setAppId(const Utf8String& id)
 bool WindowContext::hasActiveThreadLocalGlContext()
 {
     ensureInstalled();
-    return activeGlContext.id != 0u && activeGlContext.ptr != nullptr;
+    return priv::GlContext::hasActiveThreadLocalGlContext();
 }
 
 
 ////////////////////////////////////////////////////////////
 bool WindowContext::setActiveThreadLocalGlContext(priv::GlContext& glContext, const bool active)
 {
-    auto& wc = ensureInstalled();
-
-    // If `glContext` is already the active one on this thread, don't do anything
-    if (active && glContext.m_id == activeGlContext.id)
-    {
-        ZA_ASSERT(activeGlContext.ptr == &glContext);
-        return true;
-    }
-
-    // If `glContext` is not the active one on this thread, don't do anything
-    if (!active && glContext.m_id != activeGlContext.id)
-    {
-        ZA_ASSERT(activeGlContext.ptr != &glContext);
-        return true;
-    }
-
-    // Activate/deactivate the context
-    if (!glContext.makeCurrent(active))
-    {
-        priv::errMsg("`glContext.makeCurrent` failure in `WindowContext::setActiveThreadLocalGlContext`");
-        return false;
-    }
-
-    if (&glContext == &wc.sharedGlContext)
-    {
-        ZA_ASSERT(active);
-
-        activeGlContext.id  = glContext.m_id;
-        activeGlContext.ptr = &glContext;
-    }
-    else
-    {
-        // Revert to shared context if `glContext` is disabled
-
-        activeGlContext.id  = active ? glContext.m_id : 1u;
-        activeGlContext.ptr = active ? &glContext : &wc.sharedGlContext;
-    }
-
-    return true;
+    ensureInstalled();
+    return priv::GlContext::setActiveThreadLocalGlContext(glContext, active);
 }
 
 
 ////////////////////////////////////////////////////////////
 bool WindowContext::setActiveThreadLocalGlContextToSharedContext()
 {
-    auto& wc = ensureInstalled();
-    return setActiveThreadLocalGlContext(wc.sharedGlContext, true);
-}
-
-
-////////////////////////////////////////////////////////////
-void WindowContext::onGlContextDestroyed(priv::GlContext& glContext)
-{
     ensureInstalled();
-
-    // If `glContext` is not the active one on this thread, don't do anything
-    if (glContext.m_id != activeGlContext.id)
-        return;
-
-    if (!setActiveThreadLocalGlContextToSharedContext())
-    {
-        priv::errMsg("Failed to enable shared GL context in `WindowContext::onGlContextDestroyed`");
-        ZA_ASSERT(false);
-    }
+    return priv::GlContext::setActiveThreadLocalGlContextToSharedContext();
 }
 
 
@@ -923,27 +870,16 @@ void WindowContext::onGlContextDestroyed(priv::GlContext& glContext)
 ////////////////////////////////////////////////////////////
 bool WindowContext::isActiveGlContextSharedContext()
 {
-    auto& wc = ensureInstalled();
-    return activeGlContext.id == 1u && activeGlContext.ptr == &wc.sharedGlContext;
+    ensureInstalled();
+    return priv::GlContext::isActiveGlContextSharedContext();
 }
 
 
 ////////////////////////////////////////////////////////////
 void WindowContext::disableSharedGlContext()
 {
-    auto& wc = ensureInstalled();
-
-    ZA_ASSERT(hasActiveThreadLocalGlContext());
-    ZA_ASSERT(isActiveGlContextSharedContext());
-
-    if (!wc.sharedGlContext.makeCurrent(false))
-    {
-        priv::errMsg("Could not disable shared GL context in `WindowContext::disableSharedGlContext()`");
-        return;
-    }
-
-    activeGlContext.id  = 0u;
-    activeGlContext.ptr = nullptr;
+    ensureInstalled();
+    [[maybe_unused]] const bool disabled = priv::GlContext::disableSharedGlContext();
 }
 
 
