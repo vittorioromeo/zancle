@@ -28,9 +28,12 @@
 #include "Zancle/Trait/IsUnsigned.hpp"
 #include "Zancle/Trait/IsVoid.hpp"
 #include "Zancle/Trait/MakeUnsigned.hpp"
+#include "Zancle/Trait/RegularizeVoid.hpp"
 #include "Zancle/Trait/RemoveCVRef.hpp"
 #include "Zancle/Trait/RemoveReference.hpp"
 #include "Zancle/Trait/UnderlyingType.hpp"
+
+#include "Zancle/Base/DeclVal.hpp"
 
 
 namespace
@@ -433,5 +436,51 @@ static_assert(!za::isTriviallyDefaultConstructible<NothrowMemberSwap[2]> ||
 ////////////////////////////////////////////////////////////
 static_assert(ZA_IS_SAME(ZA_REMOVE_REFERENCE(int (&)[3]), int[3]));
 static_assert(ZA_IS_SAME(ZA_REMOVE_REFERENCE(void (&&)()), void()));
+
+
+////////////////////////////////////////////////////////////
+namespace TraitsTest
+{
+inline constexpr int regularizeVoidGlobal = 0;
+
+struct RefQualifiedCall
+{
+    constexpr void operator()() &
+    {
+    }
+
+    constexpr int operator()() &&
+    {
+        return 0;
+    }
+};
+
+struct NonCopyable
+{
+    NonCopyable()                   = default;
+    NonCopyable(const NonCopyable&) = delete;
+};
+
+inline NonCopyable nonCopyableGlobal;
+
+} // namespace TraitsTest
+
+static_assert(ZA_IS_SAME(decltype(za::regularizeVoid([] {})), za::RegularizeVoidDummy));
+static_assert(ZA_IS_SAME(decltype(za::regularizeVoid([] { return 1; })), int));
+static_assert(za::regularizeVoid([] { return 42; }) == 42);
+
+// References are forwarded rather than copied
+static_assert(ZA_IS_SAME(decltype(za::regularizeVoid([]() -> const int& { return TraitsTest::regularizeVoidGlobal; })),
+                         const int&));
+static_assert(&za::regularizeVoid([]() -> const int& { return TraitsTest::regularizeVoidGlobal; }) ==
+              &TraitsTest::regularizeVoidGlobal);
+static_assert(ZA_IS_SAME(decltype(za::regularizeVoid([]() -> TraitsTest::NonCopyable&
+{ return TraitsTest::nonCopyableGlobal; })),
+                         TraitsTest::NonCopyable&));
+
+// The `void` check uses the same (forwarded) invocation as the call itself
+static_assert(ZA_IS_SAME(decltype(za::regularizeVoid(TraitsTest::RefQualifiedCall{})), int));
+static_assert(ZA_IS_SAME(decltype(za::regularizeVoid(za::declVal<TraitsTest::RefQualifiedCall&>())),
+                         za::RegularizeVoidDummy));
 
 } // namespace
