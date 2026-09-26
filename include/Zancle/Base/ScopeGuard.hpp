@@ -30,7 +30,7 @@ struct [[nodiscard]] ScopeGuard : F
     /// \brief Destructor, invokes the wrapped callable
     ///
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline, gnu::flatten]] ~ScopeGuard()
+    [[gnu::always_inline]] ~ScopeGuard()
     {
         static_cast<F&>(*this)();
     }
@@ -44,17 +44,21 @@ struct [[nodiscard]] ScopeGuard : F
 template <typename F>
 ScopeGuard(F) -> ScopeGuard<F>; // Needed by clang-cl
 
+} // namespace za
+
 
 ////////////////////////////////////////////////////////////
 /// \brief Convenience macro that declares a uniquely-named scope guard from a lambda body
 ///
 /// Usage: `ZA_SCOPE_GUARD({ cleanup(); });`
 ///
+/// The lambda is marked `always_inline` so that its body is inlined into
+/// the guard's destructor even in unoptimized builds, without recursively
+/// inlining everything it calls (as `gnu::flatten` would on GCC).
+///
 ////////////////////////////////////////////////////////////
 #define ZA_SCOPE_GUARD(...)                                      \
     const ::za::ScopeGuard ZA_TOKEN_PASTE(_scopeGuard, __LINE__) \
     {                                                            \
-        [&] __VA_ARGS__                                          \
+        [&] [[gnu::always_inline]] __VA_ARGS__                   \
     }
-
-} // namespace za
