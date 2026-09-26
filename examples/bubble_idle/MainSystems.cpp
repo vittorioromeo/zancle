@@ -400,6 +400,10 @@ void Main::gameLoopUpdateBubbles(const float deltaTimeMs)
 
         bubble.rotation += deltaTimeMs * bubble.torque;
 
+        // Keep long-lived spinning bubbles' angles small (Star/Nova bubbles use `rotation` as absorption progress)
+        if (bubble.type != BubbleType::Star && bubble.type != BubbleType::Nova)
+            bubble.rotation = za::remainder(bubble.rotation, za::tau);
+
         if (bubble.type == BubbleType::Star || bubble.type == BubbleType::Nova)
             bubble.hueMod += deltaTimeMs * 0.125f;
 

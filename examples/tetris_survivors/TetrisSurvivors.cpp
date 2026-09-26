@@ -107,7 +107,6 @@
 #include "Zancle/Math/Clamp.hpp"
 #include "Zancle/Math/Constants.hpp"
 #include "Zancle/Math/Floor.hpp"
-#include "Zancle/Math/Fmod.hpp"
 #include "Zancle/Math/MinMax.hpp"
 #include "Zancle/Math/Remainder.hpp"
 #include "Zancle/Math/Sin.hpp"
@@ -4086,7 +4085,7 @@ private:
                 endPos += guideLaserDir.toVec2f() * 3.f;
 
             za::RectangleShape guide{{
-                .rotation    = guideRotation.wrapUnsigned(),
+                .rotation    = guideRotation,
                 .textureRect = m_txrRedDot,
                 .size        = za::Vec2f{1.f, (endPos - startPos).length()},
             }};
@@ -4384,11 +4383,10 @@ private:
 
             m_rtGame.draw(
                 za::CircleShapeData{
-                    .position = {blend(newPos2.x, newPos.x, 0.5f), newPos.y},
-                    .scale    = za::Vec2f{0.25f, 0.25f} * particle.progress.remapBounced(0.6f, 2.f),
-                    .origin   = {12.f, 12.f},
-                    .rotation = za::radians(
-                        za::fmod(particle.startRotation + particle.progress.remap(0.f, za::tau * 2.f), za::tau)),
+                    .position    = {blend(newPos2.x, newPos.x, 0.5f), newPos.y},
+                    .scale       = za::Vec2f{0.25f, 0.25f} * particle.progress.remapBounced(0.6f, 2.f),
+                    .origin      = {12.f, 12.f},
+                    .rotation    = za::radians(particle.startRotation + particle.progress.remap(0.f, za::tau * 2.f)),
                     .textureRect = m_txrRedDot,
                     .fillColor   = hueColorFromPaletteIdx(particle.paletteIdx, alpha),
                     .radius      = 12.f,

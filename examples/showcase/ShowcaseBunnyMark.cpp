@@ -169,6 +169,9 @@ void ExampleBunnyMark::update(const float deltaTimeMs)
             position.y = 0.f;
 
         rotation += za::radians(0.05f * deltaTimeMs);
+
+        if (rotation >= za::Angle::Full)
+            rotation -= za::Angle::Full;
     }
 }
 

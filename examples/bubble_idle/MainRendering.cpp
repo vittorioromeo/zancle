@@ -1165,7 +1165,7 @@ void drawCatVisuals(const CatDrawContext& ctx)
             .position           = ctx.catAnchor,
             .scale              = ctx.catScale,
             .origin             = ctx.catTxr.size / 2.f,
-            .rotation           = bodyRotation.wrapUnsigned(),
+            .rotation           = bodyRotation,
             .outlineTextureRect = ctx.main.atlasRects.txrWhiteDot,
             .fillColor          = za::Color::Transparent,
             .outlineColor       = za::Color{255u, 0u, 0u, ctx.alpha},
