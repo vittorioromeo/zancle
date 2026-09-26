@@ -414,6 +414,24 @@ TEST_CASE("[Base] Base/Variant.hpp")
         CHECK(result.value == 4);
     }
 
+    SECTION("recursiveMatch and linearMatch")
+    {
+        using namespace VariantTest;
+
+        za::Variant<int, OtherAlt> v{OtherAlt{3}};
+
+        CHECK(v.recursiveMatch([](int x) { return x; }, [](const OtherAlt& o) { return o.x * 10; }) == 30);
+        CHECK(v.linearMatch([](int x) { return x; }, [](const OtherAlt& o) { return o.x * 10; }) == 30);
+
+        // Reference results are forwarded as-is
+        int& r = v.linearMatch([](int& x) -> int& { return x; }, [](OtherAlt& o) -> int& { return o.x; });
+        STATIC_CHECK(ZA_IS_SAME(decltype(v.recursiveMatch([](int& x) -> int& { return x; },
+                                                          [](OtherAlt& o) -> int& { return o.x; })),
+                                int&));
+
+        CHECK(&r == &v.as<OtherAlt>().x);
+    }
+
     SECTION("Construction and assignment only accept exact alternatives")
     {
         using namespace VariantTest;

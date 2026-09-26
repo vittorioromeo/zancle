@@ -624,8 +624,7 @@ public:
     ///
     ////////////////////////////////////////////////////////////
     template <typename Self, typename... Fs>
-    [[nodiscard, gnu::always_inline, gnu::flatten]] auto recursiveMatch(this Self&& self, Fs&&... fs)
-        -> decltype(static_cast<Self&&>(self).recursiveVisit(OverloadSet{static_cast<Fs&&>(fs)...}))
+    [[nodiscard, gnu::always_inline, gnu::flatten]] decltype(auto) recursiveMatch(this Self&& self, Fs&&... fs)
     {
         return static_cast<Self&&>(self).recursiveVisit(OverloadSet{static_cast<Fs&&>(fs)...});
     }
@@ -679,8 +678,7 @@ public:
     ///
     ////////////////////////////////////////////////////////////
     template <typename Self, typename... Fs>
-    [[nodiscard, gnu::always_inline, gnu::flatten]] auto linearMatch(this Self&& self, Fs&&... fs)
-        -> decltype(static_cast<Self&&>(self).linearVisit(OverloadSet{static_cast<Fs&&>(fs)...}))
+    [[nodiscard, gnu::always_inline, gnu::flatten]] decltype(auto) linearMatch(this Self&& self, Fs&&... fs)
     {
         return static_cast<Self&&>(self).linearVisit(OverloadSet{static_cast<Fs&&>(fs)...});
     }
