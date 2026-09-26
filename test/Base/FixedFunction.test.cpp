@@ -469,6 +469,14 @@ TEST_CASE("[Base] Base/FixedFunction.hpp")
         CHECK(x == 42);
     }
 
+    SECTION("Void return type discards the callable's result")
+    {
+        int x = 0;
+        FFv ff([&x] { return x = 42; });
+        ff();
+        CHECK(x == 42);
+    }
+
     SECTION("Multiple arguments")
     {
         za::FixedFunction<int(int, int, int), 64> ff([](int a, int b, int c) { return a + b + c; });

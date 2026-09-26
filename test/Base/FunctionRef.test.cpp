@@ -226,6 +226,15 @@ TEST_CASE("[Base] Base/FunctionRef.hpp")
         CHECK(out == 42);
     }
 
+    SECTION("Void return type discards the callable's result")
+    {
+        int                     out = 0;
+        auto                    lam = [&out] { return out = 42; };
+        za::FunctionRef<void()> fr(lam);
+        fr();
+        CHECK(out == 42);
+    }
+
     SECTION("Void return type - free function")
     {
         int                         out = 0;

@@ -106,7 +106,12 @@ public:
 
         // NOLINTNEXTLINE(readability-non-const-parameter)
         m_methodPtr = [](char* s, FnPtrType, Ts... xs) -> RetType
-        { return ZA_LAUNDER_CAST(StoredType*, s)->operator()(ZA_FORWARD(xs)...); };
+        {
+            if constexpr (ZA_IS_SAME(RetType, void))
+                ZA_LAUNDER_CAST(StoredType*, s)->operator()(ZA_FORWARD(xs)...); // Discard any result
+            else
+                return ZA_LAUNDER_CAST(StoredType*, s)->operator()(ZA_FORWARD(xs)...);
+        };
 
         // NOLINTNEXTLINE(readability-non-const-parameter)
         m_allocPtr = [](char* s, void* o, const Operation operation)

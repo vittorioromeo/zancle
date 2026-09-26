@@ -82,7 +82,11 @@ public:
         m_thunk{[](void* o, Ts&&... args) -> TReturn
     {
         using UnrefType = ZA_REMOVE_REFERENCE(TFFwd);
-        return (*reinterpret_cast<UnrefType*>(o))(ZA_FORWARD(args)...);
+
+        if constexpr (ZA_IS_SAME(TReturn, void))
+            (*reinterpret_cast<UnrefType*>(o))(ZA_FORWARD(args)...); // Discard any result
+        else
+            return (*reinterpret_cast<UnrefType*>(o))(ZA_FORWARD(args)...);
     }}
     {
     }
