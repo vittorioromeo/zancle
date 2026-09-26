@@ -9,7 +9,7 @@ Diagnostics:
       - cppcoreguidelines-pro-bounds-avoid-unchecked-container-access
       - readability-inconsistent-ifelse-braces
 CompileFlags:
-  CompilationDatabase: build_vrdev_clang
+  CompilationDatabase: build_vrdev_clang_clangenv
   Add: [-D__CLANGD__]
 
 ---
