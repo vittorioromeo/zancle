@@ -18,22 +18,17 @@
         #include "Zancle/Base/ScopeGuard.hpp"
         #include "Zancle/Base/UIntPtrT.hpp"
 
+        #ifdef ZA_SYSTEM_WINDOWS
+            #include "Zancle/Base/WindowsHeader.hpp"
+        #endif
+
         #include <backtrace.h>
 
         #include <cstdlib>
         #include <cxxabi.h>
 
         #ifdef ZA_SYSTEM_WINDOWS
-            #ifndef NOMINMAX
-                #define NOMINMAX
-            #endif
-
-            #ifndef WIN32_LEAN_AND_MEAN
-                #define WIN32_LEAN_AND_MEAN
-            #endif
-
             #include <io.h>
-            #include <windows.h>
 
             #ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
                 #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x00'04
