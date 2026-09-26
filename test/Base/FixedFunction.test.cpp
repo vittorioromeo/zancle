@@ -660,6 +660,40 @@ TEST_CASE("[Base] Base/FixedFunction.hpp")
 
 
 ////////////////////////////////////////////////////////////
+struct Pair
+{
+    int a;
+    int b;
+};
+
+
+////////////////////////////////////////////////////////////
+TEST_CASE("[Base] za::FixedFunction - argument passing")
+{
+    SECTION("By-value argument is constructed once, then moved into the callable")
+    {
+        Counters c;
+
+        {
+            za::FixedFunction<int(LifecycleTracker), 64> ff([](LifecycleTracker t) { return t.value; });
+            CHECK(ff(LifecycleTracker(c, 3)) == 3);
+        }
+
+        CHECK(c.constructions == 1);
+        CHECK(c.copies == 0);
+        CHECK(c.moves == 1);
+        CHECK(c.alive() == 0);
+    }
+
+    SECTION("Braced-init arguments")
+    {
+        za::FixedFunction<int(Pair), 64> ff([](Pair p) { return p.a + p.b; });
+        CHECK(ff({1, 2}) == 3);
+    }
+}
+
+
+////////////////////////////////////////////////////////////
 TEST_CASE("[Base] za::FixedFunction - const call operator")
 {
     using FFi = za::FixedFunction<int(int), 64>;
@@ -669,7 +703,7 @@ TEST_CASE("[Base] za::FixedFunction - const call operator")
         const FFi f{&squareInt};
         CHECK(f(7) == 49);
 
-        // Non-const call should also work via the delegating overload.
+        // Non-const call works too (single `const` call operator).
         FFi g{&squareInt};
         CHECK(g(8) == 64);
     }
@@ -688,7 +722,7 @@ TEST_CASE("[Base] za::FixedFunction - const call operator")
         CHECK(f(0) == 10);
     }
 
-    SECTION("Both overloads forward arguments and return value identically")
+    SECTION("Const and non-const objects forward arguments and return value identically")
     {
         FFi       g{[](const int x) { return x + 1; }};
         const FFi f{[](const int x) { return x + 1; }};

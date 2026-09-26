@@ -56,7 +56,7 @@ private:
 
     ////////////////////////////////////////////////////////////
     using FnPtrType  = RetType (*)(Ts...);
-    using MethodType = RetType (*)(char*, FnPtrType, Ts...);
+    using MethodType = RetType (*)(char*, FnPtrType, Ts&&...);
     using AllocType  = void (*)(char*, void* objectPtr, const Operation operation);
 
 
@@ -105,7 +105,7 @@ public:
         ZA_PLACEMENT_NEW(objStorage) StoredType(ZA_FORWARD(f));
 
         // NOLINTNEXTLINE(readability-non-const-parameter)
-        m_methodPtr = [](char* s, FnPtrType, Ts... xs) -> RetType
+        m_methodPtr = [](char* s, FnPtrType, Ts&&... xs) -> RetType
         {
             if constexpr (ZA_IS_SAME(RetType, void))
                 ZA_LAUNDER_CAST(StoredType*, s)->operator()(ZA_FORWARD(xs)...); // Discard any result
@@ -152,7 +152,7 @@ public:
     [[nodiscard]] FixedFunction(FnPtrType f) noexcept : functionPtr{f}, m_methodPtr{nullptr}, m_allocPtr{nullptr}
     {
         if (f != nullptr)
-            m_methodPtr = [](char* /* unused */, FnPtrType xf, Ts... xs) -> RetType { return xf(ZA_FORWARD(xs)...); };
+            m_methodPtr = [](char* /* unused */, FnPtrType xf, Ts&&... xs) -> RetType { return xf(ZA_FORWARD(xs)...); };
     }
 
 
@@ -291,22 +291,6 @@ public:
     ////////////////////////////////////////////////////////////
     /// \brief Invoke the wrapped callable
     ///
-    /// Delegates to the `const`-qualified overload below; the
-    /// underlying trampoline always invokes the wrapped callable
-    /// through a non-`const` path regardless, so providing both
-    /// overloads is purely for API symmetry with `std::function`.
-    ///
-    ////////////////////////////////////////////////////////////
-    template <typename... TArgs>
-    [[gnu::always_inline, gnu::flatten]] RetType operator()(TArgs&&... args)
-    {
-        return const_cast<const FixedFunction&>(*this)(ZA_FORWARD(args)...);
-    }
-
-
-    ////////////////////////////////////////////////////////////
-    /// \brief Invoke the wrapped callable through a `const` reference
-    ///
     /// Mirrors `std::function::operator() const`. The wrapped callable
     /// is invoked through a non-`const` path regardless of `*this`'s
     /// const-ness, so a callable whose `operator()` is non-`const`
@@ -315,8 +299,7 @@ public:
     /// `FixedFunction` if you don't want this behavior.
     ///
     ////////////////////////////////////////////////////////////
-    template <typename... TArgs>
-    [[gnu::always_inline, gnu::flatten]] RetType operator()(TArgs&&... args) const
+    [[gnu::always_inline, gnu::flatten]] RetType operator()(Ts... args) const
     {
         ZA_ASSERT(m_methodPtr != nullptr);
         return m_methodPtr(const_cast<char*>(objStorage), functionPtr, ZA_FORWARD(args)...);
