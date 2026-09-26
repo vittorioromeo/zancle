@@ -18,8 +18,8 @@ namespace za::priv
 ////////////////////////////////////////////////////////////
 enum : U32
 {
-    sinTableBits    = 13u,
-    sinTableSize    = 1u << sinTableBits, // 8192 entries per turn
+    sinTableBits    = 12u,
+    sinTableSize    = 1u << sinTableBits, // 4096 entries per turn (16 KiB)
     sinTableMask    = sinTableSize - 1u,
     sinTableQuarter = sinTableSize / 4u
 };
@@ -112,13 +112,12 @@ inline constexpr float sinLookupMaxRadians = 1'000'000.f;
 
 
 ////////////////////////////////////////////////////////////
-/// One turn of sine values, followed by an extra quarter turn so that the
-/// cosine of entry `i` is simply entry `i + sinTableQuarter`, unwrapped.
+/// One turn of sine values; the cosine of entry `i` is entry `i + sinTableQuarter` (wrapped)
 ///
 ////////////////////////////////////////////////////////////
 struct alignas(64) SinTable
 {
-    float data[sinTableSize + sinTableQuarter];
+    float data[sinTableSize];
 };
 
 
@@ -131,15 +130,17 @@ extern const SinTable sinTable;
 ////////////////////////////////////////////////////////////
 // Macros rather than functions, to minimize stack traffic in unoptimized builds.
 //
-// `ZA_PRIV_SIN_TABLE_COORDS` declares `index`, the wrapped table index of `radians` truncated towards
-// zero, and `delta`, the remaining angle in `(-sinTableStep, sinTableStep)`. Truncation (rather than
+// `ZA_PRIV_SIN_TABLE_COORDS` declares `sinIndex`, the wrapped table index of `radians` truncated towards
+// zero, `cosIndex`, the wrapped index of the matching cosine entry (a quarter turn later), and `delta`,
+// the remaining angle in `(-sinTableStep, sinTableStep)`. Truncation (rather than
 // rounding to nearest) is cheaper and needs no special handling for negative angles: the first-order
 // correction is valid on either side of the entry.
-#define ZA_PRIV_SIN_TABLE_COORDS(radians, index, delta)                                                                \
+#define ZA_PRIV_SIN_TABLE_COORDS(radians, sinIndex, cosIndex, delta)                                                   \
     const float     zaPrivScaled    = (radians) * ::za::priv::radToSinTableIndex;                                      \
     const ::za::I32 zaPrivTruncated = static_cast<::za::I32>(zaPrivScaled);                                            \
     const float     delta           = (zaPrivScaled - static_cast<float>(zaPrivTruncated)) * ::za::priv::sinTableStep; \
-    const ::za::U32 index           = static_cast<::za::U32>(zaPrivTruncated) & ::za::priv::sinTableMask
+    const ::za::U32 sinIndex        = static_cast<::za::U32>(zaPrivTruncated) & ::za::priv::sinTableMask;              \
+    const ::za::U32 cosIndex        = (sinIndex + ::za::priv::sinTableQuarter) & ::za::priv::sinTableMask
 
 #define ZA_PRIV_SIN_TABLE_AT(i) \
     (__builtin_is_constant_evaluated() ? ::za::priv::sinTableEntry(i) : ::za::priv::sinTable.data[i])
@@ -150,9 +151,9 @@ namespace za
 ////////////////////////////////////////////////////////////
 /// \brief Lookup-table sine of `radians` (faster than `std::sin`, less precise)
 ///
-/// Reads an entry of an 8192-entry sine table and applies a first-order
+/// Reads an entry of a 4096-entry sine table and applies a first-order
 /// correction, using the same table for the derivative. The maximum
-/// absolute error is about `6e-7` in `[-2*Pi, 2*Pi]` and `1e-6` in
+/// absolute error is about `1.3e-6` in `[-2*Pi, 2*Pi]` and `1.5e-6` in
 /// `[-4*Pi, 4*Pi]`; like any `float` function, precision degrades as
 /// `|radians|` grows. Multiples of `Pi/2` (e.g. `za::halfPi * 3.f`) yield
 /// exact results. Constant-evaluated calls return the same values as
@@ -166,9 +167,9 @@ namespace za
 {
     ZA_ASSERT_AND_ASSUME(ZA_MATH_FABSF(radians) < priv::sinLookupMaxRadians); // Also rejects NaN
 
-    ZA_PRIV_SIN_TABLE_COORDS(radians, i, d);
+    ZA_PRIV_SIN_TABLE_COORDS(radians, is, ic, d);
 
-    return ZA_PRIV_SIN_TABLE_AT(i) + d * ZA_PRIV_SIN_TABLE_AT(i + priv::sinTableQuarter);
+    return ZA_PRIV_SIN_TABLE_AT(is) + d * ZA_PRIV_SIN_TABLE_AT(ic);
 }
 
 
@@ -184,9 +185,9 @@ namespace za
 {
     ZA_ASSERT_AND_ASSUME(ZA_MATH_FABSF(radians) < priv::sinLookupMaxRadians); // Also rejects NaN
 
-    ZA_PRIV_SIN_TABLE_COORDS(radians, i, d);
+    ZA_PRIV_SIN_TABLE_COORDS(radians, is, ic, d);
 
-    return ZA_PRIV_SIN_TABLE_AT(i + priv::sinTableQuarter) - d * ZA_PRIV_SIN_TABLE_AT(i);
+    return ZA_PRIV_SIN_TABLE_AT(ic) - d * ZA_PRIV_SIN_TABLE_AT(is);
 }
 
 
@@ -207,10 +208,10 @@ namespace za
         float sin, cos;
     };
 
-    ZA_PRIV_SIN_TABLE_COORDS(radians, i, d);
+    ZA_PRIV_SIN_TABLE_COORDS(radians, is, ic, d);
 
-    const float s = ZA_PRIV_SIN_TABLE_AT(i);
-    const float c = ZA_PRIV_SIN_TABLE_AT(i + priv::sinTableQuarter);
+    const float s = ZA_PRIV_SIN_TABLE_AT(is);
+    const float c = ZA_PRIV_SIN_TABLE_AT(ic);
 
     return Result{s + d * c, c - d * s};
 }
