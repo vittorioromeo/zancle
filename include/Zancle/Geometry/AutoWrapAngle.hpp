@@ -8,6 +8,8 @@
 ////////////////////////////////////////////////////////////
 #include "Zancle/Geometry/Angle.hpp"
 
+#include "Zancle/Math/Constants.hpp"
+
 #include "Zancle/Base/Assert.hpp"
 
 
@@ -18,7 +20,7 @@ namespace za
 ///
 /// This class behaves similarly to `za::Angle` but automatically wraps
 /// the angle to the range `[0, 360)` degrees (or `[0, 2*Pi)` radians)
-/// whenever its value is accessed or used in comparisons/operations.
+/// whenever its value is modified, so reading it is free.
 ///
 /// This is useful for representing properties like rotation where only
 /// the final orientation matters, regardless of the number of full turns.
@@ -34,31 +36,31 @@ public:
     [[nodiscard]] constexpr AutoWrapAngle() = default;
 
     ////////////////////////////////////////////////////////////
-    /// \brief Construct from an `za::Angle`
+    /// \brief Construct from an `za::Angle`, wrapping it into `[0, 360)`
     ///
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::flatten]] inline constexpr /* implicit */ AutoWrapAngle(const Angle angle) :
-        m_radians(angle.radians)
+        m_radians(angle.wrapUnsigned().radians)
     {
     }
 
     ////////////////////////////////////////////////////////////
-    /// \brief Assign an `za::Angle`
+    /// \brief Assign an `za::Angle`, wrapping it into `[0, 360)`
     ///
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline, gnu::flatten]] inline constexpr AutoWrapAngle& operator=(const Angle angle) noexcept
     {
-        m_radians = angle.radians;
+        m_radians = angle.wrapUnsigned().radians;
         return *this;
     }
 
     ////////////////////////////////////////////////////////////
-    /// \brief Implicitly convert to `za::Angle` wrapped into `[0, 360)`
+    /// \brief Implicitly convert to `za::Angle` (always in `[0, 360)`)
     ///
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr operator Angle() const noexcept
     {
-        return radians(m_radians).wrapUnsigned();
+        return radians(m_radians);
     }
 
     ////////////////////////////////////////////////////////////
@@ -69,7 +71,7 @@ public:
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr float asDegrees() const
     {
-        return operator Angle().asDegrees();
+        return m_radians * (180.f / za::pi);
     }
 
     ////////////////////////////////////////////////////////////
@@ -80,11 +82,11 @@ public:
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr float asRadians() const
     {
-        return operator Angle().asRadians();
+        return m_radians;
     }
 
     ////////////////////////////////////////////////////////////
-    /// \brief Rotate towards `other` by at most `speed`, wrapping first (see `za::Angle::rotatedTowards`)
+    /// \brief Rotate towards `other` by at most `speed` (see `za::Angle::rotatedTowards`)
     ///
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr Angle rotatedTowards(const Angle other,
@@ -99,53 +101,48 @@ public:
     ////////////////////////////////////////////////////////////
     friend constexpr bool operator==(AutoWrapAngle lhs, AutoWrapAngle rhs)
     {
-        return Angle(lhs) == Angle(rhs);
+        return lhs.m_radians == rhs.m_radians;
     }
 
     ////////////////////////////////////////////////////////////
-    /// \brief Add `rhs` to the (unwrapped) angle value
+    /// \brief Add `rhs` to the angle value, then wrap
     ///
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline, gnu::flatten]] inline constexpr AutoWrapAngle& operator+=(const Angle rhs)
     {
-        m_radians += rhs.radians;
-        return *this;
+        return *this = radians(m_radians + rhs.radians);
     }
 
     ////////////////////////////////////////////////////////////
-    /// \brief Subtract `rhs` from the (unwrapped) angle value
+    /// \brief Subtract `rhs` from the angle value, then wrap
     ///
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline, gnu::flatten]] inline constexpr AutoWrapAngle& operator-=(const Angle rhs)
     {
-        m_radians -= rhs.radians;
-        return *this;
+        return *this = radians(m_radians - rhs.radians);
     }
 
     ////////////////////////////////////////////////////////////
-    /// \brief Multiply the (unwrapped) angle value by `rhs`
+    /// \brief Multiply the angle value by `rhs`, then wrap
     ///
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline, gnu::flatten]] inline constexpr AutoWrapAngle& operator*=(const float rhs)
     {
-        m_radians *= rhs;
-        return *this;
+        return *this = radians(m_radians * rhs);
     }
 
     ////////////////////////////////////////////////////////////
-    /// \brief Divide the (unwrapped) angle value by `rhs` (asserts `rhs != 0`)
+    /// \brief Divide the angle value by `rhs` (asserts `rhs != 0`), then wrap
     ///
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline, gnu::flatten]] inline constexpr AutoWrapAngle& operator/=(const float rhs)
     {
         ZA_ASSERT(rhs != 0.f);
-
-        m_radians /= rhs;
-        return *this;
+        return *this = radians(m_radians / rhs);
     }
 
     ////////////////////////////////////////////////////////////
-    /// \brief Assign `*this % rhs`, wrapping the current angle first (see `za::Angle::operator%`)
+    /// \brief Assign `*this % rhs`, then wrap (see `za::Angle::operator%`)
     ///
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline, gnu::flatten]] inline constexpr AutoWrapAngle& operator%=(const Angle rhs)
@@ -154,7 +151,7 @@ public:
     }
 
 private:
-    float m_radians{0.f};
+    float m_radians{0.f}; //!< Always in `[0, 2*Pi)`
 };
 
 } // namespace za
@@ -166,7 +163,10 @@ private:
 ///
 /// `za::AutoWrapAngle` is a wrapper around `za::Angle` that automatically
 /// normalizes the angle to the range `[0, 360)` degrees (or `[0, 2*Pi)` radians)
-/// upon access or use in operations.
+/// whenever it is modified.
+///
+/// Wrapping on modification (rather than on access) keeps the stored value
+/// small, so repeated increments do not lose precision, and makes reads free.
 ///
 /// This is particularly useful for representing properties like rotation
 /// where angles outside the standard range are equivalent (e.g., 450 degrees
