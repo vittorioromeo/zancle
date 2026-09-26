@@ -1,10 +1,13 @@
+#include "Zancle/Trait/AddPointer.hpp"
 #include "Zancle/Trait/CommonType.hpp"
 #include "Zancle/Trait/Conditional.hpp"
+#include "Zancle/Trait/CopyCV.hpp"
 #include "Zancle/Trait/Decay.hpp"
 #include "Zancle/Trait/DeclVal.hpp"
 #include "Zancle/Trait/EnableTrivialRelocation.hpp"
 #include "Zancle/Trait/IsArray.hpp"
 #include "Zancle/Trait/IsBaseOf.hpp"
+#include "Zancle/Trait/IsConst.hpp"
 #include "Zancle/Trait/IsCopyAssignable.hpp"
 #include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsEnum.hpp"
@@ -19,6 +22,7 @@
 #include "Zancle/Trait/IsNothrowMoveConstructible.hpp"
 #include "Zancle/Trait/IsNothrowSwappable.hpp"
 #include "Zancle/Trait/IsPointer.hpp"
+#include "Zancle/Trait/IsReference.hpp"
 #include "Zancle/Trait/IsRvalueReference.hpp"
 #include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/IsTriviallyCopyAssignable.hpp"
@@ -29,11 +33,13 @@
 #include "Zancle/Trait/IsTriviallyMoveAssignable.hpp"
 #include "Zancle/Trait/IsTriviallyMoveConstructible.hpp"
 #include "Zancle/Trait/IsTriviallyRelocatable.hpp"
+#include "Zancle/Trait/IsUnion.hpp"
 #include "Zancle/Trait/IsUnsigned.hpp"
 #include "Zancle/Trait/IsVoid.hpp"
 #include "Zancle/Trait/MakeUnsigned.hpp"
 #include "Zancle/Trait/ReferenceConvertsFromTemporary.hpp"
 #include "Zancle/Trait/RegularizeVoid.hpp"
+#include "Zancle/Trait/RemoveCV.hpp"
 #include "Zancle/Trait/RemoveCVRef.hpp"
 #include "Zancle/Trait/RemoveReference.hpp"
 #include "Zancle/Trait/UnderlyingType.hpp"
@@ -225,6 +231,8 @@ namespace
 {
 
 static_assert(ZA_IS_TRIVIALLY_RELOCATABLE(TraitsTest::Custom2));
+static_assert(ZA_IS_TRIVIALLY_RELOCATABLE(const TraitsTest::Custom2)); // specialization applies to cv-qualified `T`
+static_assert(ZA_IS_TRIVIALLY_RELOCATABLE(const volatile TraitsTest::Custom2));
 
 
 struct Custom3
@@ -521,5 +529,131 @@ static_assert(ZA_IS_SAME(decltype(za::regularizeVoid([]() -> TraitsTest::NonCopy
 static_assert(ZA_IS_SAME(decltype(za::regularizeVoid(TraitsTest::RefQualifiedCall{})), int));
 static_assert(ZA_IS_SAME(decltype(za::regularizeVoid(za::declVal<TraitsTest::RefQualifiedCall&>())),
                          za::RegularizeVoidDummy));
+
+
+////////////////////////////////////////////////////////////
+namespace TraitsTest
+{
+union U
+{
+    int   i;
+    float f;
+};
+
+struct DeletedDtor
+{
+    ~DeletedDtor() = delete;
+};
+
+class PrivateDtor
+{
+    ~PrivateDtor() = default;
+};
+
+struct TrivialDtor
+{
+    int i;
+};
+
+using Abominable = void() const;
+
+#ifdef __SIZEOF_INT128__
+enum class E128 : __int128
+{
+};
+#endif
+
+} // namespace TraitsTest
+
+
+////////////////////////////////////////////////////////////
+static_assert(ZA_IS_SAME(za::RemoveCVRefIndirect<const volatile int&>, int));
+static_assert(ZA_IS_SAME(za::RemoveCVRefIndirect<const int&&>, int));
+static_assert(ZA_IS_SAME(za::RemoveCVRefIndirect<const int*>, const int*));
+static_assert(ZA_IS_SAME(za::RemoveCVRefIndirect<const int (&)[3]>, int[3]));
+static_assert(ZA_IS_SAME(za::RemoveCVRefIndirect<void (&)()>, void()));
+
+
+////////////////////////////////////////////////////////////
+static_assert(ZA_IS_SAME(za::RemoveCV<const volatile int>, int));
+static_assert(ZA_IS_SAME(za::RemoveCV<const int&>, const int&)); // not through references
+static_assert(ZA_IS_SAME(za::RemoveCV<const int*>, const int*)); // not through pointers
+static_assert(ZA_IS_SAME(za::RemoveCV<int* const>, int*));
+static_assert(ZA_IS_SAME(za::RemoveCV<const int[3]>, int[3]));
+
+
+////////////////////////////////////////////////////////////
+static_assert(za::isSame<za::CopyCV<int, float>, float>);
+static_assert(za::isSame<za::CopyCV<const int, float>, const float>);
+static_assert(za::isSame<za::CopyCV<volatile int, float>, volatile float>);
+static_assert(za::isSame<za::CopyCV<const volatile int, float>, const volatile float>);
+static_assert(za::isSame<za::CopyCV<int, const float>, const float>); // adds, never removes
+static_assert(za::isSame<za::CopyCV<const int&, float>, float>);      // `const int&` itself is not `const`
+
+
+////////////////////////////////////////////////////////////
+static_assert(za::isConst<const int>);
+static_assert(za::isConst<const volatile int>);
+static_assert(za::isConst<int* const>);
+static_assert(za::isConst<const int[3]>);
+static_assert(!za::isConst<int>);
+static_assert(!za::isConst<const int*>);
+static_assert(!za::isConst<const int&>);
+static_assert(!za::isConst<void()>);
+
+
+////////////////////////////////////////////////////////////
+static_assert(za::isReference<int&>);
+static_assert(za::isReference<const int&&>);
+static_assert(za::isReference<void (&)()>);
+static_assert(!za::isReference<int>);
+static_assert(!za::isReference<int*>);
+static_assert(!za::isReference<void>);
+
+
+////////////////////////////////////////////////////////////
+static_assert(za::isUnion<TraitsTest::U>);
+static_assert(za::isUnion<const TraitsTest::U>);
+static_assert(!za::isUnion<TraitsTest::B>);
+static_assert(!za::isUnion<TraitsTest::U&>);
+static_assert(!za::isUnion<int>);
+
+
+////////////////////////////////////////////////////////////
+static_assert(ZA_IS_SAME(za::AddPointer<int>, int*));
+static_assert(ZA_IS_SAME(za::AddPointer<const int>, const int*));
+static_assert(ZA_IS_SAME(za::AddPointer<int&>, int*));
+static_assert(ZA_IS_SAME(za::AddPointer<const int&&>, const int*));
+static_assert(ZA_IS_SAME(za::AddPointer<void>, void*));
+static_assert(ZA_IS_SAME(za::AddPointer<void()>, void (*)()));
+static_assert(ZA_IS_SAME(za::AddPointer<void (&)()>, void (*)()));
+static_assert(ZA_IS_SAME(za::AddPointer<TraitsTest::Abominable>, TraitsTest::Abominable)); // cannot form a pointer
+
+
+////////////////////////////////////////////////////////////
+static_assert(ZA_IS_TRIVIALLY_DESTRUCTIBLE(TraitsTest::TrivialDtor));
+static_assert(ZA_IS_TRIVIALLY_DESTRUCTIBLE(TraitsTest::TrivialDtor[4]));
+static_assert(ZA_IS_TRIVIALLY_DESTRUCTIBLE(int&));
+static_assert(ZA_IS_TRIVIALLY_DESTRUCTIBLE(TraitsTest::NonTrivial&&));
+static_assert(ZA_IS_TRIVIALLY_DESTRUCTIBLE(int*));
+static_assert(!ZA_IS_TRIVIALLY_DESTRUCTIBLE(TraitsTest::NonTrivial[4]));
+static_assert(!ZA_IS_TRIVIALLY_DESTRUCTIBLE(int[])); // unbounded arrays cannot be destroyed
+static_assert(!ZA_IS_TRIVIALLY_DESTRUCTIBLE(TraitsTest::DeletedDtor));
+static_assert(!ZA_IS_TRIVIALLY_DESTRUCTIBLE(TraitsTest::PrivateDtor));
+static_assert(!ZA_IS_TRIVIALLY_DESTRUCTIBLE(void));
+static_assert(!ZA_IS_TRIVIALLY_DESTRUCTIBLE(void()));
+
+
+////////////////////////////////////////////////////////////
+// Extended types follow Clang/libc++ (implementation-defined, see `IsFloatingPoint.hpp` and `MakeUnsigned.hpp`)
+#ifdef __SIZEOF_FLOAT128__
+static_assert(za::isFloatingPoint<__float128>);
+static_assert(za::isFloatingPoint<const __float128>);
+#endif
+
+#ifdef __SIZEOF_INT128__
+static_assert(za::isSame<za::MakeUnsigned<TraitsTest::E128>, __uint128_t>);
+static_assert(za::isSame<za::MakeUnsigned<const TraitsTest::E128>, const __uint128_t>);
+#endif
 
 } // namespace

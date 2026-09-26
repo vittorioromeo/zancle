@@ -10,7 +10,7 @@ template <typename From>
 struct CopyCVImpl
 {
     template <typename To>
-    using Type = To;
+    using type = To;
 };
 
 
@@ -19,7 +19,7 @@ template <typename From>
 struct CopyCVImpl<const From>
 {
     template <typename To>
-    using Type = const To;
+    using type = const To;
 };
 
 
@@ -28,7 +28,7 @@ template <typename From>
 struct CopyCVImpl<volatile From>
 {
     template <typename To>
-    using Type = volatile To;
+    using type = volatile To;
 };
 
 
@@ -37,7 +37,7 @@ template <typename From>
 struct CopyCVImpl<const volatile From>
 {
     template <typename To>
-    using Type = const volatile To;
+    using type = const volatile To;
 };
 
 } // namespace za::priv
@@ -47,6 +47,6 @@ namespace za
 {
 ////////////////////////////////////////////////////////////
 template <typename From, typename To>
-using CopyCV = typename priv::CopyCVImpl<From>::template Type<To>;
+using CopyCV = typename priv::CopyCVImpl<From>::template type<To>;
 
 } // namespace za

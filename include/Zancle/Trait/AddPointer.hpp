@@ -20,7 +20,7 @@ namespace za::priv
 {
 ////////////////////////////////////////////////////////////
 template <typename T, typename = void>
-struct AddPointerHelper
+struct AddPointerImpl // not pointable (e.g. `void() const`): unchanged
 {
     using type = T;
 };
@@ -28,7 +28,7 @@ struct AddPointerHelper
 
 ////////////////////////////////////////////////////////////
 template <typename T>
-struct AddPointerHelper<T, VoidT<T*>>
+struct AddPointerImpl<T, VoidT<T*>>
 {
     using type = T*;
 };
@@ -36,14 +36,7 @@ struct AddPointerHelper<T, VoidT<T*>>
 
 ////////////////////////////////////////////////////////////
 template <typename T>
-struct AddPointer : public AddPointerHelper<T>
-{
-};
-
-
-////////////////////////////////////////////////////////////
-template <typename T>
-struct AddPointer<T&>
+struct AddPointerImpl<T&>
 {
     using type = T*;
 };
@@ -51,7 +44,7 @@ struct AddPointer<T&>
 
 ////////////////////////////////////////////////////////////
 template <typename T>
-struct AddPointer<T&&>
+struct AddPointerImpl<T&&>
 {
     using type = T*;
 };
@@ -59,7 +52,7 @@ struct AddPointer<T&&>
 } // namespace za::priv
 
     ////////////////////////////////////////////////////////////
-    #define ZA_ADD_POINTER(...) typename ::za::priv::AddPointer<__VA_ARGS__>::type
+    #define ZA_ADD_POINTER(...) typename ::za::priv::AddPointerImpl<__VA_ARGS__>::type
 
 #endif
 

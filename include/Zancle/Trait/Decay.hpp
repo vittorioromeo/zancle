@@ -23,7 +23,7 @@ namespace za::priv
 {
 ////////////////////////////////////////////////////////////
 template <typename U>
-struct DecaySelector
+struct DecayNonRefImpl
 {
     using type = Conditional<ZA_IS_CONST(const U), ZA_REMOVE_CV(U), ZA_ADD_POINTER(U)>;
 };
@@ -31,7 +31,7 @@ struct DecaySelector
 
 ////////////////////////////////////////////////////////////
 template <typename U, auto N>
-struct DecaySelector<U[N]>
+struct DecayNonRefImpl<U[N]>
 {
     using type = U*;
 };
@@ -39,7 +39,7 @@ struct DecaySelector<U[N]>
 
 ////////////////////////////////////////////////////////////
 template <typename U>
-struct DecaySelector<U[]>
+struct DecayNonRefImpl<U[]>
 {
     using type = U*;
 };
@@ -47,31 +47,31 @@ struct DecaySelector<U[]>
 
 ////////////////////////////////////////////////////////////
 template <typename T>
-struct Decay
+struct DecayImpl
 {
-    using type = typename DecaySelector<T>::type;
+    using type = typename DecayNonRefImpl<T>::type;
 };
 
 
 ////////////////////////////////////////////////////////////
 template <typename T>
-struct Decay<T&>
+struct DecayImpl<T&>
 {
-    using type = typename DecaySelector<T>::type;
+    using type = typename DecayNonRefImpl<T>::type;
 };
 
 
 ////////////////////////////////////////////////////////////
 template <typename T>
-struct Decay<T&&>
+struct DecayImpl<T&&>
 {
-    using type = typename DecaySelector<T>::type;
+    using type = typename DecayNonRefImpl<T>::type;
 };
 
 } // namespace za::priv
 
     ////////////////////////////////////////////////////////////
-    #define ZA_DECAY(...) typename ::za::priv::Decay<__VA_ARGS__>::type
+    #define ZA_DECAY(...) typename ::za::priv::DecayImpl<__VA_ARGS__>::type
 
 #endif
 

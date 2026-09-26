@@ -28,19 +28,19 @@ struct CommonTypeImpl;
 
 ////////////////////////////////////////////////////////////
 template <typename... Ts>
-using CommonType = typename CommonTypeImpl<Ts...>::type;
+using CommonTypeT = typename CommonTypeImpl<Ts...>::type;
 
 
 ////////////////////////////////////////////////////////////
 template <typename... Ts>
-struct CommonTypeImpl : __builtin_common_type<CommonType, TypeIdentityImpl, EmptyImpl, Ts...>
+struct CommonTypeImpl : __builtin_common_type<CommonTypeT, TypeIdentityImpl, EmptyImpl, Ts...>
 {
 };
 
 } // namespace za::priv
 
     ////////////////////////////////////////////////////////////
-    #define ZA_COMMON_TYPE(...) ::za::priv::CommonType<__VA_ARGS__>
+    #define ZA_COMMON_TYPE(...) ::za::priv::CommonTypeT<__VA_ARGS__>
 
 #else
 
@@ -64,14 +64,14 @@ using CondType = decltype(false ? declVal<T>() : declVal<U>());
 
 ////////////////////////////////////////////////////////////
 template <typename T, typename U, typename = void>
-struct CommonType3
+struct CommonType3Impl
 {
 };
 
 
 ////////////////////////////////////////////////////////////
 template <typename T, typename U>
-struct CommonType3<T, U, VoidT<CondType<const T&, const U&>>>
+struct CommonType3Impl<T, U, VoidT<CondType<const T&, const U&>>>
 {
     using type = ZA_REMOVE_CVREF(CondType<const T&, const U&>);
 };
@@ -79,7 +79,7 @@ struct CommonType3<T, U, VoidT<CondType<const T&, const U&>>>
 
 ////////////////////////////////////////////////////////////
 template <typename T, typename U, typename = void>
-struct CommonType2Impl : CommonType3<T, U>
+struct CommonType2Impl : CommonType3Impl<T, U>
 {
 };
 
@@ -102,7 +102,7 @@ struct CommonType2Impl<void, void> // `declVal<void>()` is ill-formed
 
 ////////////////////////////////////////////////////////////
 template <typename, typename = void>
-struct CommonTypeImpl
+struct CommonTypeFoldImpl
 {
 };
 
@@ -114,57 +114,57 @@ struct CommonTypes;
 
 ////////////////////////////////////////////////////////////
 template <typename... T>
-struct CommonType;
+struct CommonTypeImpl;
 
 
 ////////////////////////////////////////////////////////////
 template <typename T, typename U>
-struct CommonTypeImpl<CommonTypes<T, U>, VoidT<typename CommonType<T, U>::type>>
+struct CommonTypeFoldImpl<CommonTypes<T, U>, VoidT<typename CommonTypeImpl<T, U>::type>>
 {
-    using type = typename CommonType<T, U>::type;
+    using type = typename CommonTypeImpl<T, U>::type;
 };
 
 
 ////////////////////////////////////////////////////////////
 template <typename T, typename U, typename V, typename... Rest>
-struct CommonTypeImpl<CommonTypes<T, U, V, Rest...>, VoidT<typename CommonType<T, U>::type>> :
-    CommonTypeImpl<CommonTypes<typename CommonType<T, U>::type, V, Rest...>>
+struct CommonTypeFoldImpl<CommonTypes<T, U, V, Rest...>, VoidT<typename CommonTypeImpl<T, U>::type>> :
+    CommonTypeFoldImpl<CommonTypes<typename CommonTypeImpl<T, U>::type, V, Rest...>>
 {
 };
 
 
 ////////////////////////////////////////////////////////////
 template <>
-struct CommonType<>
+struct CommonTypeImpl<>
 {
 };
 
 
 ////////////////////////////////////////////////////////////
 template <typename T>
-struct CommonType<T> : public CommonType<T, T>
+struct CommonTypeImpl<T> : public CommonTypeImpl<T, T>
 {
 };
 
 
 ////////////////////////////////////////////////////////////
 template <typename T, typename U>
-struct CommonType<T, U> :
-    Conditional<ZA_IS_SAME(T, ZA_DECAY(T)) && ZA_IS_SAME(U, ZA_DECAY(U)), CommonType2Impl<T, U>, CommonType<ZA_DECAY(T), ZA_DECAY(U)>>
+struct CommonTypeImpl<T, U> :
+    Conditional<ZA_IS_SAME(T, ZA_DECAY(T)) && ZA_IS_SAME(U, ZA_DECAY(U)), CommonType2Impl<T, U>, CommonTypeImpl<ZA_DECAY(T), ZA_DECAY(U)>>
 {
 };
 
 
 ////////////////////////////////////////////////////////////
 template <typename T, typename U, typename V, typename... Rest>
-struct CommonType<T, U, V, Rest...> : CommonTypeImpl<CommonTypes<T, U, V, Rest...>>
+struct CommonTypeImpl<T, U, V, Rest...> : CommonTypeFoldImpl<CommonTypes<T, U, V, Rest...>>
 {
 };
 
 } // namespace za::priv
 
     ////////////////////////////////////////////////////////////
-    #define ZA_COMMON_TYPE(...) typename ::za::priv::CommonType<__VA_ARGS__>::type
+    #define ZA_COMMON_TYPE(...) typename ::za::priv::CommonTypeImpl<__VA_ARGS__>::type
 
 #endif
 
