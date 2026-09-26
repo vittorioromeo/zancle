@@ -13,7 +13,6 @@
 ////////////////////////////////////////////////////////////
 template struct za::Vec2<float>;
 template struct za::Vec2<double>;
-template struct za::Vec2<long double>;
 
 #define ZA_INSTANTIATE_VECTOR2_INTEGRAL_MEMBER_FUNCTIONS(type)            \
     template type           za::Vec2<type>::lengthSquared() const;        \
@@ -23,7 +22,6 @@ template struct za::Vec2<long double>;
     template za::Vec2<type> za::Vec2<type>::componentWiseMul(Vec2) const; \
     template za::Vec2<type> za::Vec2<type>::componentWiseDiv(Vec2) const;
 
-ZA_INSTANTIATE_VECTOR2_INTEGRAL_MEMBER_FUNCTIONS(bool)
 ZA_INSTANTIATE_VECTOR2_INTEGRAL_MEMBER_FUNCTIONS(int)
 ZA_INSTANTIATE_VECTOR2_INTEGRAL_MEMBER_FUNCTIONS(unsigned int)
 ZA_INSTANTIATE_VECTOR2_INTEGRAL_MEMBER_FUNCTIONS(::za::SizeT)

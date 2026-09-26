@@ -15,7 +15,6 @@
 ////////////////////////////////////////////////////////////
 template class za::Rect2<float>;
 template class za::Rect2<double>;
-template class za::Rect2<long double>;
 template class za::Rect2<int>;
 template class za::Rect2<unsigned int>;
 template class za::Rect2<za::SizeT>;

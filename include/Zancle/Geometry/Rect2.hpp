@@ -444,7 +444,6 @@ using Rect2uz = Rect2<za::SizeT>;
 ////////////////////////////////////////////////////////////
 extern template class za::Rect2<float>;
 extern template class za::Rect2<double>;
-extern template class za::Rect2<long double>;
 extern template class za::Rect2<int>;
 extern template class za::Rect2<unsigned int>;
 extern template class za::Rect2<za::SizeT>;

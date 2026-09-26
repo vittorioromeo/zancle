@@ -273,8 +273,6 @@ using Vec3uz = Vec3<za::SizeT>;
 ////////////////////////////////////////////////////////////
 extern template struct za::Vec3<float>;
 extern template struct za::Vec3<double>;
-extern template struct za::Vec3<long double>;
-extern template struct za::Vec3<bool>;
 extern template struct za::Vec3<int>;
 extern template struct za::Vec3<unsigned int>;
 extern template struct za::Vec3<za::SizeT>;
