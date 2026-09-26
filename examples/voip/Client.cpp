@@ -13,6 +13,7 @@
 #include "Zancle/Network/TcpSocket.hpp"
 
 #include "Zancle/Scn/ScnStdin.hpp"
+#include "Zancle/Scn/ScnString.hpp" // IWYU pragma: keep (provides the `scnArg` overload for `za::String`)
 
 #include "Zancle/Fmt/Fmt.hpp"
 
