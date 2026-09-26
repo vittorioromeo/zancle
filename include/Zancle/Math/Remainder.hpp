@@ -12,12 +12,18 @@
 namespace za
 {
 ////////////////////////////////////////////////////////////
-/// \brief Truncated `a % b` for floats (sign follows `a`)
+/// \brief Truncated remainder `a - trunc(a / b) * b` for floats (sign follows `a`)
 ///
-/// Lighter and faster than `std::fmod`: uses `int` truncation rather
-/// than the IEEE-754 remainder operation, which is sufficient for the
-/// gameplay use cases that need it. `b` must be strictly positive, and
-/// `|a / b|` must be less than `2^31` (as the quotient is truncated via `int`).
+/// Same semantics as `std::fmod` (e.g. `remainder(-7.f, 3.f) == -1.f`),
+/// not `std::remainder` (which rounds the quotient to the nearest
+/// integer instead of truncating it). Lighter and faster than `std::fmod`,
+/// but not exact: the quotient is truncated via an `int` conversion and
+/// the result is computed in `float` arithmetic, so its absolute error
+/// grows with `|a|` (up to about `ulp(a)`), which is sufficient for the
+/// gameplay use cases that need it.
+///
+/// `b` must be strictly positive, and `|a / b|` must be less than `2^31`
+/// (as the quotient is truncated via `int`).
 ///
 ////////////////////////////////////////////////////////////
 [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] constexpr float remainder(const float a, const float b) noexcept
@@ -31,9 +37,11 @@ namespace za
 ////////////////////////////////////////////////////////////
 /// \brief Like `remainder` but always returns a value in `[0, b)`
 ///
-/// Equivalent to `((a % b) + b) % b` for floats. `b` must be strictly
-/// positive, and `|a / b|` must be less than `2^31` (as the quotient is
-/// truncated via `int`). Useful for wrapping angles or texture coordinates.
+/// Equivalent to `((a % b) + b) % b` for floats (e.g.
+/// `positiveRemainder(-7.f, 3.f) == 2.f`), with the same precision as
+/// `remainder`. `b` must be strictly positive, and `|a / b|` must be
+/// less than `2^31` (as the quotient is truncated via `int`). Useful for
+/// wrapping angles or texture coordinates.
 ///
 ////////////////////////////////////////////////////////////
 [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] constexpr float positiveRemainder(const float a, const float b) noexcept
