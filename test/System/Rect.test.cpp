@@ -199,17 +199,17 @@ TEMPLATE_TEST_CASE("[System] za::Rect2", "", int, float)
     {
         constexpr za::Vec2<TestType> target{100, 200};
 
-#define ZA_PRIV_CHECK_ANCHOR_ROUNDTRIP(setter, getter, factors)       \
-    do                                                                \
-    {                                                                 \
-        za::Rect2<TestType> r({1, 2}, {7, 9});                        \
-        r.setter(target);                                             \
-        CHECK(r.getter() == target);                                  \
-        CHECK(r.size == za::Vec2<TestType>{7, 9});                    \
-                                                                      \
-        za::Rect2<TestType> r2({1, 2}, {7, 9});                       \
-        r2.setAnchorPoint(factors, target);                           \
-        CHECK(r2.position == r.position);                             \
+#define ZA_PRIV_CHECK_ANCHOR_ROUNDTRIP(setter, getter, factors) \
+    do                                                          \
+    {                                                           \
+        za::Rect2<TestType> r({1, 2}, {7, 9});                  \
+        r.setter(target);                                       \
+        CHECK(r.getter() == target);                            \
+        CHECK(r.size == za::Vec2<TestType>{7, 9});              \
+                                                                \
+        za::Rect2<TestType> r2({1, 2}, {7, 9});                 \
+        r2.setAnchorPoint(factors, target);                     \
+        CHECK(r2.position == r.position);                       \
     } while (false)
 
         ZA_PRIV_CHECK_ANCHOR_ROUNDTRIP(setTopLeft, getTopLeft, za::Vec2f(0.f, 0.f));

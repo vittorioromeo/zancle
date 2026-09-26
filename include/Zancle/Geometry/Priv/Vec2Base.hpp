@@ -17,9 +17,9 @@
 
 ////////////////////////////////////////////////////////////
 // Assert that converting `x` and `y` (of type `T`) to `U` does not wrap a negative value
-#define ZA_PRIV_VEC2_ASSERT_CONVERTIBLE_TO(U)                                                          \
-    if constexpr (ZA_IS_UNSIGNED(U) && !ZA_IS_SAME(U, bool) && !ZA_IS_UNSIGNED(T))                      \
-    {                                                                                                  \
+#define ZA_PRIV_VEC2_ASSERT_CONVERTIBLE_TO(U)                                                              \
+    if constexpr (ZA_IS_UNSIGNED(U) && !ZA_IS_SAME(U, bool) && !ZA_IS_UNSIGNED(T))                         \
+    {                                                                                                      \
         ZA_ASSERT_AND_ASSUME(x >= T{0} && y >= T{0} && "cannot convert negative values to unsigned type"); \
     }
 
