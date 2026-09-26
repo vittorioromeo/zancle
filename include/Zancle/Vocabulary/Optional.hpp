@@ -668,7 +668,7 @@ private:
 ///
 ////////////////////////////////////////////////////////////
 template <typename Object>
-[[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr auto makeOptional(Object&& object)
+[[nodiscard, gnu::always_inline, gnu::pure]] inline constexpr auto makeOptional(Object&& object)
 {
     return Optional<ZA_REMOVE_CVREF(Object)>{ZA_FORWARD(object)};
 }
@@ -679,7 +679,7 @@ template <typename Object>
 ///
 ////////////////////////////////////////////////////////////
 template <typename T, typename... Args>
-[[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr Optional<T> makeOptional(Args&&... args)
+[[nodiscard, gnu::always_inline, gnu::pure]] inline constexpr Optional<T> makeOptional(Args&&... args)
 {
     return Optional<T>{inPlace, ZA_FORWARD(args)...};
 }
@@ -691,7 +691,7 @@ template <typename T, typename... Args>
 ///
 ////////////////////////////////////////////////////////////
 template <typename F>
-[[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr auto makeOptionalFromFunc(F&& f)
+[[nodiscard, gnu::always_inline, gnu::pure]] inline constexpr auto makeOptionalFromFunc(F&& f)
 {
     return Optional<decltype(ZA_FORWARD(f)())>{fromFunc, ZA_FORWARD(f)};
 }

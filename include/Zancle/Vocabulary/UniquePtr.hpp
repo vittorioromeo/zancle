@@ -109,7 +109,7 @@ public:
     /// \brief Destructor, invokes the deleter on the held pointer
     ///
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline, gnu::flatten]] constexpr ~UniquePtr() noexcept
+    [[gnu::always_inline]] constexpr ~UniquePtr() noexcept
     {
         static_cast<TDeleter*>(this)->operator()(m_ptr);
     }
@@ -143,7 +143,7 @@ public:
     ///
     ////////////////////////////////////////////////////////////
     template <typename U, typename UDeleter>
-    [[gnu::always_inline, gnu::flatten]] constexpr UniquePtr& operator=(UniquePtr<U, UDeleter>&& rhs) noexcept
+    [[gnu::always_inline]] constexpr UniquePtr& operator=(UniquePtr<U, UDeleter>&& rhs) noexcept
         requires(isSame<T, U> || isBaseOf<T, U>)
     {
         reset(rhs.release());
@@ -212,7 +212,7 @@ public:
     /// that the destructor never observes a dangling pointer.
     ///
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline, gnu::flatten]] constexpr void reset(T* const ptr = nullptr) noexcept
+    [[gnu::always_inline]] constexpr void reset(T* const ptr = nullptr) noexcept
     {
         T* const oldPtr = m_ptr;
         m_ptr           = ptr;
@@ -224,7 +224,7 @@ public:
     /// \brief Release ownership without destroying; caller owns the returned pointer
     ///
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline, gnu::flatten]] constexpr T* release() noexcept
+    [[gnu::always_inline]] constexpr T* release() noexcept
     {
         T* const ptr = m_ptr;
         m_ptr        = nullptr;
@@ -238,7 +238,7 @@ public:
 ///
 ////////////////////////////////////////////////////////////
 template <typename T, typename... Ts>
-[[nodiscard, gnu::always_inline, gnu::flatten]] inline constexpr UniquePtr<T> makeUnique(Ts&&... xs)
+[[nodiscard, gnu::always_inline]] inline constexpr UniquePtr<T> makeUnique(Ts&&... xs)
 {
     return UniquePtr<T>{new T{static_cast<Ts&&>(xs)...}};
 }
