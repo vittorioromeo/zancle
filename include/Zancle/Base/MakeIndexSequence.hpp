@@ -54,11 +54,20 @@ using MakeIndexSequence = __make_integer_seq<priv::MakeIndexSequenceHelper, Size
     #include <utility>
 
 
+namespace za::priv
+{
+////////////////////////////////////////////////////////////
+// Converts `std::index_sequence` to `za::IndexSequence` (declaration only)
+template <SizeT... Is>
+IndexSequence<Is...> toIndexSequence(std::index_sequence<Is...>);
+
+} // namespace za::priv
+
 namespace za
 {
 ////////////////////////////////////////////////////////////
 template <SizeT N>
-using MakeIndexSequence = std::make_index_sequence<N>;
+using MakeIndexSequence = decltype(priv::toIndexSequence(std::make_index_sequence<N>{}));
 
 } // namespace za
 
