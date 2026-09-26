@@ -18,6 +18,27 @@
 #include "Zancle/Trait/IsTriviallyRelocatable.hpp"
 
 
+namespace
+{
+namespace SpanTest // for unity builds
+{
+////////////////////////////////////////////////////////////
+struct Base
+{
+    int a;
+};
+
+
+////////////////////////////////////////////////////////////
+struct Derived : Base
+{
+    int b;
+};
+
+} // namespace SpanTest
+} // namespace
+
+
 TEST_CASE("[Base] Base/Span.hpp")
 {
     SECTION("Type traits")
@@ -90,5 +111,21 @@ TEST_CASE("[Base] Base/Span.hpp")
 
         // Types lacking .data()/.size() must not match the range constructor.
         STATIC_CHECK(!ZA_IS_CONSTRUCTIBLE(za::Span<int>, int));
+    }
+
+    SECTION("Element types must match exactly (up to added cv-qualifiers)")
+    {
+        using namespace SpanTest;
+
+        // A `Span<Base>` over `Derived` objects would index with the wrong stride.
+        STATIC_CHECK(!ZA_IS_CONSTRUCTIBLE(za::Span<Base>, za::Vector<Derived>&));
+        STATIC_CHECK(!ZA_IS_CONSTRUCTIBLE(za::Span<const Base>, const za::Vector<Derived>&));
+        STATIC_CHECK(!ZA_IS_CONSTRUCTIBLE(za::Span<Base>, Derived*, za::SizeT));
+
+        STATIC_CHECK(ZA_IS_CONSTRUCTIBLE(za::Span<Base>, Base*, za::SizeT));
+        STATIC_CHECK(ZA_IS_CONSTRUCTIBLE(za::Span<const Base>, Base*, za::SizeT));
+        STATIC_CHECK(ZA_IS_CONSTRUCTIBLE(za::Span<const Base>, za::Vector<Base>&));
+        STATIC_CHECK(ZA_IS_CONSTRUCTIBLE(za::Span<Base>, decltype(nullptr), za::SizeT));
+        STATIC_CHECK(!ZA_IS_CONSTRUCTIBLE(za::Span<Base>, const Base*, za::SizeT));
     }
 }

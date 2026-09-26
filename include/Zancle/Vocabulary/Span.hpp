@@ -14,6 +14,21 @@
 #include "Zancle/Base/SizeT.hpp"
 
 
+namespace za::priv
+{
+////////////////////////////////////////////////////////////
+// `std::span`-style element compatibility: `U*` may be viewed as a span of
+// `T` if `U(*)[]` converts to `T(*)[]`. This allows adding cv-qualifiers, but
+// rejects e.g. derived-to-base conversions, which would break indexing.
+template <typename UPtr, typename T>
+inline constexpr bool isSpanCompatiblePtr = false;
+
+template <typename U, typename T>
+inline constexpr bool isSpanCompatiblePtr<U*, T> = isConvertible<U (*)[], T (*)[]>;
+
+} // namespace za::priv
+
+
 namespace za
 {
 ////////////////////////////////////////////////////////////
@@ -49,6 +64,15 @@ struct Span
 
 
     ////////////////////////////////////////////////////////////
+    /// \brief Reject pointers to incompatible element types (e.g. derived-to-base)
+    ///
+    ////////////////////////////////////////////////////////////
+    template <typename U>
+        requires(!priv::isSpanCompatiblePtr<U*, T>)
+    constexpr Span(U* data, SizeT size) = delete;
+
+
+    ////////////////////////////////////////////////////////////
     /// \brief Construct a span from a C-style array (deduced size)
     ///
     ////////////////////////////////////////////////////////////
@@ -68,7 +92,7 @@ struct Span
     template <typename Range>
         requires(!isSame<RemoveCVRefIndirect<Range>, Span> &&
                  requires(Range&& r) {
-                     requires isConvertible<decltype(r.data()), T*>;
+                     requires priv::isSpanCompatiblePtr<decltype(r.data()), T>;
                      r.size();
                  })
     [[nodiscard, gnu::always_inline]] constexpr Span(Range&& range) : theData{range.data()}, theSize{range.size()}
