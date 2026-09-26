@@ -120,6 +120,38 @@ struct DtorCounter
 
 
 ////////////////////////////////////////////////////////////
+// Constructors that throw on demand, tracking the number of live objects
+struct MaybeThrows
+{
+    static inline int  liveCount{};
+    static inline bool throwOnCopy{};
+
+    explicit MaybeThrows(const bool doThrow)
+    {
+        if (doThrow)
+            throw 42;
+
+        ++liveCount;
+    }
+
+    MaybeThrows(const MaybeThrows&)
+    {
+        if (throwOnCopy)
+            throw 42;
+
+        ++liveCount;
+    }
+
+    MaybeThrows& operator=(const MaybeThrows&) = default;
+
+    ~MaybeThrows()
+    {
+        --liveCount;
+    }
+};
+
+
+////////////////////////////////////////////////////////////
 // Copy-assignable, but not copy-constructible
 struct AssignOnly
 {
@@ -235,6 +267,63 @@ TEST_CASE("[Base] Base/Optional.hpp")
         CHECK(!a.hasValue());
         CHECK(DtorCounter::dtorCount == 1);
     }
+
+#ifdef __cpp_exceptions
+    SECTION("Stays disengaged if construction throws")
+    {
+        const auto throws = [](auto&& f)
+        {
+            try
+            {
+                f();
+            } catch (const int)
+            {
+                return true;
+            }
+
+            return false;
+        };
+
+        const auto throwingFactory = []() -> MaybeThrows { throw 42; };
+
+        MaybeThrows::liveCount = 0;
+
+        {
+            za::Optional<MaybeThrows> o;
+
+            CHECK(throws([&] { o.emplace(true); }));
+            CHECK(!o.hasValue());
+
+            CHECK(throws([&] { o.emplaceIfNeeded(true); }));
+            CHECK(!o.hasValue());
+
+            CHECK(throws([&] { o.emplaceFromFuncIfNeeded(throwingFactory); }));
+            CHECK(!o.hasValue());
+
+            // Replacing an existing value destroys it first
+            o.emplace(false);
+            CHECK(throws([&] { o.emplace(true); }));
+            CHECK(!o.hasValue());
+            CHECK(MaybeThrows::liveCount == 0);
+
+            o.emplace(false);
+            CHECK(throws([&] { o.emplaceFromFunc(throwingFactory); }));
+            CHECK(!o.hasValue());
+            CHECK(MaybeThrows::liveCount == 0);
+
+            // Copy-assigning into an empty optional (move operations are `noexcept`)
+            za::Optional<MaybeThrows> src;
+            src.emplace(false);
+
+            MaybeThrows::throwOnCopy = true;
+            CHECK(throws([&] { o = src; }));
+            CHECK(!o.hasValue());
+            MaybeThrows::throwOnCopy = false;
+        }
+
+        CHECK(MaybeThrows::liveCount == 0); // no double destruction, no leak
+    }
+#endif
 }
 
 } // namespace OptionalTest

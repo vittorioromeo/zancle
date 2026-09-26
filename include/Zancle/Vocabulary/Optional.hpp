@@ -104,9 +104,10 @@ inline constexpr struct FromFunc { } fromFunc;
 /// `Optional<T>` propagates trivial relocatability from `T` so that it
 /// can be moved with `memcpy` inside Zancle containers when applicable.
 ///
-/// `Optional` is intentionally not exception-safe: `T`'s constructors
-/// and assignments must not throw (`value()` on an empty optional is
-/// the only operation that may throw).
+/// `T`'s move operations must not throw, as `Optional`'s move constructor
+/// and move assignment are unconditionally `noexcept`. If constructing
+/// the value throws elsewhere (e.g. in `emplace`, `emplaceFromFunc`, or
+/// copy assignment into an empty optional), the optional is left empty.
 ///
 ////////////////////////////////////////////////////////////
 template <typename T>
@@ -247,8 +248,8 @@ public:
         }
         else if (!m_engaged && rhs.m_engaged)
         {
-            m_engaged = true;
             ZA_PLACEMENT_NEW(&m_buffer.obj) T(rhs.m_buffer.obj);
+            m_engaged = true; // only after construction succeeded
         }
         else
         {
@@ -286,8 +287,8 @@ public:
         }
         else if (!m_engaged && rhs.m_engaged)
         {
-            m_engaged = true;
             ZA_PLACEMENT_NEW(&m_buffer.obj) T(ZA_MOVE(rhs.m_buffer.obj));
+            m_engaged = true; // only after construction succeeded
         }
         else
         {
@@ -354,9 +355,12 @@ public:
     [[gnu::always_inline]] constexpr T& emplace(Args&&... args)
     {
         ZA_PRIV_OPTIONAL_DESTROY_IF_ENGAGED(T, m_engaged, m_buffer);
+        m_engaged = false; // in case construction throws
+
+        T& result = *(ZA_PLACEMENT_NEW(&m_buffer.obj) T(ZA_FORWARD(args)...));
         m_engaged = true;
 
-        return *(ZA_PLACEMENT_NEW(&m_buffer.obj) T(ZA_FORWARD(args)...));
+        return result;
     }
 
 
@@ -370,9 +374,12 @@ public:
     [[gnu::always_inline]] constexpr T& emplaceFromFunc(F&& func)
     {
         ZA_PRIV_OPTIONAL_DESTROY_IF_ENGAGED(T, m_engaged, m_buffer);
+        m_engaged = false; // in case construction throws
+
+        T& result = *(ZA_PLACEMENT_NEW(&m_buffer.obj) T(ZA_FORWARD(func)()));
         m_engaged = true;
 
-        return *(ZA_PLACEMENT_NEW(&m_buffer.obj) T(ZA_FORWARD(func)()));
+        return result;
     }
 
 
@@ -388,8 +395,10 @@ public:
         if (m_engaged) [[likely]]
             return m_buffer.obj;
 
-        m_engaged = true;
-        return *(ZA_PLACEMENT_NEW(&m_buffer.obj) T(ZA_FORWARD(args)...));
+        T& result = *(ZA_PLACEMENT_NEW(&m_buffer.obj) T(ZA_FORWARD(args)...));
+        m_engaged = true; // only after construction succeeded
+
+        return result;
     }
 
 
@@ -405,8 +414,10 @@ public:
         if (m_engaged) [[likely]]
             return m_buffer.obj;
 
-        m_engaged = true;
-        return *(ZA_PLACEMENT_NEW(&m_buffer.obj) T(ZA_FORWARD(func)()));
+        T& result = *(ZA_PLACEMENT_NEW(&m_buffer.obj) T(ZA_FORWARD(func)()));
+        m_engaged = true; // only after construction succeeded
+
+        return result;
     }
 
 
