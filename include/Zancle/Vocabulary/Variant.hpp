@@ -162,6 +162,11 @@ public:
     static constexpr SizeT indexOf = getTypePackIndex<T, Alternatives...>();
 
 
+    ////////////////////////////////////////////////////////////
+    template <typename T>
+    static constexpr bool isAlternative = indexOf<T> != badTypePackIndex;
+
+
 private:
     ////////////////////////////////////////////////////////////
     static constexpr MakeIndexSequence<alternativeCount> alternativeIndexSequence{};
@@ -327,7 +332,7 @@ public:
     ////////////////////////////////////////////////////////////
     template <typename T>
     [[nodiscard, gnu::always_inline]] explicit Variant(T&& x) noexcept
-        requires(!isSame<RemoveCVRefIndirect<T>, Variant>)
+        requires(isAlternative<RemoveCVRefIndirect<T>>)
         : Variant{inPlaceType<ZA_REMOVE_CVREF(T)>, static_cast<T&&>(x)}
     {
     }
@@ -472,7 +477,7 @@ public:
     ////////////////////////////////////////////////////////////
     template <typename T>
     [[gnu::always_inline]] Variant& operator=(T&& x)
-        requires(!isSame<RemoveCVRefIndirect<T>, Variant>)
+        requires(isAlternative<RemoveCVRefIndirect<T>>)
     {
         using Type = ZA_REMOVE_CVREF(T);
 

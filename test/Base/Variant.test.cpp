@@ -3,6 +3,8 @@
 #include "Zancle/Vocabulary/Variant.hpp"
 
 #include "Zancle/Trait/IsAggregate.hpp"
+#include "Zancle/Trait/IsAssignable.hpp"
+#include "Zancle/Trait/IsConstructible.hpp"
 #include "Zancle/Trait/IsStandardLayout.hpp"
 #include "Zancle/Trait/IsTrivial.hpp"
 #include "Zancle/Trait/IsTriviallyAssignable.hpp"
@@ -339,6 +341,22 @@ TEST_CASE("[Base] Base/Variant.hpp")
 
         CHECK(a.is<int>());
         CHECK(DtorCounter::dtorCount == 1);
+    }
+
+    SECTION("Construction and assignment only accept exact alternatives")
+    {
+        using namespace VariantTest;
+        using V = za::Variant<int, float>;
+
+        STATIC_CHECK(ZA_IS_CONSTRUCTIBLE(V, int));
+        STATIC_CHECK(ZA_IS_CONSTRUCTIBLE(V, const float&));
+        STATIC_CHECK(!ZA_IS_CONSTRUCTIBLE(V, double));
+        STATIC_CHECK(!ZA_IS_CONSTRUCTIBLE(V, OtherAlt));
+
+        STATIC_CHECK(ZA_IS_ASSIGNABLE(V&, int));
+        STATIC_CHECK(ZA_IS_ASSIGNABLE(V&, const float&));
+        STATIC_CHECK(!ZA_IS_ASSIGNABLE(V&, double));
+        STATIC_CHECK(!ZA_IS_ASSIGNABLE(V&, OtherAlt));
     }
 
     SECTION("recursiveVisit dispatches correctly for any alternative count")
