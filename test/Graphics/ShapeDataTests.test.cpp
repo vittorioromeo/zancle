@@ -24,7 +24,6 @@
 
 #include "Zancle/Math/Constants.hpp"
 #include "Zancle/Math/Fabs.hpp"
-#include "Zancle/Math/Remainder.hpp"
 #include "Zancle/Math/SinCosLookup.hpp"
 
 #include "Zancle/Trait/IsCopyAssignable.hpp"
@@ -399,7 +398,7 @@ TEST_CASE("[Graphics] za::PieSliceShapeData")
 
             const float step  = sd.sweepAngle.asRadians() / static_cast<float>(sd.pointCount - 2u);
             const float angle = sd.startAngle.asRadians() + static_cast<float>(i - 1u) * step;
-            const auto  sc    = za::sinCosLookup(za::positiveRemainder(angle, za::tau));
+            const auto  sc    = za::sinCosLookup(angle);
             return za::Vec2f{sd.radius - sd.radius * sc.sin, sd.radius + sd.radius * sc.cos};
         });
 
@@ -492,7 +491,7 @@ TEST_CASE("[Graphics] za::RingPieSliceShapeData")
             const unsigned int local     = outerSide ? i : (sd.pointCount - 1u - (i - sd.pointCount));
             const float        radius    = outerSide ? sd.outerRadius : sd.innerRadius;
             const float        angle     = sd.startAngle.asRadians() + static_cast<float>(local) * step;
-            const auto         sc        = za::sinCosLookup(za::positiveRemainder(angle, za::tau));
+            const auto         sc        = za::sinCosLookup(angle);
             return za::Vec2f{sd.outerRadius + radius * sc.cos, sd.outerRadius + radius * sc.sin};
         });
 

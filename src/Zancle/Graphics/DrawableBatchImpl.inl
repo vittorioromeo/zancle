@@ -50,7 +50,6 @@
 #include "Zancle/Math/FloatEpsilon.hpp"
 #include "Zancle/Math/MinMax.hpp"
 #include "Zancle/Math/MinMaxMacros.hpp"
-#include "Zancle/Math/Remainder.hpp"
 #include "Zancle/Math/SinCosLookup.hpp"
 
 #include "Zancle/Base/Assert.hpp"
@@ -789,7 +788,7 @@ BatchedGeometry DrawableBatchImpl<TStorage>::add(const CurvedArrowShapeData& sd)
     const IndexType firstHeadFillVertexIndex = m_storage.getNumVertices();
     Vertex* const   headFillVertexPtr        = reservedVertexPtr + bodyFillVertexCount; // After body
 
-    const float endAngleRad = za::positiveRemainder(startRadians + static_cast<float>(numArcPoints - 1u) * angleStep, za::tau);
+    const float endAngleRad                     = startRadians + static_cast<float>(numArcPoints - 1u) * angleStep;
     const auto [endAngleRadSin, endAngleRadCos] = za::sinCosLookup(endAngleRad);
 
     // Centerline point at the end of the body's curve (local, untransformed)

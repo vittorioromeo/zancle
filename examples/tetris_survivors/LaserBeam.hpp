@@ -20,7 +20,6 @@
 
 #include "Zancle/Math/Ceil.hpp"
 #include "Zancle/Math/Constants.hpp"
-#include "Zancle/Math/Remainder.hpp"
 #include "Zancle/Math/SinCosLookup.hpp"
 
 #include "Zancle/Base/SizeT.hpp"
@@ -111,10 +110,10 @@ public:
             const float progress = static_cast<float>(i) / static_cast<float>(numSegments);
             const float distance = beamLength * progress;
 
-            const float sineInput1    = za::positiveRemainder(timeOffset1 + distance * spatialFrequency1, za::tau);
+            const float sineInput1    = timeOffset1 + distance * spatialFrequency1;
             const float displacement1 = za::sinLookup(sineInput1) * wobbleAmplitude1;
 
-            const float sineInput2    = za::positiveRemainder(timeOffset2 + distance * spatialFrequency2, za::tau);
+            const float sineInput2    = timeOffset2 + distance * spatialFrequency2;
             const float displacement2 = za::sinLookup(sineInput2) * wobbleAmplitude2;
 
             // The final displacement is the sum of both waves

@@ -1713,7 +1713,7 @@ public:
                                     .position    = drawPosition,
                                     .scale       = scaleMultiplier,
                                     .origin      = {64.f, 64.f},
-                                    .rotation    = za::radians(rotationRadians).wrapUnsigned(),
+                                    .rotation    = za::radians(rotationRadians),
                                     .textureRect = m_txrPinned,
                                     .color       = getHueColor(kindToColor(blockImpl.kind).toHSL().hue),
                                 });
@@ -1722,21 +1722,20 @@ public:
                                 m_dbObjectAttributes.add(za::Sprite{
                                     .position = drawPosition,
                                     .scale = scaleMultiplier.rotatedBy(block.gravityDir.toVec2f().abs().angle()) * 0.6f,
-                                    .origin      = {64.f, 64.f},
-                                    .rotation    = za::radians(
-                                                       block.gravityDir.toVec2f().componentWiseMul({-1.f, 1.f}).angle().asRadians() +
-                                                       rotationRadians + arrowRotationRadians)
-                                                       .wrapUnsigned(),
+                                    .origin   = {64.f, 64.f},
+                                    .rotation = za::radians(
+                                        block.gravityDir.toVec2f().componentWiseMul({-1.f, 1.f}).angle().asRadians() +
+                                        rotationRadians + arrowRotationRadians),
                                     .textureRect = m_txrGravArrow,
                                     .color       = getHueColor(kindToColor(blockImpl.kind).toHSL().hue),
                                 });
 
                             if (isLocked(block))
                                 m_dbObjectAttributes.add(za::Sprite{
-                                    .position = drawPosition + za::Vec2f{40.f, 30.f},
-                                    .scale    = scaleMultiplier * 0.5f,
-                                    .origin   = {64.f, 64.f},
-                                    .rotation = za::radians(rotationRadians + lockRotationRadians + 0.2f).wrapUnsigned(),
+                                    .position    = drawPosition + za::Vec2f{40.f, 30.f},
+                                    .scale       = scaleMultiplier * 0.5f,
+                                    .origin      = {64.f, 64.f},
+                                    .rotation    = za::radians(rotationRadians + lockRotationRadians + 0.2f),
                                     .textureRect = m_txrLock0,
                                     .color       = getHueColor(kindToColor(block.locked.value()).toHSL().hue),
                                 });
@@ -1771,7 +1770,7 @@ public:
                                 .position    = drawPosition,
                                 .scale       = scaleMultiplier,
                                 .origin      = {64.f, 64.f},
-                                .rotation    = za::radians(rotationRadians).wrapUnsigned(),
+                                .rotation    = za::radians(rotationRadians),
                                 .textureRect = txr,
                                 .color       = getHueColor(0.f),
                             });
@@ -1782,7 +1781,7 @@ public:
                                     .position = drawPosition,
                                     .scale    = scaleMultiplier,
                                     .origin   = {64.f, 64.f},
-                                    .rotation = za::radians(rotationRadians).wrapUnsigned(),
+                                    .rotation = za::radians(rotationRadians),
                                     .textureRect = {m_txrWallBits.position + za::Vec2f{128.f * index, 0.f}, {128.f, 128.f}},
                                     .color = getHueColor(0.f),
                                 });
@@ -1814,7 +1813,7 @@ public:
                                 .position    = drawPosition,
                                 .scale       = scaleMultiplier,
                                 .origin      = {64.f, 64.f},
-                                .rotation    = za::radians(rotationRadians).wrapUnsigned(),
+                                .rotation    = za::radians(rotationRadians),
                                 .textureRect = *txr,
                                 .color       = getHueColor(kindToColor(bColored.kind).toHSL().hue),
                             });
@@ -1831,7 +1830,7 @@ public:
                                 .position    = drawPosition,
                                 .scale       = scaleMultiplier,
                                 .origin      = {64.f, 64.f},
-                                .rotation    = za::radians(rotationRadians).wrapUnsigned(),
+                                .rotation    = za::radians(rotationRadians),
                                 .textureRect = *txr,
                                 .color       = getHueColor(kindToColor(bKey.kind).toHSL().hue),
                             });
@@ -1846,7 +1845,7 @@ public:
                                 .position    = drawPosition,
                                 .scale       = scaleMultiplier,
                                 .origin      = {64.f, 64.f},
-                                .rotation    = za::radians(rotationRadians).wrapUnsigned(),
+                                .rotation    = za::radians(rotationRadians),
                                 .textureRect = *txr,
                                 .color       = getHueColor(kindToColor(BlockKind::A).toHSL().hue),
                             });

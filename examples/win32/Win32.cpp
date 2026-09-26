@@ -155,7 +155,7 @@ int main()
                 zancleView1.draw(texture1,
                                  {.position = texture1.getSize().toVec2f() / 2.f,
                                   .origin   = texture1.getSize().toVec2f() / 2.f,
-                                  .rotation = za::degrees(time * 100)});
+                                  .rotation = za::degrees(time * 100).wrapUnsigned()});
 
                 // Draw sprite 2 on view 2
                 zancleView2.draw(texture2, {.position = {za::cos(time) * 100.f, 0.f}});

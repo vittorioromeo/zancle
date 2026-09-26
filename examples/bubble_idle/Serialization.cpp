@@ -520,7 +520,9 @@ DEFINE_TWO_WAY_SERIALIZER(Bubble)
 
     FIELD(radius);
     FIELD(rotation);
+    FIELD(torque);
     FIELD(hueMod);
+    FIELD(absorptionProgress);
 
     FIELD(repelledCountdown);
     FIELD(attractedCountdown);

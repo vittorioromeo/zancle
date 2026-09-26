@@ -14,7 +14,6 @@
 
 #include "Zancle/Math/Constants.hpp"
 #include "Zancle/Math/Fabs.hpp"
-#include "Zancle/Math/Remainder.hpp"
 #include "Zancle/Math/SinCosLookup.hpp"
 #include "Zancle/Math/Sqrt.hpp"
 
@@ -42,7 +41,7 @@ namespace za::priv
     const Vec2f origin,
     const Angle rotation) noexcept
 {
-    const auto [sine, cosine] = za::sinCosLookup(za::positiveRemainder(rotation.asRadians(), za::tau));
+    const auto [sine, cosine] = za::sinCosLookup(rotation.asRadians());
 
     const float a = localSemiAxes.x * ZA_MATH_FABSF(scale.x);
     const float b = localSemiAxes.y * ZA_MATH_FABSF(scale.y);

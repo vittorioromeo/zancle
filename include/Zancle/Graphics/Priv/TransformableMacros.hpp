@@ -15,13 +15,15 @@
 /// \brief Define the data members of a transformable object's settings
 ///
 ////////////////////////////////////////////////////////////
-#define ZA_PRIV_DEFINE_SETTINGS_DATA_MEMBERS_TRANSFORMABLE                                    \
-    ::za::Vec2f position{};      /*!< Position of the object in the 2D world */               \
-    ::za::Vec2f scale{1.f, 1.f}; /*!< Scale of the object */                                  \
-    ::za::Vec2f origin{};        /*!< Origin of translation/rotation/scaling of the object */ \
-    /* NOLINTNEXTLINE(readability-redundant-member-init) */                                   \
-    ::za::Angle rotation{}; /*!< Orientation of the object */                                 \
-                                                                                              \
+#define ZA_PRIV_DEFINE_SETTINGS_DATA_MEMBERS_TRANSFORMABLE                                     \
+    ::za::Vec2f position{};      /*!< Position of the object in the 2D world */                \
+    ::za::Vec2f scale{1.f, 1.f}; /*!< Scale of the object */                                   \
+    ::za::Vec2f origin{};        /*!< Origin of translation/rotation/scaling of the object */  \
+    /* Not wrapped: when derived from ever-growing values (e.g. elapsed time), keep it bounded \
+       (e.g. via `wrapUnsigned()`), as precision degrades with magnitude */                    \
+    /* NOLINTNEXTLINE(readability-redundant-member-init) */                                    \
+    ::za::Angle rotation{}; /*!< Orientation of the object */                                  \
+                                                                                               \
     static_assert(true)
 
 

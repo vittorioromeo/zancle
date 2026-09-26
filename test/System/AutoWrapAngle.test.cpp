@@ -6,6 +6,7 @@
 #include "Zancle/Geometry/Angle.hpp"
 
 #include "Zancle/Math/Constants.hpp"
+#include "Zancle/Math/Remainder.hpp"
 
 #include "Zancle/Trait/IsAggregate.hpp"
 #include "Zancle/Trait/IsCopyAssignable.hpp"
@@ -137,5 +138,44 @@ TEST_CASE("[System] za::AutoWrapAngle")
         const float before = angle.asRadians();
         angle += za::radians(0.01f);
         CHECK(angle.asRadians() != before);
+    }
+
+    SECTION("Wrapping matches `positiveRemainder` bit for bit")
+    {
+        // `wrapUnsigned` returns already-wrapped angles unchanged without dividing; that fast path
+        // must produce exactly what the general `positiveRemainder` path would
+        const auto bits = [](const float x) { return __builtin_bit_cast(unsigned int, x); };
+
+        const auto matches = [&](const float x)
+        { return bits(za::AutoWrapAngle{za::radians(x)}.asRadians()) == bits(za::positiveRemainder(x, za::tau)); };
+
+        STATIC_CHECK(za::radians(1.f).wrapUnsigned().asRadians() == 1.f);
+        STATIC_CHECK(za::radians(za::tau).wrapUnsigned().asRadians() == 0.f);
+        STATIC_CHECK(za::radians(-1e-8f).wrapUnsigned().asRadians() == 0.f);
+
+        const float edgeCases[] =
+            {0.f,
+             -0.f,
+             1e-30f,
+             -1e-30f,
+             -1e-8f,
+             __builtin_nextafterf(za::tau, 0.f),
+             za::tau,
+             __builtin_nextafterf(za::tau, 10.f),
+             -za::tau,
+             za::pi,
+             -za::pi,
+             1000.f,
+             -1000.f};
+
+        int mismatchCount = 0;
+
+        for (const float x : edgeCases)
+            mismatchCount += !matches(x);
+
+        for (int i = -300'000; i <= 300'000; ++i)
+            mismatchCount += !matches(static_cast<float>(i) * 0.0001f);
+
+        CHECK(mismatchCount == 0);
     }
 }

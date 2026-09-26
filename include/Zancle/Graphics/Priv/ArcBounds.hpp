@@ -31,7 +31,7 @@ namespace za::priv
     const float radius,
     const float radians) noexcept
 {
-    const auto [sine, cosine] = za::sinCosLookup(za::positiveRemainder(radians, za::tau));
+    const auto [sine, cosine] = za::sinCosLookup(radians);
     return {outerRadius + radius * cosine, outerRadius + radius * sine};
 }
 
