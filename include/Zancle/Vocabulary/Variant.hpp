@@ -22,6 +22,10 @@
 #include "Zancle/Trait/CopyCV.hpp"
 #include "Zancle/Trait/DeclVal.hpp"
 #include "Zancle/Trait/EnableTrivialRelocation.hpp"
+#include "Zancle/Trait/IsCopyAssignable.hpp"
+#include "Zancle/Trait/IsCopyConstructible.hpp"
+#include "Zancle/Trait/IsMoveAssignable.hpp"
+#include "Zancle/Trait/IsMoveConstructible.hpp"
 #include "Zancle/Trait/IsReference.hpp"
 #include "Zancle/Trait/IsRvalueReference.hpp"
 #include "Zancle/Trait/IsSame.hpp"
@@ -150,6 +154,13 @@ private:
     static inline constexpr bool triviallyMoveAssignable = (... && isTriviallyMoveAssignable<Alternatives>) &&
                                                            triviallyMoveConstructible && triviallyDestructible;
 
+    // The non-trivial special members additionally require every alternative to support
+    // the operation, so that e.g. `isCopyConstructible<Variant<int, UniquePtr<int>>>` is `false`
+    static inline constexpr bool copyConstructible = (... && isCopyConstructible<Alternatives>);
+    static inline constexpr bool moveConstructible = (... && isMoveConstructible<Alternatives>);
+    static inline constexpr bool copyAssignable    = copyConstructible && (... && isCopyAssignable<Alternatives>);
+    static inline constexpr bool moveAssignable    = moveConstructible && (... && isMoveAssignable<Alternatives>);
+
 
     ////////////////////////////////////////////////////////////
     using DiscriminatorType = unsigned char; // Supports up to 254 alternatives (see static assertion above)
@@ -252,9 +263,10 @@ private:
 
     ////////////////////////////////////////////////////////////
     // Each of the three recursive helpers below is a single static function
-    // template that perfect-forwards `self`. `getByIndex` is itself a
-    // deducing-this template, so `static_cast<Self&&>(self).getByIndex<I>()`
-    // propagates the cvref onto the returned reference automatically.
+    // template that perfect-forwards `self`. `bufferAs` is itself a
+    // deducing-this template, so `static_cast<Self&&>(self).bufferAs<T>()`
+    // propagates the cvref onto the returned reference automatically. The
+    // unchecked `bufferAs` is used as the index was just compared.
     ////////////////////////////////////////////////////////////
     template <SizeT I, typename R, typename Self, typename Visitor>
     [[nodiscard, gnu::always_inline]] static R recursiveVisitImpl(Self&& self, Visitor&& visitor)
@@ -262,12 +274,12 @@ private:
         if constexpr (I < sizeof...(Alternatives) - 1)
         {
             return (self.m_index == I)
-                       ? visitor(static_cast<Self&&>(self).template getByIndex<I>())
+                       ? visitor(static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I)>())
                        : recursiveVisitImpl<I + 1, R>(static_cast<Self&&>(self), static_cast<Visitor&&>(visitor));
         }
         else
         {
-            return visitor(static_cast<Self&&>(self).template getByIndex<I>());
+            return visitor(static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I)>());
         }
     }
 
@@ -284,11 +296,11 @@ private:
         if constexpr (I + 5 < sizeof...(Alternatives))
         {
             // clang-format off
-            return (self.m_index == I + 0) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 0>()) :
-                   (self.m_index == I + 1) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 1>()) :
-                   (self.m_index == I + 2) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 2>()) :
-                   (self.m_index == I + 3) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 3>()) :
-                   (self.m_index == I + 4) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 4>()) :
+            return (self.m_index == I + 0) ? visitor(static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I + 0)>()) :
+                   (self.m_index == I + 1) ? visitor(static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I + 1)>()) :
+                   (self.m_index == I + 2) ? visitor(static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I + 2)>()) :
+                   (self.m_index == I + 3) ? visitor(static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I + 3)>()) :
+                   (self.m_index == I + 4) ? visitor(static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I + 4)>()) :
                    recursiveVisitImplOpt5<I + 5, R>(static_cast<Self&&>(self), static_cast<Visitor&&>(visitor));
             // clang-format on
         }
@@ -306,16 +318,16 @@ private:
         if constexpr (I + 10 < sizeof...(Alternatives))
         {
             // clang-format off
-            return (self.m_index == I + 0) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 0>()) :
-                   (self.m_index == I + 1) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 1>()) :
-                   (self.m_index == I + 2) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 2>()) :
-                   (self.m_index == I + 3) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 3>()) :
-                   (self.m_index == I + 4) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 4>()) :
-                   (self.m_index == I + 5) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 5>()) :
-                   (self.m_index == I + 6) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 6>()) :
-                   (self.m_index == I + 7) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 7>()) :
-                   (self.m_index == I + 8) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 8>()) :
-                   (self.m_index == I + 9) ? visitor(static_cast<Self&&>(self).template getByIndex<I + 9>()) :
+            return (self.m_index == I + 0) ? visitor(static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I + 0)>()) :
+                   (self.m_index == I + 1) ? visitor(static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I + 1)>()) :
+                   (self.m_index == I + 2) ? visitor(static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I + 2)>()) :
+                   (self.m_index == I + 3) ? visitor(static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I + 3)>()) :
+                   (self.m_index == I + 4) ? visitor(static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I + 4)>()) :
+                   (self.m_index == I + 5) ? visitor(static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I + 5)>()) :
+                   (self.m_index == I + 6) ? visitor(static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I + 6)>()) :
+                   (self.m_index == I + 7) ? visitor(static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I + 7)>()) :
+                   (self.m_index == I + 8) ? visitor(static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I + 8)>()) :
+                   (self.m_index == I + 9) ? visitor(static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I + 9)>()) :
                    recursiveVisitImplOpt10<I + 10, R>(static_cast<Self&&>(self), static_cast<Visitor&&>(visitor));
             // clang-format on
         }
@@ -379,7 +391,7 @@ public:
     ////////////////////////////////////////////////////////////
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     [[gnu::always_inline]] Variant(const Variant& rhs)
-        requires(!triviallyCopyConstructible)
+        requires(!triviallyCopyConstructible && copyConstructible)
         : m_index{rhs.m_index}
     {
         ZA_VARIANT_DO_WITH_CURRENT_INDEX(I,
@@ -397,7 +409,7 @@ public:
     ////////////////////////////////////////////////////////////
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     [[gnu::always_inline]] Variant(Variant&& rhs) noexcept
-        requires(!triviallyMoveConstructible)
+        requires(!triviallyMoveConstructible && moveConstructible)
         : m_index{rhs.m_index}
     {
         ZA_VARIANT_DO_WITH_CURRENT_INDEX(I,
@@ -429,7 +441,7 @@ public:
 
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline]] Variant& operator=(const Variant& rhs)
-        requires(!triviallyCopyAssignable)
+        requires(!triviallyCopyAssignable && copyAssignable)
     {
         if (this == &rhs)
             return *this;
@@ -464,7 +476,7 @@ public:
 
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline]] Variant& operator=(Variant&& rhs) noexcept
-        requires(!triviallyMoveAssignable)
+        requires(!triviallyMoveAssignable && moveAssignable)
     {
         if (this == &rhs)
             return *this;
@@ -595,7 +607,8 @@ public:
     [[nodiscard, gnu::always_inline]] auto&& getByIndex(this Self&& self) noexcept
     {
         ZA_VARIANT_STATIC_ASSERT_INDEX_VALIDITY(I);
-        return static_cast<Self&&>(self).template as<ZA_VARIANT_NTH_TYPE(I)>();
+        ZA_ASSERT(self.m_index == I); // not via `as<T>()`, which would fail for duplicate alternatives
+        return static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I)>();
     }
 
 
@@ -648,13 +661,16 @@ public:
             ZA_REMOVE_REFERENCE(R) * ret; // NOLINT(cppcoreguidelines-init-variables)
             ZA_VARIANT_DO_WITH_CURRENT_INDEX_OBJ(self,
                                                  I,
-                                                 ret = addressOf(
-                                                     visitor(static_cast<Self&&>(self).template getByIndex<I>())));
+                                                 ret = addressOf(visitor(
+                                                     static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I)>())));
             return static_cast<R>(*ret);
         }
         else if constexpr (ZA_IS_SAME(R, void))
         {
-            ZA_VARIANT_DO_WITH_CURRENT_INDEX_OBJ(self, I, (visitor(static_cast<Self&&>(self).template getByIndex<I>())));
+            ZA_VARIANT_DO_WITH_CURRENT_INDEX_OBJ(self,
+                                                 I,
+                                                 (visitor(
+                                                     static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I)>())));
         }
         else
         {
@@ -662,8 +678,8 @@ public:
 
             ZA_VARIANT_DO_WITH_CURRENT_INDEX_OBJ(self,
                                                  I,
-                                                 ZA_PLACEMENT_NEW(retBuffer)
-                                                     R(visitor(static_cast<Self&&>(self).template getByIndex<I>())));
+                                                 ZA_PLACEMENT_NEW(retBuffer) R(visitor(
+                                                     static_cast<Self&&>(self).template bufferAs<ZA_VARIANT_NTH_TYPE(I)>())));
 
             // Only guard after construction, as the visitor may throw before `R` exists
             ZA_SCOPE_GUARD({

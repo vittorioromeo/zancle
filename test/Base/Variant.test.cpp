@@ -10,6 +10,10 @@
 #include "Zancle/Trait/IsAggregate.hpp"
 #include "Zancle/Trait/IsAssignable.hpp"
 #include "Zancle/Trait/IsConstructible.hpp"
+#include "Zancle/Trait/IsCopyAssignable.hpp"
+#include "Zancle/Trait/IsCopyConstructible.hpp"
+#include "Zancle/Trait/IsMoveAssignable.hpp"
+#include "Zancle/Trait/IsMoveConstructible.hpp"
 #include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/IsStandardLayout.hpp"
 #include "Zancle/Trait/IsTrivial.hpp"
@@ -490,5 +494,78 @@ TEST_CASE("[Base] Base/Variant.hpp")
         CHECK(recursiveVisitHitsEveryAlternative<16>());
         CHECK(recursiveVisitHitsEveryAlternative<20>());
         CHECK(recursiveVisitHitsEveryAlternative<21>());
+    }
+
+    SECTION("Special members are only available if all alternatives support them")
+    {
+        struct MoveOnly // non-trivial, to exercise the user-provided special member path
+        {
+            MoveOnly() = default;
+
+            // NOLINTNEXTLINE(modernize-use-equals-default)
+            MoveOnly(MoveOnly&&) noexcept
+            {
+            }
+
+            // NOLINTNEXTLINE(modernize-use-equals-default)
+            MoveOnly& operator=(MoveOnly&&) noexcept
+            {
+                return *this;
+            }
+        };
+
+        struct ConstMember // copy/move constructible, but not assignable
+        {
+            const int i;
+
+            // NOLINTNEXTLINE(modernize-use-equals-default)
+            ~ConstMember()
+            {
+            }
+        };
+
+        struct TrivialConstMember // same, via the trivial special member path
+        {
+            const int i;
+        };
+
+        STATIC_CHECK(!ZA_IS_COPY_CONSTRUCTIBLE(za::Variant<MoveOnly, int>));
+        STATIC_CHECK(!ZA_IS_COPY_ASSIGNABLE(za::Variant<MoveOnly, int>));
+        STATIC_CHECK(ZA_IS_MOVE_CONSTRUCTIBLE(za::Variant<MoveOnly, int>));
+        STATIC_CHECK(ZA_IS_MOVE_ASSIGNABLE(za::Variant<MoveOnly, int>));
+
+        STATIC_CHECK(ZA_IS_COPY_CONSTRUCTIBLE(za::Variant<ConstMember, int>));
+        STATIC_CHECK(!ZA_IS_COPY_ASSIGNABLE(za::Variant<ConstMember, int>));
+        STATIC_CHECK(ZA_IS_MOVE_CONSTRUCTIBLE(za::Variant<ConstMember, int>));
+        STATIC_CHECK(!ZA_IS_MOVE_ASSIGNABLE(za::Variant<ConstMember, int>));
+
+        STATIC_CHECK(ZA_IS_COPY_CONSTRUCTIBLE(za::Variant<TrivialConstMember, int>));
+        STATIC_CHECK(!ZA_IS_COPY_ASSIGNABLE(za::Variant<TrivialConstMember, int>));
+        STATIC_CHECK(!ZA_IS_MOVE_ASSIGNABLE(za::Variant<TrivialConstMember, int>));
+
+        za::Variant<MoveOnly, int> v0{MoveOnly{}};
+        za::Variant<MoveOnly, int> v1{static_cast<za::Variant<MoveOnly, int>&&>(v0)};
+        v0 = static_cast<za::Variant<MoveOnly, int>&&>(v1);
+        CHECK(v0.is<MoveOnly>());
+    }
+
+    SECTION("Duplicate alternatives are accessed and visited by index")
+    {
+        using V = za::Variant<int, float, int>;
+
+        const V v{za::inPlaceIndex<2>, 42};
+        CHECK(v.hasIndex(2));
+        CHECK(v.getByIndex<2>() == 42);
+
+        CHECK(v.linearVisit([](const auto& x) { return static_cast<int>(x); }) == 42);
+        CHECK(v.recursiveVisit([](const auto& x) { return static_cast<int>(x); }) == 42);
+
+        V copy{v};
+        CHECK(copy.hasIndex(2));
+        CHECK(copy.getByIndex<2>() == 42);
+
+        copy = V{za::inPlaceIndex<0>, 7};
+        CHECK(copy.hasIndex(0));
+        CHECK(copy.getByIndex<0>() == 7);
     }
 }
