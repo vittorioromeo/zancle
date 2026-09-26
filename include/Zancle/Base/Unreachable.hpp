@@ -3,7 +3,20 @@
 // https://github.com/vittorioromeo/Zancle/blob/master/license.md
 
 
-#if __has_builtin(__builtin_unreachable)
+////////////////////////////////////////////////////////////
+// Headers
+////////////////////////////////////////////////////////////
+#include "Zancle/Config.hpp" // IWYU pragma: keep
+
+
+#ifdef ZA_DEBUG
+
+    #include "Zancle/Base/Assert.hpp" // IWYU pragma: keep
+
+    ////////////////////////////////////////////////////////////
+    #define ZA_UNREACHABLE() ::za::priv::assertFailure("false /* ZA_UNREACHABLE() */", __FILE__, __LINE__)
+
+#elif __has_builtin(__builtin_unreachable)
 
     ////////////////////////////////////////////////////////////
     #define ZA_UNREACHABLE() __builtin_unreachable()
@@ -16,15 +29,9 @@
 #else
 
     #include "Zancle/Base/Abort.hpp"
-    #include "Zancle/Base/Assert.hpp"
 
     ////////////////////////////////////////////////////////////
-    #define ZA_UNREACHABLE()  \
-        do                    \
-        {                     \
-            ZA_ASSERT(false); \
-            ::za::abort();    \
-        } while (false)
+    #define ZA_UNREACHABLE() ::za::abort()
 
 #endif
 
@@ -35,8 +42,14 @@
 /// \brief Portable "unreachable" hint
 ///
 /// Marks a code path as unreachable so that the optimizer can omit
-/// any safety checks leading to it. Reaching it at run time is
-/// undefined behavior in release mode; on compilers that lack a
-/// dedicated builtin it falls back to a debug-only assertion.
+/// any safety checks leading to it.
+///
+/// In debug mode (`ZA_DEBUG`), reaching it is reported as an assertion
+/// failure (with a stack trace, if enabled) and aborts the program, as
+/// `__builtin_unreachable()` would otherwise silently fall through into
+/// unrelated code in unoptimized builds.
+///
+/// In release mode, reaching it is undefined behavior. On compilers that
+/// lack a dedicated builtin, it falls back to `za::abort()`.
 ///
 ////////////////////////////////////////////////////////////
