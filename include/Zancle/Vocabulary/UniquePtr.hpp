@@ -127,6 +127,23 @@ public:
 
 
     ////////////////////////////////////////////////////////////
+    /// \brief Move constructor, leaves `rhs` null
+    ///
+    /// Must not be a template (a template constructor is never a move
+    /// constructor): `ZA_TRIVIAL_ABI` is silently ignored on a class
+    /// whose copy and move constructors are all deleted, which would
+    /// force `UniquePtr` to be passed in memory instead of in a register.
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline]] constexpr UniquePtr(UniquePtr&& rhs) noexcept :
+        TDeleter{static_cast<TDeleter&&>(rhs)},
+        m_ptr{rhs.m_ptr}
+    {
+        rhs.m_ptr = nullptr;
+    }
+
+
+    ////////////////////////////////////////////////////////////
     /// \brief Move-construct from a derived/related `UniquePtr`
     ///
     /// Allows storing `UniquePtr<Derived>` in a `UniquePtr<Base>`.

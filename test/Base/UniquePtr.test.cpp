@@ -3,6 +3,7 @@
 #include "Zancle/Vocabulary/UniquePtr.hpp"
 
 #include "Zancle/Trait/IsAggregate.hpp"
+#include "Zancle/Trait/IsNothrowMoveConstructible.hpp"
 #include "Zancle/Trait/IsStandardLayout.hpp"
 #include "Zancle/Trait/IsTrivial.hpp"
 #include "Zancle/Trait/IsTriviallyAssignable.hpp"
@@ -109,6 +110,8 @@ TEST_CASE("[Base] Base/UniquePtr.hpp")
         STATIC_CHECK(!ZA_IS_TRIVIALLY_ASSIGNABLE(za::UniquePtr<int>, za::UniquePtr<int>));
 
         STATIC_CHECK(ZA_IS_TRIVIALLY_RELOCATABLE(za::UniquePtr<int>));
+        STATIC_CHECK(ZA_IS_NOTHROW_MOVE_CONSTRUCTIBLE(za::UniquePtr<int>));
+        STATIC_CHECK(ZA_IS_NOTHROW_MOVE_CONSTRUCTIBLE(za::UniquePtr<int, TaggedDeleter>));
 
         using NonRelocatablePtr = za::UniquePtr<int, NonRelocatableDeleter>;
         STATIC_CHECK(!ZA_IS_TRIVIALLY_RELOCATABLE(NonRelocatablePtr));
@@ -171,5 +174,39 @@ TEST_CASE("[Base] Base/UniquePtr.hpp")
 
         CHECK(ObservingDeleter::ownerPtrDuringDeletion == newPtr);
         CHECK(*p == 2);
+    }
+
+    SECTION("Move construction transfers the pointer and the deleter")
+    {
+        int* const raw = new int{3};
+
+        za::UniquePtr<int, TaggedDeleter> a{raw, TaggedDeleter{.tag = 7}};
+        za::UniquePtr<int, TaggedDeleter> b{static_cast<za::UniquePtr<int, TaggedDeleter>&&>(a)};
+
+        CHECK(a.get() == nullptr);
+        CHECK(b.get() == raw);
+
+        TaggedDeleter::lastDeleterTag = 0;
+        b.reset();
+        CHECK(TaggedDeleter::lastDeleterTag == 7);
+    }
+
+    SECTION("Converting move construction")
+    {
+        struct Base
+        {
+            virtual ~Base() = default;
+        };
+
+        struct Derived : Base
+        {
+        };
+
+        auto                d   = za::makeUnique<Derived>();
+        Derived* const      raw = d.get();
+        za::UniquePtr<Base> b{static_cast<za::UniquePtr<Derived>&&>(d)};
+
+        CHECK(d.get() == nullptr);
+        CHECK(b.get() == raw);
     }
 }
