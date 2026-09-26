@@ -28,11 +28,10 @@ using MakeIndexSequence = ZA_MAKE_INDEX_SEQUENCE(N);
 namespace za::priv
 {
 ////////////////////////////////////////////////////////////
+// Alias (rather than a class with a nested `type`) avoids one class
+// template instantiation per distinct `N`
 template <typename T, T... Is>
-struct MakeIndexSequenceHelper
-{
-    using type = IndexSequence<Is...>;
-};
+using MakeIndexSequenceHelper = IndexSequence<Is...>;
 
 } // namespace za::priv
 
@@ -40,7 +39,7 @@ namespace za
 {
 ////////////////////////////////////////////////////////////
 template <SizeT N>
-using MakeIndexSequence = typename __make_integer_seq<priv::MakeIndexSequenceHelper, SizeT, N>::type;
+using MakeIndexSequence = __make_integer_seq<priv::MakeIndexSequenceHelper, SizeT, N>;
 
 } // namespace za
 
