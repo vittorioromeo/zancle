@@ -336,7 +336,7 @@ public:
     /// \brief Ratio of two angles
     ///
     ////////////////////////////////////////////////////////////
-    friend constexpr float operator/(const Angle lhs, const Angle rhs)
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] friend constexpr float operator/(const Angle lhs, const Angle rhs)
     {
         ZA_ASSERT(rhs.radians != 0.f && "Angle::operator/ cannot divide by 0");
         return lhs.radians / rhs.radians;
@@ -402,7 +402,7 @@ private:
 
 ////////////////////////////////////////////////////////////
 // NOLINTNEXTLINE(readability-identifier-naming)
-inline constexpr Angle Angle::Zero{}; //!< Predefined 0 degree angle valuep
+inline constexpr Angle Angle::Zero{}; //!< Predefined 0 degree angle value
 
 
 ////////////////////////////////////////////////////////////

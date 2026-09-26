@@ -8,8 +8,20 @@
 ////////////////////////////////////////////////////////////
 #include "Zancle/Math/ClampMacro.hpp"
 
+#include "Zancle/Trait/IsSame.hpp"
+#include "Zancle/Trait/IsUnsigned.hpp"
+
 #include "Zancle/Base/AssertAndAssume.hpp"
 #include "Zancle/Base/SizeT.hpp"
+
+
+////////////////////////////////////////////////////////////
+// Assert that converting `x` and `y` (of type `T`) to `U` does not wrap a negative value
+#define ZA_PRIV_VEC2_ASSERT_CONVERTIBLE_TO(U)                                                          \
+    if constexpr (ZA_IS_UNSIGNED(U) && !ZA_IS_SAME(U, bool) && !ZA_IS_UNSIGNED(T))                      \
+    {                                                                                                  \
+        ZA_ASSERT_AND_ASSUME(x >= T{0} && y >= T{0} && "cannot convert negative values to unsigned type"); \
+    }
 
 
 namespace za
@@ -75,7 +87,7 @@ struct [[nodiscard]] Vec2
     ///
     /// \return The smallest angle which rotates `*this` in positive
     /// or negative direction, until it has the same direction as `rhs`.
-    /// The result has a sign and lies in the range [-180, 180) degrees.
+    /// The result has a sign and lies in the range [-180, 180] degrees.
     /// \pre Neither `*this` nor `rhs` is a zero vec2.
     ///
     ////////////////////////////////////////////////////////////
@@ -86,7 +98,7 @@ struct [[nodiscard]] Vec2
     ///
     /// For example, the vec2 (1,0) corresponds to 0 degrees, (0,1) corresponds to 90 degrees.
     ///
-    /// \return Angle in the range [-180, 180) degrees.
+    /// \return Angle in the range [-180, 180] degrees.
     /// \pre This vec2 is no zero vec2.
     ///
     ////////////////////////////////////////////////////////////
@@ -110,8 +122,8 @@ struct [[nodiscard]] Vec2
     /// Returns a vec2 starting at the position of the original, but moved by \c r
     /// units in the direction of \c phi.
     ///
-    /// In Zancle's default coordinate system with +X rhs and +Y down,
-    /// this amounts to a clockwise rotation by \c phi.
+    /// In Zancle's default coordinate system with +X right and +Y down,
+    /// positive angles are measured clockwise from the +X axis.
     ///
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr Vec2 movedTowards(T r, Angle phi) const;
@@ -242,7 +254,7 @@ struct [[nodiscard]] Vec2
     /// Returns `*this` rotated by +90 degrees; (x,y) becomes (-y,x).
     /// For example, the vec2 (1,0) is transformed to (0,1).
     ///
-    /// In Zancle's default coordinate system with +X rhs and +Y down,
+    /// In Zancle's default coordinate system with +X right and +Y down,
     /// this amounts to a clockwise rotation.
     ///
     ////////////////////////////////////////////////////////////
@@ -310,7 +322,7 @@ struct [[nodiscard]] Vec2
 
 
     ////////////////////////////////////////////////////////////
-    /// \brief Floors the components of the vector
+    /// \brief Floors the components of the vector <i><b>(floating-point)</b></i>
     ///
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr Vec2 componentWiseFloor() const;
@@ -447,6 +459,8 @@ struct [[nodiscard]] Vec2
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr OtherVec2 to() const
     {
         using ValueType = decltype(OtherVec2{}.x);
+        ZA_PRIV_VEC2_ASSERT_CONVERTIBLE_TO(ValueType);
+
         return Vec2<ValueType>{static_cast<ValueType>(x), static_cast<ValueType>(y)};
     }
 
@@ -477,7 +491,7 @@ struct [[nodiscard]] Vec2
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr Vec2<unsigned int> toVec2u() const
     {
-        ZA_ASSERT_AND_ASSUME(x >= 0 && y >= 0 && "cannot convert negative values to unsigned type");
+        ZA_PRIV_VEC2_ASSERT_CONVERTIBLE_TO(unsigned int);
 
         return {static_cast<unsigned int>(x), static_cast<unsigned int>(y)};
     }
@@ -489,7 +503,7 @@ struct [[nodiscard]] Vec2
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr Vec2<za::SizeT> toVec2uz() const
     {
-        ZA_ASSERT_AND_ASSUME(x >= 0 && y >= 0 && "cannot convert negative values to unsigned type");
+        ZA_PRIV_VEC2_ASSERT_CONVERTIBLE_TO(za::SizeT);
 
         return {static_cast<za::SizeT>(x), static_cast<za::SizeT>(y)};
     }
@@ -638,11 +652,16 @@ struct [[nodiscard]] Vec2
     /// \param lhs  Left operand (a scalar value)
     /// \param rhs Right operand (a vec2)
     ///
-    /// \return Member-wise division by `lhs`
+    /// \return `(lhs / rhs.x, lhs / rhs.y)`
+    ///
+    /// \pre Neither component of `rhs` is zero.
     ///
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::const]] friend constexpr Vec2 operator/(const T lhs, const Vec2 rhs)
     {
+        ZA_ASSERT_AND_ASSUME(rhs.x != 0 && "Vec2::operator/ cannot divide by 0 (x coordinate)");
+        ZA_ASSERT_AND_ASSUME(rhs.y != 0 && "Vec2::operator/ cannot divide by 0 (y coordinate)");
+
         return Vec2(lhs / rhs.x, lhs / rhs.y);
     }
 
@@ -717,6 +736,8 @@ struct [[nodiscard]] Vec2
     T x{}; //!< X coordinate of the vec2
     T y{}; //!< Y coordinate of the vec2
 };
+
+#undef ZA_PRIV_VEC2_ASSERT_CONVERTIBLE_TO
 
 // Aliases for the most common types
 using Vec2i  = Vec2<int>;

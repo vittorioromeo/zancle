@@ -262,6 +262,8 @@ constexpr Vec2<T> Vec2<T>::clampLengthSquared(const T minLengthSquared, const T 
 template <typename T>
 constexpr Vec2<T> Vec2<T>::componentWiseFloor() const
 {
+    static_assert(ZA_IS_FLOATING_POINT(T));
+
     return {za::floor(x), za::floor(y)};
 }
 
