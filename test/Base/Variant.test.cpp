@@ -119,6 +119,27 @@ struct OtherAlt
 
 
 ////////////////////////////////////////////////////////////
+// Trivially copy/move assignable, but with a non-trivial destructor
+struct DtorCounter
+{
+    static inline int dtorCount{};
+
+    DtorCounter() = default;
+
+    DtorCounter(const DtorCounter&)            = default;
+    DtorCounter& operator=(const DtorCounter&) = default;
+
+    DtorCounter(DtorCounter&&) noexcept            = default;
+    DtorCounter& operator=(DtorCounter&&) noexcept = default;
+
+    ~DtorCounter()
+    {
+        ++dtorCount;
+    }
+};
+
+
+////////////////////////////////////////////////////////////
 template <za::SizeT I>
 struct IndexedAlt
 {
@@ -291,6 +312,33 @@ TEST_CASE("[Base] Base/Variant.hpp")
         CHECK(Tracker::dtor == 1);
         CHECK(v.is<OtherAlt>());
         CHECK(v.as<OtherAlt>().x == 7);
+    }
+
+    SECTION("Assignment across alternatives destroys the old value (trivial assignment, non-trivial destructor)")
+    {
+        using namespace VariantTest;
+        using V = za::Variant<int, DtorCounter>;
+
+        STATIC_CHECK(!ZA_IS_TRIVIALLY_COPY_ASSIGNABLE(V));
+        STATIC_CHECK(!ZA_IS_TRIVIALLY_MOVE_ASSIGNABLE(V));
+
+        V a{DtorCounter{}};
+        V b{5};
+
+        DtorCounter::dtorCount = 0;
+        a                      = b;
+
+        CHECK(a.is<int>());
+        CHECK(a.as<int>() == 5);
+        CHECK(DtorCounter::dtorCount == 1);
+
+        a = DtorCounter{};
+
+        DtorCounter::dtorCount = 0;
+        a                      = static_cast<V&&>(b);
+
+        CHECK(a.is<int>());
+        CHECK(DtorCounter::dtorCount == 1);
     }
 
     SECTION("recursiveVisit dispatches correctly for any alternative count")

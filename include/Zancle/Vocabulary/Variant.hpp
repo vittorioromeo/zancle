@@ -139,8 +139,13 @@ private:
     static inline constexpr bool triviallyDestructible      = (... && isTriviallyDestructible<Alternatives>);
     static inline constexpr bool triviallyCopyConstructible = (... && isTriviallyCopyConstructible<Alternatives>);
     static inline constexpr bool triviallyMoveConstructible = (... && isTriviallyMoveConstructible<Alternatives>);
-    static inline constexpr bool triviallyCopyAssignable    = (... && isTriviallyCopyAssignable<Alternatives>);
-    static inline constexpr bool triviallyMoveAssignable    = (... && isTriviallyMoveAssignable<Alternatives>);
+
+    // Assignment can switch the active alternative, so a byte-wise copy is
+    // only correct if construction and destruction are trivial too
+    static inline constexpr bool triviallyCopyAssignable = (... && isTriviallyCopyAssignable<Alternatives>) &&
+                                                           triviallyCopyConstructible && triviallyDestructible;
+    static inline constexpr bool triviallyMoveAssignable = (... && isTriviallyMoveAssignable<Alternatives>) &&
+                                                           triviallyMoveConstructible && triviallyDestructible;
 
 
     ////////////////////////////////////////////////////////////

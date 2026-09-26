@@ -109,6 +109,16 @@ inline constexpr struct FromFunc { } fromFunc;
 template <typename T>
 class [[nodiscard]] Optional
 {
+private:
+    ////////////////////////////////////////////////////////////
+    // Assignment can engage or disengage the optional, so a byte-wise
+    // copy is only correct if construction and destruction are trivial too
+    static inline constexpr bool triviallyCopyAssignable = isTriviallyCopyAssignable<T> &&
+                                                           isTriviallyCopyConstructible<T> && isTriviallyDestructible<T>;
+
+    static inline constexpr bool triviallyMoveAssignable = isTriviallyMoveAssignable<T> &&
+                                                           isTriviallyMoveConstructible<T> && isTriviallyDestructible<T>;
+
 public:
     ////////////////////////////////////////////////////////////
     using TriviallyRelocatableTag = Conditional<ZA_IS_TRIVIALLY_RELOCATABLE(T), Optional, void>;
@@ -222,7 +232,7 @@ public:
     ///
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline]] constexpr Optional& operator=(const Optional& rhs)
-        requires(!isTriviallyCopyAssignable<T> && isCopyAssignable<T>)
+        requires(!triviallyCopyAssignable && isCopyAssignable<T>)
     {
         if (&rhs == this || (!m_engaged && !rhs.m_engaged))
             return *this;
@@ -252,7 +262,7 @@ public:
     ///
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline]] constexpr Optional& operator=(const Optional& rhs)
-        requires(isTriviallyCopyAssignable<T>)
+        requires(triviallyCopyAssignable)
     = default;
 
 
@@ -261,7 +271,7 @@ public:
     ///
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline]] constexpr Optional& operator=(Optional&& rhs) noexcept
-        requires(!isTriviallyMoveAssignable<T> && isMoveAssignable<T>)
+        requires(!triviallyMoveAssignable && isMoveAssignable<T>)
     {
         if (&rhs == this || (!m_engaged && !rhs.m_engaged))
             return *this;
@@ -291,7 +301,7 @@ public:
     ///
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline]] constexpr Optional& operator=(Optional&& rhs)
-        requires(isTriviallyMoveAssignable<T>)
+        requires(triviallyMoveAssignable)
     = default;
 
 

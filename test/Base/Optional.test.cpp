@@ -7,8 +7,10 @@
 #include "Zancle/Trait/IsMoveAssignable.hpp"
 #include "Zancle/Trait/IsMoveConstructible.hpp"
 #include "Zancle/Trait/IsTrivial.hpp"
+#include "Zancle/Trait/IsTriviallyCopyAssignable.hpp"
 #include "Zancle/Trait/IsTriviallyCopyConstructible.hpp"
 #include "Zancle/Trait/IsTriviallyCopyable.hpp"
+#include "Zancle/Trait/IsTriviallyDestructible.hpp"
 #include "Zancle/Trait/IsTriviallyMoveAssignable.hpp"
 #include "Zancle/Trait/IsTriviallyMoveConstructible.hpp"
 #include "Zancle/Trait/IsTriviallyRelocatable.hpp"
@@ -95,6 +97,27 @@ struct MoveOnly
 };
 
 
+////////////////////////////////////////////////////////////
+// Trivially copy/move assignable, but with a non-trivial destructor
+struct DtorCounter
+{
+    static inline int dtorCount{};
+
+    DtorCounter() = default;
+
+    DtorCounter(const DtorCounter&)            = default;
+    DtorCounter& operator=(const DtorCounter&) = default;
+
+    DtorCounter(DtorCounter&&) noexcept            = default;
+    DtorCounter& operator=(DtorCounter&&) noexcept = default;
+
+    ~DtorCounter()
+    {
+        ++dtorCount;
+    }
+};
+
+
 TEST_CASE("[Base] Base/Optional.hpp")
 {
     SECTION("Type traits")
@@ -151,6 +174,32 @@ TEST_CASE("[Base] Base/Optional.hpp")
         STATIC_CHECK(ZA_IS_MOVE_ASSIGNABLE(za::Optional<MoveOnly>));
         STATIC_CHECK(!ZA_IS_COPY_CONSTRUCTIBLE(za::Optional<MoveOnly>));
         STATIC_CHECK(!ZA_IS_COPY_ASSIGNABLE(za::Optional<MoveOnly>));
+
+        STATIC_CHECK(ZA_IS_TRIVIALLY_COPY_ASSIGNABLE(DtorCounter));
+        STATIC_CHECK(ZA_IS_TRIVIALLY_MOVE_ASSIGNABLE(DtorCounter));
+        STATIC_CHECK(!ZA_IS_TRIVIALLY_DESTRUCTIBLE(DtorCounter));
+        STATIC_CHECK(!ZA_IS_TRIVIALLY_COPY_ASSIGNABLE(za::Optional<DtorCounter>));
+        STATIC_CHECK(!ZA_IS_TRIVIALLY_MOVE_ASSIGNABLE(za::Optional<DtorCounter>));
+    }
+
+    SECTION("Assigning an empty optional destroys the value (trivial assignment, non-trivial destructor)")
+    {
+        za::Optional<DtorCounter> a{DtorCounter{}};
+        za::Optional<DtorCounter> b;
+
+        DtorCounter::dtorCount = 0;
+        a                      = b;
+
+        CHECK(!a.hasValue());
+        CHECK(DtorCounter::dtorCount == 1);
+
+        a.emplace();
+
+        DtorCounter::dtorCount = 0;
+        a                      = static_cast<za::Optional<DtorCounter>&&>(b);
+
+        CHECK(!a.hasValue());
+        CHECK(DtorCounter::dtorCount == 1);
     }
 }
 
