@@ -9,6 +9,8 @@
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/LifetimeAttributes.hpp"
 
+#include "Zancle/Trait/IsClass.hpp"
+
 
 namespace za
 {
@@ -25,7 +27,7 @@ namespace za
 ///
 ////////////////////////////////////////////////////////////
 template <typename T>
-    requires(!__is_class(T))
+    requires(!za::isClass<T>)
 [[nodiscard, gnu::always_inline, gnu::const]] constexpr T clamp(const T value, const T minValue, const T maxValue) noexcept
 {
     ZA_ASSERT(!(maxValue < minValue));
@@ -36,7 +38,7 @@ template <typename T>
 
 ////////////////////////////////////////////////////////////
 template <typename T>
-    requires(__is_class(T))
+    requires(za::isClass<T>)
 [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& clamp(const T& value    ZA_LIFETIMEBOUND,
                                                                       const T& minValue ZA_LIFETIMEBOUND,
                                                                       const T& maxValue ZA_LIFETIMEBOUND) noexcept

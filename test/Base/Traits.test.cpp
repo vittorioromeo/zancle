@@ -7,6 +7,7 @@
 #include "Zancle/Trait/EnableTrivialRelocation.hpp"
 #include "Zancle/Trait/IsArray.hpp"
 #include "Zancle/Trait/IsBaseOf.hpp"
+#include "Zancle/Trait/IsClass.hpp"
 #include "Zancle/Trait/IsConst.hpp"
 #include "Zancle/Trait/IsCopyAssignable.hpp"
 #include "Zancle/Trait/IsCopyConstructible.hpp"
@@ -609,6 +610,15 @@ static_assert(za::isReference<void (&)()>);
 static_assert(!za::isReference<int>);
 static_assert(!za::isReference<int*>);
 static_assert(!za::isReference<void>);
+
+
+////////////////////////////////////////////////////////////
+static_assert(za::isClass<TraitsTest::B>);
+static_assert(za::isClass<const TraitsTest::B>);
+static_assert(!za::isClass<TraitsTest::U>); // unions are not classes
+static_assert(!za::isClass<TraitsTest::B&>);
+static_assert(!za::isClass<TraitsTest::E>);
+static_assert(!za::isClass<int>);
 
 
 ////////////////////////////////////////////////////////////

@@ -8,6 +8,8 @@
 ////////////////////////////////////////////////////////////
 #include "Zancle/Base/LifetimeAttributes.hpp"
 
+#include "Zancle/Trait/IsClass.hpp"
+
 
 namespace za
 {
@@ -23,7 +25,7 @@ namespace za
 ///
 ////////////////////////////////////////////////////////////
 template <typename T>
-    requires(!__is_class(T))
+    requires(!za::isClass<T>)
 [[nodiscard, gnu::always_inline, gnu::const]] constexpr T min(const T a, const T b) noexcept
 {
     return b < a ? b : a;
@@ -32,7 +34,7 @@ template <typename T>
 
 ////////////////////////////////////////////////////////////
 template <typename T>
-    requires(__is_class(T))
+    requires(za::isClass<T>)
 [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& min(const T& a ZA_LIFETIMEBOUND, const T& b ZA_LIFETIMEBOUND) noexcept
 {
     // NOLINTNEXTLINE(bugprone-return-const-ref-from-parameter)
@@ -52,7 +54,7 @@ template <typename T>
 ///
 ////////////////////////////////////////////////////////////
 template <typename T>
-    requires(!__is_class(T))
+    requires(!za::isClass<T>)
 [[nodiscard, gnu::always_inline, gnu::const]] constexpr T max(const T a, const T b) noexcept
 {
     return a < b ? b : a;
@@ -61,7 +63,7 @@ template <typename T>
 
 ////////////////////////////////////////////////////////////
 template <typename T>
-    requires(__is_class(T))
+    requires(za::isClass<T>)
 [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& max(const T& a ZA_LIFETIMEBOUND, const T& b ZA_LIFETIMEBOUND) noexcept
 {
     // NOLINTNEXTLINE(bugprone-return-const-ref-from-parameter)
