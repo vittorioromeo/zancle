@@ -8,13 +8,15 @@
 #include "Zancle/Math/Fmax.hpp"
 #include "Zancle/Math/Sin.hpp"
 
+#include "Zancle/Base/Signbit.hpp"
+
 
 namespace
 {
 ////////////////////////////////////////////////////////////
 [[nodiscard]] constexpr bool isPositiveZero(const float x)
 {
-    return x == 0.f && !__builtin_signbit(x);
+    return x == 0.f && !ZA_SIGNBIT(x);
 }
 
 
@@ -154,8 +156,8 @@ TEST_CASE("[Base] Base/SinCosLookup.hpp")
 
             CHECK(sine == c.sin);
             CHECK(cosine == c.cos);
-            CHECK(!__builtin_signbit(sine == 0.f ? sine : 1.f));
-            CHECK(!__builtin_signbit(cosine == 0.f ? cosine : 1.f));
+            CHECK(!ZA_SIGNBIT(sine == 0.f ? sine : 1.f));
+            CHECK(!ZA_SIGNBIT(cosine == 0.f ? cosine : 1.f));
         }
     }
 

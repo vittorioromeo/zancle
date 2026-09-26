@@ -10,6 +10,7 @@
 #include "Zancle/Math/Remainder.hpp"
 
 #include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/BitCast.hpp"
 
 
 namespace za
@@ -118,7 +119,7 @@ public:
         // assignment of a bounded value): skips the division, with bit-identical results. Non-negative
         // floats order like their bit patterns, while negative values and NaNs compare greater than `tau`,
         // so `0 <= radians < tau` is a single, predictable unsigned comparison (`-0.f` takes the slow path).
-        if (__builtin_bit_cast(unsigned int, radians) < __builtin_bit_cast(unsigned int, za::tau)) [[likely]]
+        if (ZA_BIT_CAST(unsigned int, radians) < ZA_BIT_CAST(unsigned int, za::tau)) [[likely]]
             return *this;
 
         return Angle(za::positiveRemainder(radians, za::tau));

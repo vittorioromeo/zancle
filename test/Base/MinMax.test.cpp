@@ -2,6 +2,8 @@
 
 #include "Zancle/Math/MinMax.hpp"
 
+#include "Zancle/Base/Signbit.hpp"
+
 
 namespace
 {
@@ -29,10 +31,10 @@ TEST_CASE("[Base] Base/MinMax.hpp")
         STATIC_CHECK(za::max(1.5f, 2.5f) == 2.5f);
 
         // Equivalent values: both return the first argument (like `std::min`/`std::max`)
-        STATIC_CHECK(__builtin_signbit(za::min(-0.f, 0.f)));
-        STATIC_CHECK(!__builtin_signbit(za::min(0.f, -0.f)));
-        STATIC_CHECK(__builtin_signbit(za::max(-0.f, 0.f)));
-        STATIC_CHECK(!__builtin_signbit(za::max(0.f, -0.f)));
+        STATIC_CHECK(ZA_SIGNBIT(za::min(-0.f, 0.f)));
+        STATIC_CHECK(!ZA_SIGNBIT(za::min(0.f, -0.f)));
+        STATIC_CHECK(ZA_SIGNBIT(za::max(-0.f, 0.f)));
+        STATIC_CHECK(!ZA_SIGNBIT(za::max(0.f, -0.f)));
 
         const int  arr[2]{};
         const int* p0 = arr;
