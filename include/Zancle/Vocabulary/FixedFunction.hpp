@@ -6,9 +6,11 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/RemoveCVRef.hpp"
 
+#include "Zancle/Base/Abort.hpp"
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/Launder.hpp"
 #include "Zancle/Base/Macros.hpp"
@@ -30,6 +32,9 @@ class FixedFunction;
 
 ////////////////////////////////////////////////////////////
 /// \brief Non-allocating `std::function` alternative with fixed storage size
+///
+/// Move-only callables are supported, but copying a `FixedFunction`
+/// that holds one aborts at run time (the callable type is erased).
 ///
 ////////////////////////////////////////////////////////////
 template <typename TReturn, typename... Ts, SizeT TStorageSize>
@@ -119,9 +124,17 @@ public:
             else
             {
                 ZA_ASSERT(operation == Operation::CopyConstruct);
-
                 ZA_ASSERT(o != nullptr);
-                ZA_PLACEMENT_NEW(s) StoredType(*static_cast<const StoredType*>(o));
+
+                if constexpr (isCopyConstructible<StoredType>)
+                {
+                    ZA_PLACEMENT_NEW(s) StoredType(*static_cast<const StoredType*>(o));
+                }
+                else
+                {
+                    ZA_ASSERT(false && "Cannot copy a `FixedFunction` holding a move-only callable");
+                    za::abort();
+                }
             }
         };
     }

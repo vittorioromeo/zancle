@@ -2,6 +2,8 @@
 
 #include "Zancle/Vocabulary/FixedFunction.hpp"
 
+#include "Zancle/Vocabulary/UniquePtr.hpp"
+
 #include "Zancle/Base/Macros.hpp"
 
 
@@ -159,6 +161,21 @@ TEST_CASE("[Base] Base/FixedFunction.hpp")
 
         CHECK(ff() == 1);
         CHECK(ff() == 2);
+    }
+
+    SECTION("Move-only callable")
+    {
+        FF ff([p = za::makeUnique<int>(21)] { return *p * 2; });
+        CHECK(ff() == 42);
+
+        FF moved(ZA_MOVE(ff));
+        CHECK(!ff);
+        CHECK(moved() == 42);
+
+        FF assigned;
+        assigned = ZA_MOVE(moved);
+        CHECK(!moved);
+        CHECK(assigned() == 42);
     }
 
     SECTION("Stateful callable - construction and destruction")
