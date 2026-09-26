@@ -34,7 +34,7 @@ enum : SizeT
 template <typename T, typename... Ts>
 [[nodiscard]] consteval SizeT getTypePackIndex() noexcept
 {
-    constexpr bool matches[]{ZA_IS_SAME(T, Ts)...};
+    constexpr bool matches[]{ZA_IS_SAME(T, Ts)..., false}; // trailing `false` avoids zero-sized array
 
     for (SizeT i = 0u; i < sizeof...(Ts); ++i)
         if (matches[i])
