@@ -559,7 +559,7 @@ struct TrivialDtor
 using Abominable = void() const;
 
 #ifdef __SIZEOF_INT128__
-enum class E128 : __int128
+enum class E128 : __int128_t
 {
 };
 #endif

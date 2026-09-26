@@ -595,10 +595,11 @@ TEST_CASE("[Base] Base/Variant.hpp")
         const za::Variant<ListOrPair, int> v0{za::inPlaceIndex<0>, 3, 4};
         CHECK(v0.as<ListOrPair>().kind == 1);
 
-        // No narrowing error
-        const double                  d = 1.5;
-        const za::Variant<float, int> v1{za::inPlaceIndex<0>, d};
-        CHECK(v1.as<float>() == 1.5f);
+        // No narrowing error (pointer-to-`bool` is a narrowing conversion, but not a lossy one)
+        const int                    x = 0;
+        const int* const             p = &x;
+        const za::Variant<bool, int> v1{za::inPlaceIndex<0>, p};
+        CHECK(v1.as<bool>());
 
         // Aggregates still work (parenthesized aggregate initialization)
         const za::Variant<Aggregate, int> v2{za::inPlaceIndex<0>, 1, 2.f};
