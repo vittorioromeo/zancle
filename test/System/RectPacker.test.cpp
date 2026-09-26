@@ -35,6 +35,20 @@ TEST_CASE("[System] za::RectPacker", "")
         CHECK(!rectPacker.pack({256u, 256u}));
     }
 
+    SECTION("Failure to pack -- size not representable as `int`")
+    {
+        // Regression: used to be cast to a negative `int`, crashing inside `stb_rect_pack`
+        za::RectPacker rectPacker({128u, 128u});
+        CHECK(!rectPacker.pack({0x80'00'00'00u, 1u}));
+        CHECK(!rectPacker.pack({1u, 0xFF'FF'FF'FFu}));
+
+        const za::Vec2u sizes[] = {{1u, 1u}, {0x80'00'00'00u, 1u}};
+        za::Vec2u       positions[2];
+        CHECK(!rectPacker.packMultiple(positions, sizes));
+
+        checkPack(rectPacker, {128u, 128u}, {0u, 0u}); // nothing consumed
+    }
+
     SECTION("Failure to pack -- zero-sized")
     {
         za::RectPacker rectPacker({128u, 128u});

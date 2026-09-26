@@ -27,6 +27,8 @@ public:
     ////////////////////////////////////////////////////////////
     /// \brief Construct a packer over a bin of the given `(width, height)`
     ///
+    /// Both dimensions must be non-zero and fit in an `int`.
+    ///
     ////////////////////////////////////////////////////////////
     [[nodiscard]] explicit RectPacker(Vec2u size);
 

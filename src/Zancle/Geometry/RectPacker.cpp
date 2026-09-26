@@ -50,6 +50,12 @@ struct RectPacker::Impl
 
     explicit Impl(const Vec2u size) : nodes(size.x)
     {
+        // `stbrp_init_target` requires at least one node and `int`-representable dimensions
+        ZA_ASSERT(size.x > 0u && size.y > 0u && "Bin size must be non-zero");
+        ZA_ASSERT(size.x <= unsigned{__INT_MAX__} && size.y <= unsigned{__INT_MAX__} && "Bin size must fit in an `int`");
+
+        // TODO P1: add limits header to Zancle/Base and fix all hardcoded values/macros
+
         stbrp_init_target(&context,
                           static_cast<int>(size.x),
                           static_cast<int>(size.y),
@@ -80,6 +86,10 @@ za::Optional<Vec2u> RectPacker::pack(const Vec2u rectSize)
 
     if (rectSize.x == 0u || rectSize.y == 0u)
         return fail("zero-sized coordinate");
+
+    // Also guarantees that the size fits in an `int` for `stb_rect_pack`
+    if (rectSize.x > getSize().x || rectSize.y > getSize().y)
+        return fail("no room to pack");
 
     stbrp_rect toPack{/* id */ 0,
                       /* input width */ static_cast<int>(rectSize.x),
@@ -124,12 +134,18 @@ bool RectPacker::packMultiple(const za::Span<Vec2u> outPositions, const za::Span
         toPack = heapBuffer.data();
     }
 
+    const Vec2u binSize = getSize();
+
     for (za::SizeT i = 0u; i < rectSizes.size(); ++i)
     {
         const auto& size = rectSizes[i];
 
         if (size.x == 0u || size.y == 0u)
             return fail("zero-sized input rect size");
+
+        // Also guarantees that the size fits in an `int` for `stb_rect_pack`
+        if (size.x > binSize.x || size.y > binSize.y)
+            return fail("no room to pack");
 
         toPack[i] = {/* id */ static_cast<int>(i),
                      /* input width */ static_cast<int>(size.x),
