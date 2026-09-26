@@ -17,6 +17,7 @@
 #include "Zancle/Vocabulary/Span.hpp"
 
 #include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/Memcpy.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
 #define STBRP_STATIC
@@ -30,6 +31,7 @@ namespace za
 struct RectPacker::Impl
 {
     za::Vector<stbrp_node> nodes;
+    za::Vector<stbrp_node> nodesBackup; //!< Lazily sized, used to roll back failed `packMultiple` calls
     stbrp_context          context{};
 
     explicit Impl(const Vec2u size) : nodes(size.x)
@@ -96,10 +98,17 @@ bool RectPacker::packMultiple(const za::Span<Vec2u> outPositions, const za::Span
     if (outPositions.size() != rectSizes.size())
         return fail("mismatched output and input sizes");
 
-    if (outPositions.size() > 512u)
-        return fail("too many rectangles to pack (max 512)");
+    // Avoid a heap allocation for the common case of a small batch
+    constexpr za::SizeT    stackCapacity = 512u;
+    stbrp_rect             stackBuffer[stackCapacity];
+    za::Vector<stbrp_rect> heapBuffer;
+    stbrp_rect*            toPack = stackBuffer;
 
-    stbrp_rect toPack[512];
+    if (rectSizes.size() > stackCapacity)
+    {
+        heapBuffer.resize(rectSizes.size());
+        toPack = heapBuffer.data();
+    }
 
     for (za::SizeT i = 0u; i < rectSizes.size(); ++i)
     {
@@ -116,17 +125,35 @@ bool RectPacker::packMultiple(const za::Span<Vec2u> outPositions, const za::Span
                      /* was_packed */ {}};
     }
 
-    const int rc = stbrp_pack_rects(&m_impl->context, toPack, /* num_rects */ static_cast<int>(rectSizes.size()));
+    // `stbrp_pack_rects` packs every rectangle that fits even if some don't, permanently
+    // consuming their space. Snapshot the packer state so that a failure can be rolled back.
+    // All node links point into `nodes` or into `context.extra`, whose addresses never change,
+    // so restoring their bytes in place restores a consistent state.
+    Impl& impl = *m_impl;
+
+    if (impl.nodesBackup.size() != impl.nodes.size())
+        impl.nodesBackup.resize(impl.nodes.size());
+
+    const za::SizeT nodesBytes = impl.nodes.size() * sizeof(stbrp_node);
+    ZA_MEMCPY(impl.nodesBackup.data(), impl.nodes.data(), nodesBytes);
+    const stbrp_context contextBackup = impl.context;
+
+    const int rc = stbrp_pack_rects(&impl.context, toPack, /* num_rects */ static_cast<int>(rectSizes.size()));
 
     if (rc == /* failure */ 0)
+    {
+        ZA_MEMCPY(impl.nodes.data(), impl.nodesBackup.data(), nodesBytes);
+        impl.context = contextBackup;
+
         return fail("no room to pack");
+    }
 
     ZA_ASSERT(rc == /* success */ 1);
 
     for (za::SizeT i = 0u; i < rectSizes.size(); ++i)
     {
         const auto& packed = toPack[i];
-        ZA_ASSERT(packed.was_packed);
+        ZA_ASSERT(packed.was_packed != 0);
 
         outPositions[i] = {static_cast<unsigned int>(packed.x), static_cast<unsigned int>(packed.y)};
     }

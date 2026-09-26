@@ -114,5 +114,48 @@ TEST_CASE("[System] za::RectPacker", "")
 
         za::RectPacker rectPacker({128u, 128u});
         CHECK(!rectPacker.packMultiple(positions, sizes));
+
+        // The three rectangles that did fit must not have consumed any space
+        checkPack(rectPacker, {128u, 128u}, {0u, 0u});
+    }
+
+    SECTION("Pack Multiple -- Failure is rolled back after previous packs")
+    {
+        za::RectPacker rectPacker({128u, 128u});
+        checkPack(rectPacker, {64u, 64u}, {0u, 0u});
+
+        const za::Vec2u sizes[] = {{64u, 64u}, {128u, 128u}};
+        za::Vec2u       positions[2];
+        CHECK(!rectPacker.packMultiple(positions, sizes));
+
+        // Only the first pack is still occupying space
+        checkPack(rectPacker, {64u, 64u}, {64u, 0u});
+        checkPack(rectPacker, {128u, 64u}, {0u, 64u});
+        CHECK(!rectPacker.pack({1u, 1u}));
+    }
+
+    SECTION("Pack Multiple -- More than 512 rectangles")
+    {
+        za::Vec2u sizes[1024];
+        za::Vec2u positions[1024];
+
+        for (auto& size : sizes)
+            size = {1u, 1u};
+
+        za::RectPacker rectPacker({32u, 32u});
+        REQUIRE(rectPacker.packMultiple(positions, sizes));
+
+        // Every 1x1 cell of the 32x32 bin is used exactly once
+        bool used[32][32]{};
+
+        for (const auto& position : positions)
+        {
+            REQUIRE(position.x < 32u);
+            REQUIRE(position.y < 32u);
+            CHECK(!used[position.y][position.x]);
+            used[position.y][position.x] = true;
+        }
+
+        CHECK(!rectPacker.pack({1u, 1u}));
     }
 }

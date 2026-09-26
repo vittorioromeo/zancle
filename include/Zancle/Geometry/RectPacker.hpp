@@ -74,6 +74,9 @@ public:
     /// On success, `outPositions` is filled with the top-left of each packed
     /// rectangle. Each entry in `rectSizes` must have both dimensions > 0.
     ///
+    /// All-or-nothing: on failure, no space is consumed (the packer is left
+    /// unchanged) and the contents of `outPositions` are unspecified.
+    ///
     /// \return `true` if all rectangles fit, `false` otherwise
     ///
     ////////////////////////////////////////////////////////////
