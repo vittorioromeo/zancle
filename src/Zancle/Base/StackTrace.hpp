@@ -5,7 +5,7 @@
 namespace za::priv
 {
 ////////////////////////////////////////////////////////////
-/// \brief Print a stack trace to stdout
+/// \brief Print a stack trace to stderr
 ///
 /// Only has effect if `ZA_ENABLE_STACK_TRACES` is defined
 ///

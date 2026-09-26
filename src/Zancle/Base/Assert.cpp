@@ -22,8 +22,11 @@ namespace za::priv
 ////////////////////////////////////////////////////////////
 void assertFailure(const char* code, const char* file, const int line)
 {
+    // Flush pending regular output first, as `abort()` does not flush stdio buffers
+    std::fflush(stdout);
+
     // NOLINTNEXTLINE(modernize-use-std-print)
-    std::printf("\n[[ZANCLE ASSERTION FAILURE]]\n- %s:%d\n- ZA_ASSERT(%s);\n", file, line, code);
+    std::fprintf(stderr, "\n[[ZANCLE ASSERTION FAILURE]]\n- %s:%d\n- ZA_ASSERT(%s);\n", file, line, code);
 
     printStackTrace();
     za::abort();

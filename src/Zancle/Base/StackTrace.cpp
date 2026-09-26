@@ -190,7 +190,7 @@ namespace za::priv
 void printStackTrace()
 {
 #ifdef ZA_ENABLE_STACK_TRACES
-    std::puts("");
+    std::fputs("\n", stderr);
 
     #ifdef ZA_SYSTEM_EMSCRIPTEN
 
@@ -198,7 +198,7 @@ void printStackTrace()
 
     char callstack[4096];
     emscripten_get_callstack(EM_LOG_NO_PATHS | EM_LOG_JS_STACK, callstack, sizeof(callstack));
-    std::puts(callstack);
+    std::fprintf(stderr, "%s\n", callstack); // NOLINT(modernize-use-std-print)
 
     #else
 
