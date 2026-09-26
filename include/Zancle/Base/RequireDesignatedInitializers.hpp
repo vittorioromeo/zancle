@@ -44,7 +44,7 @@ struct ReqDInit
 /// \see `za::priv::ReqDInit`
 ///
 ////////////////////////////////////////////////////////////
-#define ZA_REQUIRE_DESIGNATED_INITIALIZERS                     \
-    [[no_unique_address]] ::za::priv::ReqDInit _sfBaseReqDInit \
-    {                                                          \
+#define ZA_REQUIRE_DESIGNATED_INITIALIZERS                 \
+    [[no_unique_address]] ::za::priv::ReqDInit _zaReqDInit \
+    {                                                      \
     }
