@@ -24,18 +24,11 @@ class [[nodiscard]] PassKey
     friend T;
 
 private:
-    // NOLINTBEGIN(modernize-use-equals-delete)
-    // NOLINTBEGIN(modernize-use-equals-default)
-
     ////////////////////////////////////////////////////////////
-    // Intentionally not using `= default` here as it would make `PassKey` an aggregate
-    // and thus constructible from anyone
-    [[nodiscard]] explicit PassKey() noexcept
-    {
-    }
-
-    // NOLINTEND(modernize-use-equals-default)
-    // NOLINTEND(modernize-use-equals-delete)
+    // Private, so only `T` can construct a key. Since C++20, any
+    // user-declared constructor prevents `PassKey` from being an
+    // aggregate, so defaulting it does not open a loophole.
+    [[nodiscard]] explicit PassKey() noexcept = default;
 
 public:
     ////////////////////////////////////////////////////////////
