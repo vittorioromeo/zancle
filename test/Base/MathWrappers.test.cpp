@@ -20,6 +20,7 @@
 #include "Zancle/Math/Log10.hpp"
 #include "Zancle/Math/LongDoubleMax.hpp"
 #include "Zancle/Math/Lround.hpp"
+#include "Zancle/Math/Nextafter.hpp"
 #include "Zancle/Math/Pow.hpp"
 #include "Zancle/Math/Rint.hpp"
 #include "Zancle/Math/Round.hpp"
@@ -68,6 +69,7 @@ TEMPLATE_TEST_CASE("[Base] Math wrappers", "", float, double, long double)
         STATIC_CHECK(za::isSame<decltype(za::acos(T{})), T>);
         STATIC_CHECK(za::isSame<decltype(za::pow(T{}, T{})), T>);
         STATIC_CHECK(za::isSame<decltype(za::atan2(T{}, T{})), T>);
+        STATIC_CHECK(za::isSame<decltype(za::nextafter(T{}, T{})), T>);
         STATIC_CHECK(za::isSame<decltype(za::lround(T{})), long>);
     }
 
@@ -101,6 +103,18 @@ TEMPLATE_TEST_CASE("[Base] Math wrappers", "", float, double, long double)
         CHECK(za::rint(opaque(T{2.5})) == T{2}); // default rounding mode: halfway cases to even
         CHECK(za::lround(opaque(T{-2.5})) == -3L);
         CHECK(za::fmod(opaque(T{-7}), opaque(T{3})) == T{-1});
+    }
+
+    SECTION("Next representable value")
+    {
+        const T up   = za::nextafter(opaque(T{1}), opaque(T{2}));
+        const T down = za::nextafter(opaque(T{1}), opaque(T{0}));
+
+        CHECK(up > T{1});
+        CHECK(down < T{1});
+        CHECK(up - T{1} == std::numeric_limits<T>::epsilon());
+        CHECK(za::nextafter(opaque(T{1}), opaque(T{1})) == T{1});
+        CHECK(za::nextafter(up, T{0}) == T{1});
     }
 
     SECTION("Absolute value, minimum, maximum")

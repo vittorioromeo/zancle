@@ -6,7 +6,10 @@
 #include "Zancle/Geometry/Angle.hpp"
 
 #include "Zancle/Math/Constants.hpp"
+#include "Zancle/Math/Nextafter.hpp"
 #include "Zancle/Math/Remainder.hpp"
+
+#include "Zancle/Base/BitCast.hpp"
 
 #include "Zancle/Trait/IsAggregate.hpp"
 #include "Zancle/Trait/IsCopyAssignable.hpp"
@@ -144,7 +147,7 @@ TEST_CASE("[System] za::AutoWrapAngle")
     {
         // `wrapUnsigned` returns already-wrapped angles unchanged without dividing; that fast path
         // must produce exactly what the general `positiveRemainder` path would
-        const auto bits = [](const float x) { return __builtin_bit_cast(unsigned int, x); };
+        const auto bits = [](const float x) { return ZA_BIT_CAST(unsigned int, x); };
 
         const auto matches = [&](const float x)
         { return bits(za::AutoWrapAngle{za::radians(x)}.asRadians()) == bits(za::positiveRemainder(x, za::tau)); };
@@ -159,9 +162,9 @@ TEST_CASE("[System] za::AutoWrapAngle")
              1e-30f,
              -1e-30f,
              -1e-8f,
-             __builtin_nextafterf(za::tau, 0.f),
+             za::nextafter(za::tau, 0.f),
              za::tau,
-             __builtin_nextafterf(za::tau, 10.f),
+             za::nextafter(za::tau, 10.f),
              -za::tau,
              za::pi,
              -za::pi,

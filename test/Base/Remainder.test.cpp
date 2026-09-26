@@ -3,6 +3,7 @@
 #include "Zancle/Math/Remainder.hpp"
 
 #include "Zancle/Math/Constants.hpp"
+#include "Zancle/Math/Nextafter.hpp"
 
 
 TEST_CASE("[Base] Base/Remainder.hpp")
@@ -69,9 +70,9 @@ TEST_CASE("[Base] Base/Remainder.hpp")
                 float a = static_cast<float>(k) * b;
 
                 for (int j = 0; j < 4; ++j)
-                    a = __builtin_nextafterf(a, -1e30f);
+                    a = za::nextafter(a, -1e30f);
 
-                for (int j = 0; j < 9; ++j, a = __builtin_nextafterf(a, 1e30f))
+                for (int j = 0; j < 9; ++j, a = za::nextafter(a, 1e30f))
                 {
                     const float r = za::positiveRemainder(a, b);
                     outOfRangeCount += (r < 0.f || r >= b);
