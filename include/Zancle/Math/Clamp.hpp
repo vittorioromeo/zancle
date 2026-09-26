@@ -14,10 +14,26 @@ namespace za
 ////////////////////////////////////////////////////////////
 /// \brief Clamp `value` into the closed range `[minValue, maxValue]`
 ///
-/// \return Reference to `value` if in range, otherwise to the closer bound
+/// Non-class types (arithmetic, enums, pointers) are taken and returned
+/// by value, which avoids stack spills in unoptimized builds. Class types
+/// are taken and returned by `const` reference, like `std::clamp`.
+///
+/// \return `value` if in range, otherwise the closer bound
 ///
 ////////////////////////////////////////////////////////////
 template <typename T>
+    requires(!__is_class(T))
+[[nodiscard, gnu::always_inline, gnu::const]] constexpr T clamp(const T value, const T minValue, const T maxValue) noexcept
+{
+    ZA_ASSERT(minValue <= maxValue);
+
+    return (value < minValue) ? minValue : ((value > maxValue) ? maxValue : value);
+}
+
+
+////////////////////////////////////////////////////////////
+template <typename T>
+    requires(__is_class(T))
 [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& clamp(const T& value, const T& minValue, const T& maxValue) noexcept
 {
     ZA_ASSERT(minValue <= maxValue);

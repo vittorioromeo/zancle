@@ -6,12 +6,27 @@
 namespace za
 {
 ////////////////////////////////////////////////////////////
-/// \brief Return a reference to the smaller of two values
+/// \brief Return the smaller of two values
 ///
 /// Equivalent to `std::min` but does not include `<algorithm>`.
+/// Non-class types (arithmetic, enums, pointers) are taken and returned
+/// by value, which avoids stack spills in unoptimized builds. Class types
+/// are taken and returned by `const` reference, like `std::min`.
+///
+/// If the values are equivalent, returns `a`.
 ///
 ////////////////////////////////////////////////////////////
 template <typename T>
+    requires(!__is_class(T))
+[[nodiscard, gnu::always_inline, gnu::const]] constexpr T min(const T a, const T b) noexcept
+{
+    return b < a ? b : a;
+}
+
+
+////////////////////////////////////////////////////////////
+template <typename T>
+    requires(__is_class(T))
 [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& min(const T& a, const T& b) noexcept
 {
     // NOLINTNEXTLINE(bugprone-return-const-ref-from-parameter)
@@ -20,12 +35,27 @@ template <typename T>
 
 
 ////////////////////////////////////////////////////////////
-/// \brief Return a reference to the larger of two values
+/// \brief Return the larger of two values
 ///
 /// Equivalent to `std::max` but does not include `<algorithm>`.
+/// Non-class types (arithmetic, enums, pointers) are taken and returned
+/// by value, which avoids stack spills in unoptimized builds. Class types
+/// are taken and returned by `const` reference, like `std::max`.
+///
+/// If the values are equivalent, returns `a`.
 ///
 ////////////////////////////////////////////////////////////
 template <typename T>
+    requires(!__is_class(T))
+[[nodiscard, gnu::always_inline, gnu::const]] constexpr T max(const T a, const T b) noexcept
+{
+    return a < b ? b : a;
+}
+
+
+////////////////////////////////////////////////////////////
+template <typename T>
+    requires(__is_class(T))
 [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& max(const T& a, const T& b) noexcept
 {
     // NOLINTNEXTLINE(bugprone-return-const-ref-from-parameter)
