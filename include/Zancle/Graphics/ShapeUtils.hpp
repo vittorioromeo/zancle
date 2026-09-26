@@ -13,7 +13,6 @@
 #include "Zancle/Math/Constants.hpp"
 #include "Zancle/Math/Fabs.hpp"
 #include "Zancle/Math/MinMaxMacros.hpp"
-#include "Zancle/Math/Remainder.hpp"
 #include "Zancle/Math/SinCosLookup.hpp"
 #include "Zancle/Math/Sqrt.hpp"
 
@@ -47,8 +46,7 @@ namespace za::ShapeUtils
     const float     hRadius,
     const float     vRadius) noexcept
 {
-    const float wrappedAngle  = za::positiveRemainder(startRadians + static_cast<float>(index) * angleStep, za::tau);
-    const auto [sine, cosine] = za::sinCosLookup(wrappedAngle);
+    const auto [sine, cosine] = za::sinCosLookup(startRadians + static_cast<float>(index) * angleStep);
 
     ZA_ASSERT_AND_ASSUME(sine >= -1.f && sine <= 1.f);
     ZA_ASSERT_AND_ASSUME(cosine >= -1.f && cosine <= 1.f);
@@ -192,8 +190,7 @@ namespace za::ShapeUtils
     const float baseAngle = za::pi + static_cast<float>(centerIndex) * za::halfPi;
 
     const za::SizeT localIndex = index - centerIndex * cornerPointCount;
-    const float     angle     = za::positiveRemainder(baseAngle + deltaAngle * static_cast<float>(localIndex), za::tau);
-    const auto [sine, cosine] = za::sinCosLookup(angle);
+    const auto [sine, cosine]  = za::sinCosLookup(baseAngle + deltaAngle * static_cast<float>(localIndex));
     return center + Vec2f{cornerRadius * cosine, cornerRadius * sine};
 }
 
@@ -326,9 +323,8 @@ namespace za::ShapeUtils
     // There are `(pointCount - 1)` points on the arc edge.
     // These points span `(pointCount - 2)` segments along the arc.
 
-    const auto  arcPointStep  = static_cast<float>(index - 1u);
-    const float wrappedAngle  = za::positiveRemainder(startAngle + arcPointStep * arcAngleStep, za::tau);
-    const auto [sine, cosine] = za::sinCosLookup(wrappedAngle);
+    const auto arcPointStep   = static_cast<float>(index - 1u);
+    const auto [sine, cosine] = za::sinCosLookup(startAngle + arcPointStep * arcAngleStep);
 
     ZA_ASSERT_AND_ASSUME(sine >= -1.f && sine <= 1.f);
     ZA_ASSERT_AND_ASSUME(cosine >= -1.f && cosine <= 1.f);
@@ -402,10 +398,7 @@ namespace za::ShapeUtils
     ZA_ASSERT_AND_ASSUME(outerRadius >= 0.f);
     ZA_ASSERT_AND_ASSUME(innerRadius >= 0.f);
 
-    float angle = static_cast<float>(index) * angleStep - za::halfPi; // Start from top (-pi/2)
-
-    if (angle < 0.f)
-        angle += za::tau;
+    const float angle = static_cast<float>(index) * angleStep - za::halfPi; // Start from top (-pi/2)
 
     const float radius = (index % 2u == 0u) ? outerRadius : innerRadius;
 
@@ -465,8 +458,7 @@ namespace za::ShapeUtils
     ZA_ASSERT_AND_ASSUME(outerRadius >= 0.f);
     ZA_ASSERT_AND_ASSUME(innerRadius >= 0.f);
 
-    const float wrappedAngle  = za::positiveRemainder(startRadians + static_cast<float>(index) * angleStep, za::tau);
-    const auto [sine, cosine] = za::sinCosLookup(wrappedAngle);
+    const auto [sine, cosine] = za::sinCosLookup(startRadians + static_cast<float>(index) * angleStep);
 
     ZA_ASSERT_AND_ASSUME(sine >= -1.f && sine <= 1.f);
     ZA_ASSERT_AND_ASSUME(cosine >= -1.f && cosine <= 1.f);
@@ -748,7 +740,7 @@ namespace za::ShapeUtils
     const float angle  = center + offsets[vertexKind];
     const float radius = radii[vertexKind];
 
-    const auto [sine, cosine] = za::sinCosLookup(za::positiveRemainder(angle, za::tau));
+    const auto [sine, cosine] = za::sinCosLookup(angle);
 
     // Center at (outerRadius, outerRadius) for consistency with star/circle
     return {outerRadius + radius * cosine, outerRadius + radius * sine};

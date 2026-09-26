@@ -18,7 +18,6 @@
 #include "Zancle/Math/Constants.hpp"
 #include "Zancle/Math/Fabs.hpp"
 #include "Zancle/Math/MinMax.hpp"
-#include "Zancle/Math/Remainder.hpp"
 #include "Zancle/Math/SinCosLookup.hpp"
 
 
@@ -98,7 +97,7 @@ Vec2f RingPieSliceShapeData::getCentroid() const noexcept
     const float absSweep = ZA_MATH_FABSF(sweepRad);
     const float halfSwp  = absSweep * 0.5f;
 
-    const auto [sinHalf, cosHalf] = za::sinCosLookup(za::positiveRemainder(halfSwp, za::tau));
+    const auto [sinHalf, cosHalf] = za::sinCosLookup(halfSwp);
 
     const float d = priv::annulusSectorCentroidDistance(outerRadius, innerRadius, absSweep, sinHalf);
 
@@ -109,7 +108,7 @@ Vec2f RingPieSliceShapeData::getCentroid() const noexcept
     // (Works for negative sweep too: the bisector is always the angular midpoint of the sector.)
     const float bisector = startAngle.asRadians() + sweepRad * 0.5f;
 
-    const auto [sinB, cosB] = za::sinCosLookup(za::positiveRemainder(bisector, za::tau));
+    const auto [sinB, cosB] = za::sinCosLookup(bisector);
 
     return {center.x + d * cosB, center.y + d * sinB};
 }

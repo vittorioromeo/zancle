@@ -19,7 +19,6 @@
 #include "Zancle/Math/Fabs.hpp"
 #include "Zancle/Math/MinMax.hpp"
 #include "Zancle/Math/MinMaxMacros.hpp"
-#include "Zancle/Math/Remainder.hpp"
 #include "Zancle/Math/SinCosLookup.hpp"
 
 
@@ -40,7 +39,7 @@ template <typename MapFn>
     const float endAngle   = sd.startAngle.asRadians() + sweepRad;
     const float pathRadius = (sd.outerRadius + sd.innerRadius) * 0.5f;
 
-    const auto [endSin, endCos] = za::sinCosLookup(za::positiveRemainder(endAngle, za::tau));
+    const auto [endSin, endCos] = za::sinCosLookup(endAngle);
 
     const Vec2f attach    = {sd.outerRadius + pathRadius * endCos, sd.outerRadius + pathRadius * endSin};
     const Vec2f tangent   = {-endSin, endCos};
@@ -161,12 +160,12 @@ Vec2f CurvedArrowShapeData::getCentroid() const noexcept
 
     if (diffSq > 0.f && absSweep > 0.f)
     {
-        const auto [sinHalf, cosHalf] = za::sinCosLookup(za::positiveRemainder(halfSwpAbs, za::tau));
+        const auto [sinHalf, cosHalf] = za::sinCosLookup(halfSwpAbs);
 
         const float d        = priv::annulusSectorCentroidDistance(outerRadius, innerRadius, absSweep, sinHalf);
         const float bisector = startRad + sweepRad * 0.5f;
 
-        const auto [sinB, cosB] = za::sinCosLookup(za::positiveRemainder(bisector, za::tau));
+        const auto [sinB, cosB] = za::sinCosLookup(bisector);
 
         bodyCentroid = {center.x + d * cosB, center.y + d * sinB};
         bodyArea     = 0.5f * diffSq * absSweep;
@@ -176,7 +175,7 @@ Vec2f CurvedArrowShapeData::getCentroid() const noexcept
     const float endAngle   = startRad + sweepRad;
     const float pathRadius = (outerRadius + innerRadius) * 0.5f;
 
-    const auto [endSin, endCos] = za::sinCosLookup(za::positiveRemainder(endAngle, za::tau));
+    const auto [endSin, endCos] = za::sinCosLookup(endAngle);
 
     const Vec2f attach    = {center.x + pathRadius * endCos, center.y + pathRadius * endSin};
     const Vec2f tangent   = {-endSin, endCos};

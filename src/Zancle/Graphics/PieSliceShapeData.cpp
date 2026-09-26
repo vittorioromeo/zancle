@@ -16,7 +16,6 @@
 
 #include "Zancle/Math/Constants.hpp"
 #include "Zancle/Math/Fabs.hpp"
-#include "Zancle/Math/Remainder.hpp"
 #include "Zancle/Math/SinCosLookup.hpp"
 
 #include "Zancle/Base/Assert.hpp"
@@ -32,7 +31,7 @@ namespace
 [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline Vec2f pieSlicePointAtAngle(const float radius,
                                                                                              const float radians) noexcept
 {
-    const auto [sine, cosine] = za::sinCosLookup(za::positiveRemainder(radians, za::tau));
+    const auto [sine, cosine] = za::sinCosLookup(radians);
     // Match the CW-visual convention used by `computePieSlicePointFromArcAngleStep`.
     return {radius - radius * sine, radius + radius * cosine};
 }
@@ -106,7 +105,7 @@ Vec2f PieSliceShapeData::getCentroid() const noexcept
 
     const float halfSwp = absSweep * 0.5f;
 
-    const auto [sinHalf, cosHalf] = za::sinCosLookup(za::positiveRemainder(halfSwp, za::tau));
+    const auto [sinHalf, cosHalf] = za::sinCosLookup(halfSwp);
 
     // Centroid distance from hub along the bisector: d = 4*R*sin(alpha) / (3 * sweep), alpha = sweep/2.
     // Use |sweep| so the distance is always non-negative; the bisector direction (which depends on
@@ -117,7 +116,7 @@ Vec2f PieSliceShapeData::getCentroid() const noexcept
     // Works for negative sweep too: the bisector is always the angular midpoint of the sector.
     const float bisector = startAngle.asRadians() + sweepRad * 0.5f;
 
-    const auto [sinB, cosB] = za::sinCosLookup(za::positiveRemainder(bisector, za::tau));
+    const auto [sinB, cosB] = za::sinCosLookup(bisector);
 
     return {hub.x - d * sinB, hub.y + d * cosB};
 }
