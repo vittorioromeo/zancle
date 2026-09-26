@@ -3,10 +3,17 @@
 // https://github.com/vittorioromeo/Zancle/blob/master/license.md
 
 
-#if __has_builtin(__is_trivially_assignable)
+#if __has_builtin(__is_trivially_assignable) && __has_builtin(__add_lvalue_reference)
+
+////////////////////////////////////////////////////////////
+// Headers
+////////////////////////////////////////////////////////////
+    #include "Zancle/Trait/AddConst.hpp"
+
 
     ////////////////////////////////////////////////////////////
-    #define ZA_IS_TRIVIALLY_COPY_ASSIGNABLE(...) __is_trivially_assignable(__VA_ARGS__&, const __VA_ARGS__&)
+    #define ZA_IS_TRIVIALLY_COPY_ASSIGNABLE(...) \
+        __is_trivially_assignable(__add_lvalue_reference(__VA_ARGS__), __add_lvalue_reference(::za::AddConst<__VA_ARGS__>))
 
 #else
 

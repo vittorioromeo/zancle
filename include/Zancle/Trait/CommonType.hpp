@@ -94,6 +94,14 @@ struct CommonType2Impl<T, U, VoidT<decltype(true ? declVal<T>() : declVal<U>())>
 
 
 ////////////////////////////////////////////////////////////
+template <>
+struct CommonType2Impl<void, void> // `declVal<void>()` is ill-formed
+{
+    using type = void;
+};
+
+
+////////////////////////////////////////////////////////////
 template <typename, typename = void>
 struct CommonTypeImpl
 {

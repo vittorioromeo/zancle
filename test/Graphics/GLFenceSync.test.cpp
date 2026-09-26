@@ -43,8 +43,8 @@ TEST_CASE("[GLUtils] za::priv::GLFenceSync / FenceUtils" * tst::skip(skipDisplay
     {
         STATIC_CHECK(!za::isCopyConstructible<Fence>);
         STATIC_CHECK(!za::isCopyAssignable<Fence>);
-        STATIC_CHECK(za::isNoThrowMoveConstructible<Fence>);
-        STATIC_CHECK(za::isNoThrowMoveAssignable<Fence>);
+        STATIC_CHECK(za::isNothrowMoveConstructible<Fence>);
+        STATIC_CHECK(za::isNothrowMoveAssignable<Fence>);
     }
 
     SECTION("Default-constructed state has no native fence")

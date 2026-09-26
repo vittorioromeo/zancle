@@ -10,18 +10,54 @@
 
 #else
 
+////////////////////////////////////////////////////////////
+// Headers
+////////////////////////////////////////////////////////////
+    #include "Zancle/Trait/Conditional.hpp"
+    #include "Zancle/Trait/IsEnum.hpp"
+
+
 namespace za::priv
 {
 ////////////////////////////////////////////////////////////
+// Unsigned integer type with the smallest rank having the same `sizeof` as `T`
 template <typename T>
-struct MakeUnsignedImpl;
+using UnsignedOfSameSize = Conditional<
+    sizeof(T) == sizeof(unsigned char),
+    unsigned char,
+    Conditional<sizeof(T) == sizeof(unsigned short),
+                unsigned short,
+                Conditional<sizeof(T) == sizeof(unsigned int),
+                            unsigned int,
+                            Conditional<sizeof(T) == sizeof(unsigned long), unsigned long, unsigned long long>>>>;
+
+
+////////////////////////////////////////////////////////////
+// Primary template handles enumerations (same as the builtin and `std::make_unsigned`)
+template <typename T>
+struct MakeUnsignedImpl
+{
+    static_assert(ZA_IS_ENUM(T), "`MakeUnsigned` requires an integral (non-`bool`) or enumeration type");
+    using type = UnsignedOfSameSize<T>;
+};
+
+
+////////////////////////////////////////////////////////////
+// cv-qualifiers are preserved via partial specializations rather than builtins,
+// as GCC rejects builtin type traits in function signatures (e.g. `requires`)
+// clang-format off
+template <typename T> struct MakeUnsignedImpl<const T>          { using type = const typename MakeUnsignedImpl<T>::type; };
+template <typename T> struct MakeUnsignedImpl<volatile T>       { using type = volatile typename MakeUnsignedImpl<T>::type; };
+template <typename T> struct MakeUnsignedImpl<const volatile T> { using type = const volatile typename MakeUnsignedImpl<T>::type; };
+// clang-format on
 
 
 ////////////////////////////////////////////////////////////
 // clang-format off
-template <> struct MakeUnsignedImpl<char8_t>            { using type = char8_t; };
-template <> struct MakeUnsignedImpl<char16_t>           { using type = char16_t; };
-template <> struct MakeUnsignedImpl<char32_t>           { using type = char32_t; };
+template <> struct MakeUnsignedImpl<char8_t>            { using type = UnsignedOfSameSize<char8_t>; };
+template <> struct MakeUnsignedImpl<char16_t>           { using type = UnsignedOfSameSize<char16_t>; };
+template <> struct MakeUnsignedImpl<char32_t>           { using type = UnsignedOfSameSize<char32_t>; };
+template <> struct MakeUnsignedImpl<wchar_t>            { using type = UnsignedOfSameSize<wchar_t>; };
 template <> struct MakeUnsignedImpl<         char>      { using type = unsigned char; };
 template <> struct MakeUnsignedImpl<  signed char>      { using type = unsigned char; };
 template <> struct MakeUnsignedImpl<unsigned char>      { using type = unsigned char; };
@@ -33,6 +69,11 @@ template <> struct MakeUnsignedImpl<  signed long>      { using type = unsigned 
 template <> struct MakeUnsignedImpl<unsigned long>      { using type = unsigned long; };
 template <> struct MakeUnsignedImpl<  signed long long> { using type = unsigned long long; };
 template <> struct MakeUnsignedImpl<unsigned long long> { using type = unsigned long long; };
+
+    #ifdef __SIZEOF_INT128__
+template <> struct MakeUnsignedImpl<__int128_t>         { using type = __uint128_t; };
+template <> struct MakeUnsignedImpl<__uint128_t>        { using type = __uint128_t; };
+    #endif
 // clang-format on
 
 } // namespace za::priv

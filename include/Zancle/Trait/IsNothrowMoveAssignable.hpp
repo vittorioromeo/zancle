@@ -3,10 +3,12 @@
 // https://github.com/vittorioromeo/Zancle/blob/master/license.md
 
 
-#if __has_builtin(__is_nothrow_assignable)
+#if __has_builtin(__is_nothrow_assignable) && __has_builtin(__add_lvalue_reference) && \
+    __has_builtin(__add_rvalue_reference)
 
     ////////////////////////////////////////////////////////////
-    #define ZA_IS_NOTHROW_MOVE_ASSIGNABLE(...) __is_nothrow_assignable(__VA_ARGS__&, __VA_ARGS__&&)
+    #define ZA_IS_NOTHROW_MOVE_ASSIGNABLE(...) \
+        __is_nothrow_assignable(__add_lvalue_reference(__VA_ARGS__), __add_rvalue_reference(__VA_ARGS__))
 
 #else
 
@@ -26,6 +28,6 @@ namespace za
 {
 ////////////////////////////////////////////////////////////
 template <typename T>
-inline constexpr bool isNoThrowMoveAssignable = ZA_IS_NOTHROW_MOVE_ASSIGNABLE(T);
+inline constexpr bool isNothrowMoveAssignable = ZA_IS_NOTHROW_MOVE_ASSIGNABLE(T);
 
 } // namespace za

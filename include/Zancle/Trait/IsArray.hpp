@@ -14,15 +14,15 @@ namespace za::priv
 {
 ////////////////////////////////////////////////////////////
 // clang-format off
-template <typename>              struct IsArrayImpl          { enum { value = false }; };
-template <typename T, auto Size> struct IsArrayImpl<T[Size]> { enum { value = true }; };
-template <typename T>            struct IsArrayImpl<T[]>     { enum { value = true }; };
+template <typename>              inline constexpr bool isArrayImpl          = false;
+template <typename T, auto Size> inline constexpr bool isArrayImpl<T[Size]> = true;
+template <typename T>            inline constexpr bool isArrayImpl<T[]>     = true;
 // clang-format on
 
-    ////////////////////////////////////////////////////////////
-    #define ZA_IS_ARRAY(...) ::za::priv::IsArrayImpl<__VA_ARGS__>::value
-
 } // namespace za::priv
+
+    ////////////////////////////////////////////////////////////
+    #define ZA_IS_ARRAY(...) ::za::priv::isArrayImpl<__VA_ARGS__>
 
 #endif
 

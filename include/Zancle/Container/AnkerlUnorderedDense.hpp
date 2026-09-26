@@ -1653,9 +1653,9 @@ public:
         return *this;
     }
 
-    auto operator=(table&& other) noexcept(noexcept(ZA_IS_NOTHROW_MOVE_ASSIGNABLE(value_container_type) &&
-                                                    ZA_IS_NOTHROW_MOVE_ASSIGNABLE(Hash) &&
-                                                    ZA_IS_NOTHROW_MOVE_ASSIGNABLE(KeyEqual))) -> table&
+    auto operator=(table&& other) noexcept(ZA_IS_NOTHROW_MOVE_ASSIGNABLE(value_container_type) &&
+                                           ZA_IS_NOTHROW_MOVE_ASSIGNABLE(Hash) &&
+                                           ZA_IS_NOTHROW_MOVE_ASSIGNABLE(KeyEqual)) -> table&
     {
         if (&other != this)
         {
@@ -2178,9 +2178,9 @@ public:
         return tmp;
     }
 
-    void swap(table& other) noexcept(noexcept(ZA_IS_NOTHROW_SWAPPABLE(value_container_type) &&
-                                              ZA_IS_NOTHROW_SWAPPABLE(Hash) &&
-                                              ZA_IS_NOTHROW_SWAPPABLE(KeyEqual)))
+    void swap(table& other) noexcept(ZA_IS_NOTHROW_SWAPPABLE(value_container_type) &&
+                                     ZA_IS_NOTHROW_SWAPPABLE(Hash) &&
+                                     ZA_IS_NOTHROW_SWAPPABLE(KeyEqual))
     {
         za::genericSwap(m_values, other.m_values);
         za::genericSwap(m_buckets, other.m_buckets);

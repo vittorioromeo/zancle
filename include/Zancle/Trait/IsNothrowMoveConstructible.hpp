@@ -3,10 +3,11 @@
 // https://github.com/vittorioromeo/Zancle/blob/master/license.md
 
 
-#if __has_builtin(__is_nothrow_constructible)
+#if __has_builtin(__is_nothrow_constructible) && __has_builtin(__add_rvalue_reference)
 
     ////////////////////////////////////////////////////////////
-    #define ZA_IS_NOTHROW_MOVE_CONSTRUCTIBLE(...) __is_nothrow_constructible(__VA_ARGS__, __VA_ARGS__&&)
+    #define ZA_IS_NOTHROW_MOVE_CONSTRUCTIBLE(...) \
+        __is_nothrow_constructible(__VA_ARGS__, __add_rvalue_reference(__VA_ARGS__))
 
 #else
 
@@ -26,6 +27,6 @@ namespace za
 {
 ////////////////////////////////////////////////////////////
 template <typename T>
-inline constexpr bool isNoThrowMoveConstructible = ZA_IS_NOTHROW_MOVE_CONSTRUCTIBLE(T);
+inline constexpr bool isNothrowMoveConstructible = ZA_IS_NOTHROW_MOVE_CONSTRUCTIBLE(T);
 
 } // namespace za

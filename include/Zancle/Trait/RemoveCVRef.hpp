@@ -13,8 +13,9 @@
 /// compiler builtin when available; the type alias forwards to it.
 ///
 /// `RemoveCVRefIndirect<T>` is the same trait expressed without the
-/// builtin, which is required when used inside `requires` constraints
-/// (where compiler builtins are sometimes not allowed).
+/// builtin, which is required when the type appears in a function
+/// signature, including `requires` constraints: GCC rejects builtin
+/// type traits there ("use of built-in trait in function signature").
 ///
 ////////////////////////////////////////////////////////////
 
@@ -71,6 +72,6 @@ using RemoveCVRef = ZA_REMOVE_CVREF(T);
 
 ////////////////////////////////////////////////////////////
 template <typename T>
-using RemoveCVRefIndirect = typename priv::RemoveCVRefImpl<T>::type; // `requires` constraints cannot use builtins
+using RemoveCVRefIndirect = typename priv::RemoveCVRefImpl<T>::type; // no builtin, see file docs
 
 } // namespace za

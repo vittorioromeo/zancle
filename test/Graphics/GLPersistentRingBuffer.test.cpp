@@ -102,13 +102,13 @@ TEST_CASE("[GLUtils] za::GLPersistentRingBuffer" * tst::skip(skipDisplayTests))
     {
         STATIC_CHECK(!za::isCopyConstructible<VRingBuffer>);
         STATIC_CHECK(!za::isCopyAssignable<VRingBuffer>);
-        STATIC_CHECK(za::isNoThrowMoveConstructible<VRingBuffer>);
-        STATIC_CHECK(za::isNoThrowMoveAssignable<VRingBuffer>);
+        STATIC_CHECK(za::isNothrowMoveConstructible<VRingBuffer>);
+        STATIC_CHECK(za::isNothrowMoveAssignable<VRingBuffer>);
 
         STATIC_CHECK(!za::isCopyConstructible<ERingBuffer>);
         STATIC_CHECK(!za::isCopyAssignable<ERingBuffer>);
-        STATIC_CHECK(za::isNoThrowMoveConstructible<ERingBuffer>);
-        STATIC_CHECK(za::isNoThrowMoveAssignable<ERingBuffer>);
+        STATIC_CHECK(za::isNothrowMoveConstructible<ERingBuffer>);
+        STATIC_CHECK(za::isNothrowMoveAssignable<ERingBuffer>);
     }
 
     SECTION("Default-constructed state has no mapping and zero capacity")

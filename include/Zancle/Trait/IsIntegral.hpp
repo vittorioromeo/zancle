@@ -13,8 +13,14 @@
 namespace za::priv
 {
 ////////////////////////////////////////////////////////////
-template <typename T>
-inline constexpr bool isIntegralImpl = false;
+// cv-qualifiers are handled via partial specializations rather than builtins,
+// as GCC rejects builtin type traits in function signatures (e.g. `requires`)
+// clang-format off
+template <typename T> inline constexpr bool isIntegralImpl                   = false;
+template <typename T> inline constexpr bool isIntegralImpl<const T>          = isIntegralImpl<T>;
+template <typename T> inline constexpr bool isIntegralImpl<volatile T>       = isIntegralImpl<T>;
+template <typename T> inline constexpr bool isIntegralImpl<const volatile T> = isIntegralImpl<T>;
+// clang-format on
 
 
 // clang-format off
@@ -35,6 +41,11 @@ template <> inline constexpr bool isIntegralImpl<long>               = true;
 template <> inline constexpr bool isIntegralImpl<unsigned long>      = true;
 template <> inline constexpr bool isIntegralImpl<long long>          = true;
 template <> inline constexpr bool isIntegralImpl<unsigned long long> = true;
+
+    #ifdef __SIZEOF_INT128__
+template <> inline constexpr bool isIntegralImpl<__int128_t>         = true;
+template <> inline constexpr bool isIntegralImpl<__uint128_t>        = true;
+    #endif
 // clang-format on
 
 } // namespace za::priv

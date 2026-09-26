@@ -99,13 +99,13 @@ TEST_CASE("[GLUtils] za::GLPersistentBuffer" * tst::skip(skipDisplayTests))
     {
         STATIC_CHECK(!za::isCopyConstructible<VBuffer>);
         STATIC_CHECK(!za::isCopyAssignable<VBuffer>);
-        STATIC_CHECK(za::isNoThrowMoveConstructible<VBuffer>);
-        STATIC_CHECK(za::isNoThrowMoveAssignable<VBuffer>);
+        STATIC_CHECK(za::isNothrowMoveConstructible<VBuffer>);
+        STATIC_CHECK(za::isNothrowMoveAssignable<VBuffer>);
 
         STATIC_CHECK(!za::isCopyConstructible<EBuffer>);
         STATIC_CHECK(!za::isCopyAssignable<EBuffer>);
-        STATIC_CHECK(za::isNoThrowMoveConstructible<EBuffer>);
-        STATIC_CHECK(za::isNoThrowMoveAssignable<EBuffer>);
+        STATIC_CHECK(za::isNothrowMoveConstructible<EBuffer>);
+        STATIC_CHECK(za::isNothrowMoveAssignable<EBuffer>);
     }
 
     SECTION("Default-constructed state has no mapping")

@@ -3,10 +3,17 @@
 // https://github.com/vittorioromeo/Zancle/blob/master/license.md
 
 
-#if __has_builtin(__is_constructible)
+#if __has_builtin(__is_constructible) && __has_builtin(__add_lvalue_reference)
+
+////////////////////////////////////////////////////////////
+// Headers
+////////////////////////////////////////////////////////////
+    #include "Zancle/Trait/AddConst.hpp"
+
 
     ////////////////////////////////////////////////////////////
-    #define ZA_IS_COPY_CONSTRUCTIBLE(...) __is_constructible(__VA_ARGS__, const __VA_ARGS__&)
+    #define ZA_IS_COPY_CONSTRUCTIBLE(...) \
+        __is_constructible(__VA_ARGS__, __add_lvalue_reference(::za::AddConst<__VA_ARGS__>))
 
 #else
 

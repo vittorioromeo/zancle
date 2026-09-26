@@ -3,7 +3,12 @@
 // https://github.com/vittorioromeo/Zancle/blob/master/license.md
 
 
-#if __has_builtin(__remove_reference)
+#if __has_builtin(__remove_reference_t) // Clang spelling
+
+    ////////////////////////////////////////////////////////////
+    #define ZA_REMOVE_REFERENCE(...) __remove_reference_t(__VA_ARGS__)
+
+#elif __has_builtin(__remove_reference) // GCC spelling
 
     ////////////////////////////////////////////////////////////
     #define ZA_REMOVE_REFERENCE(...) __remove_reference(__VA_ARGS__)

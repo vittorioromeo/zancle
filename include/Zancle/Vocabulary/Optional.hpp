@@ -11,9 +11,9 @@
 #include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsMoveAssignable.hpp"
 #include "Zancle/Trait/IsMoveConstructible.hpp"
-#include "Zancle/Trait/IsTriviallyConstructible.hpp"
 #include "Zancle/Trait/IsTriviallyCopyAssignable.hpp"
 #include "Zancle/Trait/IsTriviallyCopyConstructible.hpp"
+#include "Zancle/Trait/IsTriviallyDefaultConstructible.hpp"
 #include "Zancle/Trait/IsTriviallyDestructible.hpp"
 #include "Zancle/Trait/IsTriviallyMoveAssignable.hpp"
 #include "Zancle/Trait/IsTriviallyMoveConstructible.hpp"
@@ -628,8 +628,8 @@ private:
         T    obj;
 
         // clang-format off
-        constexpr Buffer() requires(isTriviallyConstructible<T>) = default;
-        constexpr Buffer() requires(!isTriviallyConstructible<T>) { }
+        constexpr Buffer() requires(isTriviallyDefaultConstructible<T>) = default;
+        constexpr Buffer() requires(!isTriviallyDefaultConstructible<T>) { }
 
         constexpr ~Buffer() requires(isTriviallyDestructible<T>) = default;
         constexpr ~Buffer() requires(!isTriviallyDestructible<T>) { }

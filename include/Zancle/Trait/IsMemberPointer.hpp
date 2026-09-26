@@ -17,8 +17,12 @@ template <typename>
 inline constexpr bool isMemberPointerImpl = false;
 
 ////////////////////////////////////////////////////////////
-template <typename T, typename C>
-inline constexpr bool isMemberPointerImpl<T C::*> = true;
+// clang-format off
+template <typename T, typename C> inline constexpr bool isMemberPointerImpl<T C::*>                = true;
+template <typename T, typename C> inline constexpr bool isMemberPointerImpl<T C::* const>          = true;
+template <typename T, typename C> inline constexpr bool isMemberPointerImpl<T C::* volatile>       = true;
+template <typename T, typename C> inline constexpr bool isMemberPointerImpl<T C::* const volatile> = true;
+// clang-format on
 
 } // namespace za::priv
 

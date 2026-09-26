@@ -6,12 +6,7 @@
 #if __has_builtin(__is_trivially_constructible)
 
     ////////////////////////////////////////////////////////////
-    #define ZA_IS_TRIVIALLY_CONSTRUCTIBLE(...) __is_trivially_constructible(__VA_ARGS__)
-
-#elif __has_builtin(__has_trivial_constructor)
-
-    ////////////////////////////////////////////////////////////
-    #define ZA_IS_TRIVIALLY_CONSTRUCTIBLE(...) __has_trivial_constructor(__VA_ARGS__)
+    #define ZA_IS_TRIVIALLY_DEFAULT_CONSTRUCTIBLE(...) __is_trivially_constructible(__VA_ARGS__)
 
 #else
 
@@ -22,7 +17,7 @@
 
 
     ////////////////////////////////////////////////////////////
-    #define ZA_IS_TRIVIALLY_CONSTRUCTIBLE(...) ::std::is_trivially_constructible_v<__VA_ARGS__>
+    #define ZA_IS_TRIVIALLY_DEFAULT_CONSTRUCTIBLE(...) ::std::is_trivially_default_constructible_v<__VA_ARGS__>
 
 #endif
 
@@ -31,6 +26,6 @@ namespace za
 {
 ////////////////////////////////////////////////////////////
 template <typename T>
-inline constexpr bool isTriviallyConstructible = ZA_IS_TRIVIALLY_CONSTRUCTIBLE(T);
+inline constexpr bool isTriviallyDefaultConstructible = ZA_IS_TRIVIALLY_DEFAULT_CONSTRUCTIBLE(T);
 
 } // namespace za

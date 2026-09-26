@@ -19,7 +19,7 @@
 namespace za::priv
 {
 ////////////////////////////////////////////////////////////
-template <typename T, bool = isIntegral<T>>
+template <typename T, bool = ZA_IS_INTEGRAL(T)>
 inline constexpr bool isUnsignedImpl = false;
 
 
