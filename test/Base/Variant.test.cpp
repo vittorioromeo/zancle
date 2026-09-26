@@ -395,7 +395,32 @@ TEST_CASE("[Base] Base/Variant.hpp")
         CHECK(t.tag == 3);
         CHECK(Tracker::copyCtor == 0);
         CHECK(Tracker::moveCtor == 1);
+        CHECK(Tracker::dtor == 1); // the internal result buffer
     }
+
+#ifdef __cpp_exceptions
+    SECTION("linearVisit does not destroy an unconstructed result if the visitor throws")
+    {
+        using namespace VariantTest;
+
+        za::Variant<int, OtherAlt> v{5};
+
+        Tracker::reset();
+
+        bool caught = false;
+
+        try
+        {
+            (void)v.linearVisit([](const auto&) -> Tracker { throw 42; });
+        } catch (const int)
+        {
+            caught = true;
+        }
+
+        CHECK(caught);
+        CHECK(Tracker::dtor == 0);
+    }
+#endif
 
     SECTION("linearVisit supports move-only results")
     {

@@ -659,15 +659,17 @@ public:
         {
             alignas(R) Byte retBuffer[sizeof(R)];
 
+            ZA_VARIANT_DO_WITH_CURRENT_INDEX_OBJ(self,
+                                                 I,
+                                                 ZA_PLACEMENT_NEW(retBuffer)
+                                                     R(visitor(static_cast<Self&&>(self).template getByIndex<I>())));
+
+            // Only guard after construction, as the visitor may throw before `R` exists
             ZA_SCOPE_GUARD({
                 if constexpr (!ZA_IS_TRIVIALLY_DESTRUCTIBLE(R))
                     ZA_LAUNDER_CAST(R*, retBuffer)->~R();
             });
 
-            ZA_VARIANT_DO_WITH_CURRENT_INDEX_OBJ(self,
-                                                 I,
-                                                 ZA_PLACEMENT_NEW(retBuffer)
-                                                     R(visitor(static_cast<Self&&>(self).template getByIndex<I>())));
             return static_cast<R&&>(*ZA_LAUNDER_CAST(R*, retBuffer));
         }
     }
