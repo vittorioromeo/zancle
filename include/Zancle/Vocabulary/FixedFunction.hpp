@@ -141,11 +141,13 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] FixedFunction(FnPtrType f) noexcept :
-        functionPtr{f},
-        m_methodPtr{[](char* /* unused */, FnPtrType xf, Ts... xs) -> RetType { return xf(ZA_FORWARD(xs)...); }},
-        m_allocPtr{nullptr}
+    /// \brief Construct from a function pointer; a null pointer results in an empty function
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] FixedFunction(FnPtrType f) noexcept : functionPtr{f}, m_methodPtr{nullptr}, m_allocPtr{nullptr}
     {
+        if (f != nullptr)
+            m_methodPtr = [](char* /* unused */, FnPtrType xf, Ts... xs) -> RetType { return xf(ZA_FORWARD(xs)...); };
     }
 
 

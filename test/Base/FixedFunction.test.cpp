@@ -111,6 +111,17 @@ TEST_CASE("[Base] Base/FixedFunction.hpp")
         CHECK(!ff);
     }
 
+    SECTION("Null function pointer construction")
+    {
+        int (*const nullFn)() = nullptr;
+
+        FF ff(nullFn);
+        CHECK(!ff);
+
+        FF copy(ff); // NOLINT(performance-unnecessary-copy-initialization)
+        CHECK(!copy);
+    }
+
     SECTION("Function pointer construction and invocation")
     {
         FF ff(freeFunction);
