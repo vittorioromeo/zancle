@@ -564,7 +564,7 @@ struct WindowContextImpl
 
     ////////////////////////////////////////////////////////////
     template <typename... SharedGlContextArgs>
-    explicit WindowContextImpl(SharedGlContextArgs&&... args) : sharedGlContext(ZA_FORWARD(args)...)
+    explicit WindowContextImpl(SharedGlContextArgs&&... args) : sharedGlContext(sdlLayer, ZA_FORWARD(args)...)
     {
     }
 };
@@ -976,7 +976,8 @@ za::UniquePtr<priv::GlContext> WindowContext::createGlContextImpl(const ContextS
     if (!setActiveThreadLocalGlContextToSharedContext())
         priv::errMsg("Error enabling shared GL context in WindowContext::createGlContext()");
 
-    auto glContext = za::makeUnique<priv::SDLGlContext>(wc.nextThreadLocalGlContextId.fetchAddSeqCst(1u),
+    auto glContext = za::makeUnique<priv::SDLGlContext>(wc.sdlLayer,
+                                                        wc.nextThreadLocalGlContextId.fetchAddSeqCst(1u),
                                                         &wc.sharedGlContext,
                                                         contextSettings,
                                                         ZA_FORWARD(args)...);

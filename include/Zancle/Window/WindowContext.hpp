@@ -187,7 +187,7 @@ private:
     friend priv::GlContext;  // for `onGlContextDestroyed` and `getActiveThreadLocalGlContextPtr`
     friend priv::GLContextSaver; // for `setActiveThreadLocalGlContext`, `getActiveThreadLocalGlContextPtr`, and `disableSharedGlContext`
     friend priv::GLSharedContextGuard; // for `setActiveThreadLocalGlContextToSharedContext`
-    friend priv::SDLGlContext;         // for `cleanupUnsharedFrameBuffers` and `getSDLLayer`
+    friend priv::SDLGlContext;         // for `cleanupUnsharedFrameBuffers`
     friend priv::JoystickManager;      // for `getSDLLayer`
     friend priv::SDLWindowImpl;        // for `getJoystickManager` and `getSDLLayer`
     friend Clipboard;                  // for `getSDLLayer`

@@ -17,8 +17,9 @@ struct SDL_GLContextState;
 
 namespace za::priv
 {
+class SDLLayer;
 class SDLWindowImpl;
-}
+} // namespace za::priv
 
 namespace za
 {
@@ -33,14 +34,26 @@ class SDLGlContext : public GlContext
 {
 public:
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] explicit SDLGlContext(unsigned int id, SDLGlContext* shared, const ContextSettings& settings);
+    /// rief Create a context with its own hidden window
+    ///
+    /// `sdlLayer` is passed explicitly (rather than obtained from the
+    /// installed `WindowContext`) because the shared context is created
+    /// while the `WindowContext` itself is still being constructed.
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] explicit SDLGlContext(SDLLayer& sdlLayer, unsigned int id, SDLGlContext* shared, const ContextSettings& settings);
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] explicit SDLGlContext(unsigned int           id,
-                                        SDLGlContext*          shared,
-                                        const ContextSettings& settings,
-                                        const SDLWindowImpl&   owner,
-                                        unsigned int           bitsPerPixel);
+    /// rief Create a context for an existing window
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] explicit SDLGlContext(
+        SDLLayer&              sdlLayer,
+        unsigned int           id,
+        SDLGlContext*          shared,
+        const ContextSettings& settings,
+        const SDLWindowImpl&   owner,
+        unsigned int           bitsPerPixel);
 
     ////////////////////////////////////////////////////////////
     ~SDLGlContext() override;
@@ -76,7 +89,7 @@ private:
     /// \brief TODO P1: docs
     ///
     ////////////////////////////////////////////////////////////
-    void initContext(SDLGlContext* shared);
+    void initContext(SDLLayer& sdlLayer, SDLGlContext* shared);
 
     ////////////////////////////////////////////////////////////
     /// \brief TODO P1: docs

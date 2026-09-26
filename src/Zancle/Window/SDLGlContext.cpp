@@ -36,10 +36,8 @@ void SDLGlContext::destroyWindowIfNeeded()
 
 
 ////////////////////////////////////////////////////////////
-void SDLGlContext::initContext(SDLGlContext* const shared)
+void SDLGlContext::initContext(SDLLayer& sdlLayer, SDLGlContext* const shared)
 {
-    auto& sdlLayer = WindowContext::getSDLLayer();
-
     // Set context sharing attributes if a shared context is provided
     if (shared != nullptr)
     {
@@ -71,13 +69,13 @@ void SDLGlContext::initContext(SDLGlContext* const shared)
 
 
 ////////////////////////////////////////////////////////////
-SDLGlContext::SDLGlContext(const unsigned int id, SDLGlContext* const shared, const ContextSettings& settings) :
+SDLGlContext::SDLGlContext(SDLLayer& sdlLayer, const unsigned int id, SDLGlContext* const shared, const ContextSettings& settings) :
     GlContext(id, settings),
     m_window(nullptr),
     m_context(nullptr),
     m_ownsWindow(false)
 {
-    if (!WindowContext::getSDLLayer().applyGLContextSettings(m_settings))
+    if (!sdlLayer.applyGLContextSettings(m_settings))
         errMsg("Failed to apply SDL GL context settings for shared GL context hidden window");
 
     // Create a hidden window for the context
@@ -89,12 +87,13 @@ SDLGlContext::SDLGlContext(const unsigned int id, SDLGlContext* const shared, co
     }
 
     m_ownsWindow = true;
-    initContext(shared);
+    initContext(sdlLayer, shared);
 }
 
 
 ////////////////////////////////////////////////////////////
-SDLGlContext::SDLGlContext(const unsigned int     id,
+SDLGlContext::SDLGlContext(SDLLayer&              sdlLayer,
+                           const unsigned int     id,
                            SDLGlContext* const    shared,
                            const ContextSettings& settings,
                            const SDLWindowImpl&   owner,
@@ -104,7 +103,7 @@ SDLGlContext::SDLGlContext(const unsigned int     id,
     m_context(nullptr),
     m_ownsWindow(false)
 {
-    initContext(shared);
+    initContext(sdlLayer, shared);
 }
 
 
