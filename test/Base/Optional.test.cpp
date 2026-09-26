@@ -2,6 +2,8 @@
 
 #include "Zancle/Vocabulary/Optional.hpp"
 
+#include "Zancle/Config.hpp" // IWYU pragma: keep (for `ZA_SYSTEM_EMSCRIPTEN`)
+
 #include "Zancle/Trait/EnableTrivialRelocation.hpp"
 #include "Zancle/Trait/IsCopyAssignable.hpp"
 #include "Zancle/Trait/IsCopyConstructible.hpp"
@@ -120,6 +122,7 @@ struct DtorCounter
 };
 
 
+#ifdef __cpp_exceptions
 ////////////////////////////////////////////////////////////
 // Constructors that throw on demand, tracking the number of live objects
 struct MaybeThrows
@@ -150,6 +153,7 @@ struct MaybeThrows
         --liveCount;
     }
 };
+#endif
 
 
 ////////////////////////////////////////////////////////////
@@ -323,6 +327,50 @@ TEST_CASE("[Base] Base/Optional.hpp")
         }
 
         CHECK(MaybeThrows::liveCount == 0); // no double destruction, no leak
+    }
+#endif
+
+    SECTION("Engaged construction is usable in constant expressions")
+    {
+        constexpr za::Optional<int> fromValue{5};
+        STATIC_CHECK(fromValue.hasValue());
+        STATIC_CHECK(*fromValue == 5);
+
+        constexpr za::Optional<int> inPlace{za::inPlace, 6};
+        STATIC_CHECK(*inPlace == 6);
+
+        constexpr za::Optional<int> copy{fromValue};
+        STATIC_CHECK(*copy == 5);
+
+        constexpr za::Optional<int> empty;
+        STATIC_CHECK(!empty.hasValue());
+    }
+
+// Matches the condition under which `onBadOptionalAccess` throws rather than aborting
+#if (defined(__cpp_exceptions) || defined(_CPPUNWIND)) && !defined(ZA_SYSTEM_EMSCRIPTEN)
+    SECTION("value() throws BadOptionalAccess if empty")
+    {
+        const auto throwsBadAccess = [](auto&& f)
+        {
+            try
+            {
+                (void)f();
+            } catch (const za::BadOptionalAccess&)
+            {
+                return true;
+            }
+
+            return false;
+        };
+
+        za::Optional<int> o;
+        CHECK(throwsBadAccess([&]() -> int { return o.value(); }));
+        CHECK(throwsBadAccess([&]() -> int { return static_cast<const za::Optional<int>&>(o).value(); }));
+        CHECK(throwsBadAccess([&]() -> int { return static_cast<za::Optional<int>&&>(o).value(); }));
+
+        o.emplace(1);
+        CHECK(!throwsBadAccess([&]() -> int { return o.value(); }));
+        CHECK(o.value() == 1);
     }
 #endif
 }

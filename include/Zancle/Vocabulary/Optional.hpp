@@ -150,9 +150,10 @@ public:
     /// \brief Construct an engaged optional by copying `object`
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline]] constexpr explicit Optional(const T& object) : m_engaged{true}
+    [[nodiscard, gnu::always_inline]] constexpr explicit Optional(const T& object) :
+        m_buffer{inPlace, object},
+        m_engaged{true}
     {
-        ZA_PLACEMENT_NEW(&m_buffer.obj) T(object);
     }
 
 
@@ -160,9 +161,10 @@ public:
     /// \brief Construct an engaged optional by moving `object`
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline]] constexpr explicit Optional(T&& object) noexcept : m_engaged{true}
+    [[nodiscard, gnu::always_inline]] constexpr explicit Optional(T&& object) noexcept :
+        m_buffer{inPlace, ZA_MOVE(object)},
+        m_engaged{true}
     {
-        ZA_PLACEMENT_NEW(&m_buffer.obj) T(ZA_MOVE(object));
     }
 
 
@@ -172,7 +174,7 @@ public:
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline]] constexpr /* implicit */ Optional(const Optional& rhs)
         requires(!isTriviallyCopyConstructible<T> && isCopyConstructible<T>)
-        : m_engaged{rhs.m_engaged}
+        : m_buffer{Uninit{}}, m_engaged{rhs.m_engaged}
     {
         if (m_engaged)
             ZA_PLACEMENT_NEW(&m_buffer.obj) T(rhs.m_buffer.obj);
@@ -194,7 +196,7 @@ public:
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline]] constexpr /* implicit */ Optional(Optional&& rhs) noexcept
         requires(!isTriviallyMoveConstructible<T> && isMoveConstructible<T>)
-        : m_engaged{rhs.m_engaged}
+        : m_buffer{Uninit{}}, m_engaged{rhs.m_engaged}
     {
         if (m_engaged)
             ZA_PLACEMENT_NEW(&m_buffer.obj) T(ZA_MOVE(rhs.m_buffer.obj));
@@ -328,9 +330,10 @@ public:
     ///
     ////////////////////////////////////////////////////////////
     template <typename... Args>
-    [[nodiscard, gnu::always_inline]] constexpr explicit Optional(InPlace, Args&&... args) : m_engaged{true}
+    [[nodiscard, gnu::always_inline]] constexpr explicit Optional(InPlace, Args&&... args) :
+        m_buffer{inPlace, ZA_FORWARD(args)...},
+        m_engaged{true}
     {
-        ZA_PLACEMENT_NEW(&m_buffer.obj) T(ZA_FORWARD(args)...);
     }
 
 
@@ -646,14 +649,29 @@ public:
     }
 
 private:
+    ////////////////////////////////////////////////////////////
+    struct Uninit
+    {
+    };
+
+
+    ////////////////////////////////////////////////////////////
     union Buffer
     {
-        char dummy{}; // Needed by GCC for constant expression support, even with GCC 16.x
+        char dummy;
         T    obj;
 
         // clang-format off
-        // Never trivial (because of `dummy{}`), but never deleted either (for the same reason)
-        [[gnu::always_inline]] constexpr Buffer() = default;
+        // Empty state: activates `dummy`, as GCC requires an active union member for
+        // constant initialization (e.g. `constinit Optional<T>`), even with GCC 16.x
+        [[gnu::always_inline]] constexpr Buffer() noexcept : dummy{} { }
+
+        // Engaged state: constructs the value directly (no dummy store, usable in constant expressions)
+        template <typename... Args>
+        [[gnu::always_inline]] constexpr explicit Buffer(InPlace, Args&&... args) : obj(ZA_FORWARD(args)...) { }
+
+        // No active member: the caller placement-news `obj` when needed (no dummy store)
+        [[gnu::always_inline]] constexpr explicit Buffer(Uninit) noexcept { }
 
         constexpr ~Buffer() requires(isTriviallyDestructible<T>) = default;
         [[gnu::always_inline]] constexpr ~Buffer() requires(!isTriviallyDestructible<T>) { }
