@@ -186,11 +186,15 @@ private:
 
 
     ////////////////////////////////////////////////////////////
-#define ZA_VARIANT_DO_WITH_CURRENT_INDEX_OBJ(obj, Is, ...)                                      \
-    do                                                                                          \
-    {                                                                                           \
-        [&]<SizeT... Is> [[gnu::always_inline]] (IndexSequence<Is...>)                          \
-        { (..., (((obj).m_index == Is) ? ((__VA_ARGS__), 0) : 0)); }(alternativeIndexSequence); \
+    // Short-circuits after the active alternative, so only the necessary
+    // comparisons are performed (relevant in debug mode).
+#define ZA_VARIANT_DO_WITH_CURRENT_INDEX_OBJ(obj, Is, ...)                                                 \
+    do                                                                                                     \
+    {                                                                                                      \
+        [&]<SizeT... Is> [[gnu::always_inline]] (IndexSequence<Is...>)                                     \
+        {                                                                                                  \
+            static_cast<void>((... || (((obj).m_index == Is) && (static_cast<void>(__VA_ARGS__), true)))); \
+        }(alternativeIndexSequence);                                                                       \
     } while (false)
 
 
@@ -229,6 +233,19 @@ private:
         using Type = ZA_VARIANT_NTH_TYPE(I);
         // Discriminator check omitted: callers gate on `m_index == I` via `DO_WITH_CURRENT_INDEX`.
         bufferAs<Type>().~Type();
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    // Destroys the active alternative. Trivially destructible alternatives
+    // are skipped entirely, including their discriminator comparison.
+    [[gnu::always_inline]] void destroyCurrent() noexcept
+    {
+        [&]<SizeT... Is> [[gnu::always_inline]] (IndexSequence<Is...>)
+        {
+            static_cast<void>(
+                (... || (!isTriviallyDestructible<ZA_VARIANT_NTH_TYPE(Is)> && m_index == Is && (destroyAt<Is>(), true))));
+        }(alternativeIndexSequence);
     }
 
 
@@ -399,7 +416,7 @@ public:
     [[gnu::always_inline]] ~Variant()
         requires(!triviallyDestructible)
     {
-        ZA_VARIANT_DO_WITH_CURRENT_INDEX(I, destroyAt<I>());
+        destroyCurrent();
     }
 
 
@@ -426,7 +443,7 @@ public:
             return *this;
         }
 
-        ZA_VARIANT_DO_WITH_CURRENT_INDEX(I, destroyAt<I>());
+        destroyCurrent();
 
         ZA_VARIANT_DO_WITH_CURRENT_INDEX_OBJ(rhs,
                                              I,
@@ -460,7 +477,7 @@ public:
             return *this;
         }
 
-        ZA_VARIANT_DO_WITH_CURRENT_INDEX(I, destroyAt<I>());
+        destroyCurrent();
 
         ZA_VARIANT_DO_WITH_CURRENT_INDEX_OBJ(rhs,
                                              I,
@@ -502,7 +519,7 @@ public:
             return *this;
         }
 
-        ZA_VARIANT_DO_WITH_CURRENT_INDEX(I, destroyAt<I>());
+        destroyCurrent();
 
         ZA_PLACEMENT_NEW(m_buffer) Type{static_cast<T&&>(x)};
         m_index = indexOf<Type>;
