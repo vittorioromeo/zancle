@@ -27,8 +27,9 @@
 namespace za
 {
 
+// Not `gnu::pure`: the exponent is written through `exp`, and Clang would drop that store
 template <typename T>
-[[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr auto frexp(const T arg0, int* exp) noexcept
+[[nodiscard, gnu::always_inline, gnu::flatten]] inline constexpr auto frexp(const T arg0, int* exp) noexcept
 {
     if constexpr (ZA_IS_SAME(T, float))
         return ZA_MATH_FREXPF(arg0, exp);

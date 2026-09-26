@@ -29,6 +29,28 @@ TEST_CASE("[Base] Base/Math.hpp")
         CHECK(exponent == 0);
     }
 
+    SECTION("Frexp writes exponent")
+    {
+        // Regression: `za::frexp` used to be `gnu::pure`, so optimized Clang builds dropped the exponent store
+        int exponent = -100;
+        CHECK(za::frexp(8.f, &exponent) == 0.5f);
+        CHECK(exponent == 4);
+
+        exponent = -100;
+        CHECK(za::frexp(-3., &exponent) == -0.75);
+        CHECK(exponent == 2);
+
+        exponent = -100;
+        CHECK(za::frexp(0.25l, &exponent) == 0.5l);
+        CHECK(exponent == -1);
+
+        int exponentA = -100;
+        int exponentB = -100;
+        CHECK(za::frexp(12.f, &exponentA) == za::frexp(12.f, &exponentB));
+        CHECK(exponentA == 4);
+        CHECK(exponentB == 4);
+    }
+
     SECTION("Ldexp")
     {
         int exponent{};
