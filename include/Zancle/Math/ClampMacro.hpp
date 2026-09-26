@@ -11,4 +11,4 @@
 ///
 ////////////////////////////////////////////////////////////
 #define ZA_CLAMP(value, minValue, maxValue) \
-    ((value) < (minValue) ? (minValue) : ((value) > (maxValue) ? (maxValue) : (value)))
+    ((value) < (minValue) ? (minValue) : ((maxValue) < (value) ? (maxValue) : (value)))

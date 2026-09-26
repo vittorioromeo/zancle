@@ -6,6 +6,7 @@
 namespace
 {
 ////////////////////////////////////////////////////////////
+// Only provides `operator<`, which is all that `za::clamp` requires (like `std::clamp`)
 struct Wrapper
 {
     int value;
@@ -13,16 +14,6 @@ struct Wrapper
     [[nodiscard]] constexpr bool operator<(const Wrapper& rhs) const
     {
         return value < rhs.value;
-    }
-
-    [[nodiscard]] constexpr bool operator>(const Wrapper& rhs) const
-    {
-        return rhs < *this;
-    }
-
-    [[nodiscard]] constexpr bool operator<=(const Wrapper& rhs) const
-    {
-        return !(rhs < *this);
     }
 };
 

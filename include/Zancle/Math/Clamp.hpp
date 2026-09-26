@@ -14,6 +14,8 @@ namespace za
 ////////////////////////////////////////////////////////////
 /// \brief Clamp `value` into the closed range `[minValue, maxValue]`
 ///
+/// Like `std::clamp`, only requires `T` to provide `operator<`.
+///
 /// Non-class types (arithmetic, enums, pointers) are taken and returned
 /// by value, which avoids stack spills in unoptimized builds. Class types
 /// are taken and returned by `const` reference, like `std::clamp`.
@@ -25,9 +27,9 @@ template <typename T>
     requires(!__is_class(T))
 [[nodiscard, gnu::always_inline, gnu::const]] constexpr T clamp(const T value, const T minValue, const T maxValue) noexcept
 {
-    ZA_ASSERT(minValue <= maxValue);
+    ZA_ASSERT(!(maxValue < minValue));
 
-    return (value < minValue) ? minValue : ((value > maxValue) ? maxValue : value);
+    return (value < minValue) ? minValue : ((maxValue < value) ? maxValue : value);
 }
 
 
@@ -36,10 +38,10 @@ template <typename T>
     requires(__is_class(T))
 [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& clamp(const T& value, const T& minValue, const T& maxValue) noexcept
 {
-    ZA_ASSERT(minValue <= maxValue);
+    ZA_ASSERT(!(maxValue < minValue));
 
     // NOLINTNEXTLINE(bugprone-return-const-ref-from-parameter)
-    return (value < minValue) ? minValue : ((value > maxValue) ? maxValue : value);
+    return (value < minValue) ? minValue : ((maxValue < value) ? maxValue : value);
 }
 
 } // namespace za
