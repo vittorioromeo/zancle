@@ -25,6 +25,7 @@
 #include "Zancle/Geometry/Rect2.hpp"
 
 #include "Zancle/Base/IntTypes.hpp"
+#include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
 
@@ -337,7 +338,7 @@ public:
     ///
     ////////////////////////////////////////////////////////////
     template <typename Self>
-    [[nodiscard]] const Rect2f& getLocalBounds(this const Self& self);
+    [[nodiscard]] const Rect2f& getLocalBounds(this const Self& self ZA_LIFETIMEBOUND);
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the global bounding rectangle of the entity
@@ -377,7 +378,7 @@ public:
     ///
     ////////////////////////////////////////////////////////////
     template <typename Self>
-    [[nodiscard]] ConstVertexSpan getVertices(this const Self& self);
+    [[nodiscard]] ConstVertexSpan getVertices(this const Self& self ZA_LIFETIMEBOUND);
 
     ////////////////////////////////////////////////////////////
     /// \brief Get a mutable span to the text's vertices.

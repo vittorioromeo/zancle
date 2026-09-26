@@ -14,6 +14,8 @@
 
 #include "Zancle/Vocabulary/Span.hpp"
 
+#include "Zancle/Base/LifetimeAttributes.hpp"
+
 
 namespace za::priv
 {
@@ -22,7 +24,7 @@ namespace za::priv
 ///
 ////////////////////////////////////////////////////////////
 template <typename T>
-struct VertexSpanImpl : za::Span<T>
+struct ZA_GSL_POINTER(T) VertexSpanImpl : za::Span<T>
 {
     using za::Span<T>::Span;
 

@@ -7,6 +7,7 @@
 // Headers
 ////////////////////////////////////////////////////////////
 #include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/Macros.hpp"
 
 #include "Zancle/Trait/IsFunction.hpp"
@@ -110,7 +111,7 @@ public:
         requires(!za::isSame<za::RemoveCVRefIndirect<TFFwd>, FunctionRef> &&
                  !za::isPointer<za::RemoveCVRefIndirect<TFFwd>> && !za::isFunction<za::RemoveCVRefIndirect<TFFwd>> &&
                  za::isInvocableR<TFFwd&, TReturn, Ts...>)
-    [[nodiscard, gnu::always_inline]] FunctionRef(TFFwd&& f) noexcept :
+    [[nodiscard, gnu::always_inline]] FunctionRef(TFFwd&& f ZA_LIFETIMEBOUND) noexcept :
         m_obj{const_cast<void*>(static_cast<const void*>(&f))},
         m_thunk{[](void* o, Ts&&... args) -> TReturn
     {

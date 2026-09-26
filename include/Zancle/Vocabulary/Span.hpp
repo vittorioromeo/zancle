@@ -7,6 +7,7 @@
 // Headers
 ////////////////////////////////////////////////////////////
 #include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
 #include "Zancle/Trait/IsConvertible.hpp"
@@ -40,11 +41,14 @@ namespace za
 /// `Span<const T>` for read-only views.
 ///
 /// `Span` does not own its memory; the caller must ensure that the
-/// referenced range outlives the span.
+/// referenced range outlives the span. Constructing a `Span` from a
+/// temporary owning container (e.g. `Span<int> s = makeVector();`) is
+/// diagnosed by Clang (`-Wdangling-gsl`), while passing one as a function
+/// argument is fine.
 ///
 ////////////////////////////////////////////////////////////
 template <typename T>
-struct Span
+struct ZA_GSL_POINTER(T) Span
 {
     ////////////////////////////////////////////////////////////
     /// \brief Default constructor, creates an empty span (`data = nullptr`, `size = 0`)
@@ -77,7 +81,7 @@ struct Span
     ///
     ////////////////////////////////////////////////////////////
     template <SizeT N>
-    [[nodiscard, gnu::always_inline]] constexpr Span(T (&array)[N]) : theData{array}, theSize{N}
+    [[nodiscard, gnu::always_inline]] constexpr Span(T (&array ZA_LIFETIMEBOUND)[N]) : theData{array}, theSize{N}
     {
     }
 

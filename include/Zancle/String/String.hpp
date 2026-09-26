@@ -12,6 +12,7 @@
 
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/FwdStdAlignedNewDelete.hpp"
+#include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/Memcmp.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
@@ -33,7 +34,7 @@ namespace za
 /// at the call site to bring in the template body.
 ///
 ////////////////////////////////////////////////////////////
-class [[nodiscard]] String : public FmtAppendMixin
+class [[nodiscard]] ZA_GSL_OWNER(char) String : public FmtAppendMixin
 {
 public:
     ////////////////////////////////////////////////////////////
@@ -218,42 +219,42 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr iterator begin() noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr iterator begin() noexcept ZA_LIFETIMEBOUND
     {
         return data();
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const_iterator begin() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const_iterator begin() const noexcept ZA_LIFETIMEBOUND
     {
         return data();
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const_iterator cbegin() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const_iterator cbegin() const noexcept ZA_LIFETIMEBOUND
     {
         return data();
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr iterator end() noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr iterator end() noexcept ZA_LIFETIMEBOUND
     {
         return data() + size();
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const_iterator end() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const_iterator end() const noexcept ZA_LIFETIMEBOUND
     {
         return data() + size();
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const_iterator cend() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const_iterator cend() const noexcept ZA_LIFETIMEBOUND
     {
         return data() + size();
     }
@@ -281,28 +282,28 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const char* data() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const char* data() const noexcept ZA_LIFETIMEBOUND
     {
         return isSso() ? m_rep.sso.buffer : m_rep.heap.data;
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr char* data() noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr char* data() noexcept ZA_LIFETIMEBOUND
     {
         return isSso() ? m_rep.sso.buffer : m_rep.heap.data;
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const char* cStr() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const char* cStr() const noexcept ZA_LIFETIMEBOUND
     {
         return data();
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr char& operator[](const SizeT index) noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr char& operator[](const SizeT index) noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(index < size() + 1u);
         return data()[index];
@@ -318,7 +319,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr char& front() noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr char& front() noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(!empty());
         return data()[0];
@@ -334,7 +335,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr char& back() noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr char& back() noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(!empty());
         return data()[size() - 1u];
@@ -364,14 +365,14 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten]] constexpr StringView toStringView() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten]] constexpr StringView toStringView() const noexcept ZA_LIFETIMEBOUND
     {
         return StringView{data(), size()};
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten]] constexpr operator StringView() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten]] constexpr operator StringView() const noexcept ZA_LIFETIMEBOUND
     {
         return toStringView();
     }
@@ -454,15 +455,17 @@ public:
 
 ////////////////////////////////////////////////////////////
 // Bridge macro: forward `methodName(...)` to the equivalent on `StringView`.
-#define ZA_PRIV_DEFINE_STRING_VIEW_BRIDGE(methodName)                           \
-    decltype(auto) methodName(auto&&... args) const                             \
+// The optional trailing argument is appended after the member function qualifiers.
+#define ZA_PRIV_DEFINE_STRING_VIEW_BRIDGE(methodName, ...)                      \
+    decltype(auto) methodName(auto&&... args) const __VA_ARGS__                 \
     {                                                                           \
         return toStringView().methodName(static_cast<decltype(args)>(args)...); \
     }                                                                           \
                                                                                 \
     static_assert(true)
 
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] ZA_PRIV_DEFINE_STRING_VIEW_BRIDGE(substrByPosLen);
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] ZA_PRIV_DEFINE_STRING_VIEW_BRIDGE(substrByPosLen,
+                                                                                                 ZA_LIFETIMEBOUND);
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] ZA_PRIV_DEFINE_STRING_VIEW_BRIDGE(find);
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] ZA_PRIV_DEFINE_STRING_VIEW_BRIDGE(rfind);
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] ZA_PRIV_DEFINE_STRING_VIEW_BRIDGE(findFirstOf);

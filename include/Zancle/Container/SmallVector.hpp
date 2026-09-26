@@ -13,6 +13,7 @@
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/AssertAndAssume.hpp"
 #include "Zancle/Base/InitializerList.hpp" // IWYU pragma: keep
+#include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/PlacementNew.hpp"
 #include "Zancle/Base/PtrDiffT.hpp"
 #include "Zancle/Base/SizeT.hpp"
@@ -44,7 +45,7 @@ namespace za
 ///
 ////////////////////////////////////////////////////////////
 template <typename TItem, SizeT N>
-class [[nodiscard]] SmallVector // NOLINT(cppcoreguidelines-pro-type-member-init)
+class [[nodiscard]] ZA_GSL_OWNER(TItem) SmallVector // NOLINT(cppcoreguidelines-pro-type-member-init)
 {
     static_assert(N > 0);
 
@@ -583,14 +584,14 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] TItem* data() noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] TItem* data() noexcept ZA_LIFETIMEBOUND
     {
         return m_heapData != nullptr ? m_heapData : getInlineStorage();
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] const TItem* data() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] const TItem* data() const noexcept ZA_LIFETIMEBOUND
     {
         return m_heapData != nullptr ? m_heapData : getInlineStorage();
     }
@@ -671,7 +672,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] TItem& front() noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] TItem& front() noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(!empty());
         return *data();
@@ -679,7 +680,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] const TItem& front() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] const TItem& front() const noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(!empty());
         return *data();
@@ -687,7 +688,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] TItem& back() noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] TItem& back() noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(!empty());
         return *(data() + m_size - 1u);
@@ -695,7 +696,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] const TItem& back() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] const TItem& back() const noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(!empty());
         return *(data() + m_size - 1u);

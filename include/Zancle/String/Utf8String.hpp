@@ -11,6 +11,7 @@
 #include "Zancle/String/String.hpp"
 #include "Zancle/String/StringView.hpp"
 
+#include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/Macros.hpp"
 #include "Zancle/Base/SizeT.hpp"
 #include "Zancle/Base/Swap.hpp"
@@ -35,7 +36,7 @@ namespace za
 /// at the call site to bring in the template body.
 ///
 ////////////////////////////////////////////////////////////
-class [[nodiscard]] Utf8String : public za::FmtAppendMixin
+class [[nodiscard]] ZA_GSL_OWNER(char) Utf8String : public za::FmtAppendMixin
 {
 public:
     ////////////////////////////////////////////////////////////
@@ -152,7 +153,7 @@ public:
     /// \brief Implicit conversion to a `za::StringView` over the UTF-8 bytes
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] /* implicit */ operator za::StringView() const noexcept
+    [[nodiscard]] /* implicit */ operator za::StringView() const noexcept ZA_LIFETIMEBOUND
     {
         return m_bytes;
     }
@@ -182,7 +183,7 @@ public:
     /// \brief Pointer to a null-terminated UTF-8 C string
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] const char* cStr() const noexcept
+    [[nodiscard]] const char* cStr() const noexcept ZA_LIFETIMEBOUND
     {
         return m_bytes.cStr();
     }
@@ -192,7 +193,7 @@ public:
     /// \brief Pointer to the first byte of the UTF-8 buffer (not necessarily null-terminated)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] const char* data() const noexcept
+    [[nodiscard]] const char* data() const noexcept ZA_LIFETIMEBOUND
     {
         return m_bytes.data();
     }
@@ -215,7 +216,7 @@ public:
     /// \note Defined in `Utf8StringCodepoints.hpp`.
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] CodepointRange codepoints() const noexcept;
+    [[nodiscard]] CodepointRange codepoints() const noexcept ZA_LIFETIMEBOUND;
 
 
     ////////////////////////////////////////////////////////////
@@ -437,7 +438,7 @@ public:
     /// \brief Read-only access to the underlying byte storage
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] const za::String& asBytes() const& noexcept
+    [[nodiscard]] const za::String& asBytes() const& noexcept ZA_LIFETIMEBOUND
     {
         return m_bytes;
     }

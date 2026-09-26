@@ -10,6 +10,7 @@
 
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/InitializerList.hpp" // IWYU pragma: keep
+#include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/PlacementNew.hpp"
 #include "Zancle/Base/Prefetch.hpp"
 #include "Zancle/Base/PtrDiffT.hpp"
@@ -731,7 +732,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] TItem& operator[](const SizeT i) noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] TItem& operator[](const SizeT i) noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(i < m_size);
         return *slotPtrUnchecked(i);
@@ -739,7 +740,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] const TItem& operator[](const SizeT i) const noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] const TItem& operator[](const SizeT i) const noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(i < m_size);
         return *slotPtrUnchecked(i);
@@ -747,42 +748,42 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] iterator begin() noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] iterator begin() noexcept ZA_LIFETIMEBOUND
     {
         return iterator{this, 0u};
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] const_iterator begin() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] const_iterator begin() const noexcept ZA_LIFETIMEBOUND
     {
         return const_iterator{this, 0u};
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] iterator end() noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] iterator end() noexcept ZA_LIFETIMEBOUND
     {
         return iterator{this, m_size};
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] const_iterator end() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] const_iterator end() const noexcept ZA_LIFETIMEBOUND
     {
         return const_iterator{this, m_size};
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] const_iterator cbegin() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] const_iterator cbegin() const noexcept ZA_LIFETIMEBOUND
     {
         return begin();
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] const_iterator cend() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] const_iterator cend() const noexcept ZA_LIFETIMEBOUND
     {
         return end();
     }
@@ -839,7 +840,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] TItem& front() noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] TItem& front() noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(!empty());
         return *slotPtrUnchecked(0u);
@@ -847,7 +848,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] const TItem& front() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] const TItem& front() const noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(!empty());
         return *slotPtrUnchecked(0u);
@@ -855,7 +856,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] TItem& back() noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] TItem& back() noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(!empty());
         return *slotPtrUnchecked(m_size - 1u);
@@ -863,7 +864,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] const TItem& back() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] const TItem& back() const noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(!empty());
         return *slotPtrUnchecked(m_size - 1u);

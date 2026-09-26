@@ -23,6 +23,7 @@
 #include "Zancle/Geometry/Priv/Vec2Base.hpp"
 #include "Zancle/Geometry/Rect2.hpp"
 
+#include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
 
@@ -206,7 +207,7 @@ public:
     /// \see `setTextureRect`
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] const Rect2f& getTextureRect() const;
+    [[nodiscard]] const Rect2f& getTextureRect() const ZA_LIFETIMEBOUND;
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the sub-rectangle of the texture displayed by the shape outline
@@ -216,7 +217,7 @@ public:
     /// \see setTextureRect
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] const Rect2f& getOutlineTextureRect() const;
+    [[nodiscard]] const Rect2f& getOutlineTextureRect() const ZA_LIFETIMEBOUND;
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the fill color of the shape
@@ -270,7 +271,7 @@ public:
     /// \return Local bounding rectangle of the entity
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] const Rect2f& getLocalBounds() const;
+    [[nodiscard]] const Rect2f& getLocalBounds() const ZA_LIFETIMEBOUND;
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the global (non-minimal) bounding rectangle of the entity
@@ -304,7 +305,7 @@ public:
     /// \return Span over the fill vertices (invalidated if the shape changes)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] ConstVertexSpan getFillVertices() const
+    [[nodiscard, gnu::always_inline, gnu::pure]] ConstVertexSpan getFillVertices() const ZA_LIFETIMEBOUND
     {
         return {m_vertices.data(), m_verticesEndIndex};
     }
@@ -318,7 +319,7 @@ public:
     /// \return Span over the outline vertices (invalidated if the shape changes)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] ConstVertexSpan getOutlineVertices() const
+    [[nodiscard, gnu::always_inline, gnu::pure]] ConstVertexSpan getOutlineVertices() const ZA_LIFETIMEBOUND
     {
         return {m_vertices.data() + m_verticesEndIndex, m_vertices.size() - m_verticesEndIndex};
     }

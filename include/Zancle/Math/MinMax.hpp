@@ -3,6 +3,12 @@
 // https://github.com/vittorioromeo/Zancle/blob/master/license.md
 
 
+////////////////////////////////////////////////////////////
+// Headers
+////////////////////////////////////////////////////////////
+#include "Zancle/Base/LifetimeAttributes.hpp"
+
+
 namespace za
 {
 ////////////////////////////////////////////////////////////
@@ -27,7 +33,7 @@ template <typename T>
 ////////////////////////////////////////////////////////////
 template <typename T>
     requires(__is_class(T))
-[[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& min(const T& a, const T& b) noexcept
+[[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& min(const T& a ZA_LIFETIMEBOUND, const T& b ZA_LIFETIMEBOUND) noexcept
 {
     // NOLINTNEXTLINE(bugprone-return-const-ref-from-parameter)
     return b < a ? b : a;
@@ -56,7 +62,7 @@ template <typename T>
 ////////////////////////////////////////////////////////////
 template <typename T>
     requires(__is_class(T))
-[[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& max(const T& a, const T& b) noexcept
+[[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& max(const T& a ZA_LIFETIMEBOUND, const T& b ZA_LIFETIMEBOUND) noexcept
 {
     // NOLINTNEXTLINE(bugprone-return-const-ref-from-parameter)
     return a < b ? b : a;

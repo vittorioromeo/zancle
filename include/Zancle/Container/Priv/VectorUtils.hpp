@@ -8,6 +8,7 @@
 ////////////////////////////////////////////////////////////
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/FwdStdAlignedNewDelete.hpp"
+#include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/Memcpy.hpp"
 #include "Zancle/Base/Memmove.hpp"
 #include "Zancle/Base/PlacementNew.hpp"
@@ -284,135 +285,136 @@ template <typename T, typename U>
 
 
 ////////////////////////////////////////////////////////////
-#define ZA_PRIV_DEFINE_COMMON_VECTOR_OPERATIONS(vectorType)                                                                    \
-                                                                                                                               \
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr TItem& operator[](const SizeT i) noexcept             \
-    {                                                                                                                          \
-        ZA_ASSERT(i < size());                                                                                                 \
-        return *(data() + i);                                                                                                  \
-    }                                                                                                                          \
-                                                                                                                               \
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const TItem& operator[](const SizeT i) const noexcept \
-    {                                                                                                                          \
-        ZA_ASSERT(i < size());                                                                                                 \
-        return *(data() + i);                                                                                                  \
-    }                                                                                                                          \
-                                                                                                                               \
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr TItem* begin() noexcept                               \
-    {                                                                                                                          \
-        return data();                                                                                                         \
-    }                                                                                                                          \
-                                                                                                                               \
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const TItem* begin() const noexcept                   \
-    {                                                                                                                          \
-        return data();                                                                                                         \
-    }                                                                                                                          \
-                                                                                                                               \
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr TItem* end() noexcept                                 \
-    {                                                                                                                          \
-        return data() + size();                                                                                                \
-    }                                                                                                                          \
-                                                                                                                               \
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const TItem* end() const noexcept                     \
-    {                                                                                                                          \
-        return data() + size();                                                                                                \
-    }                                                                                                                          \
-                                                                                                                               \
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const TItem* cbegin() const noexcept                  \
-    {                                                                                                                          \
-        return data();                                                                                                         \
-    }                                                                                                                          \
-                                                                                                                               \
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const TItem* cend() const noexcept                    \
-    {                                                                                                                          \
-        return data() + size();                                                                                                \
-    }                                                                                                                          \
-                                                                                                                               \
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr bool empty() const noexcept                                         \
-    {                                                                                                                          \
-        return size() == 0u;                                                                                                   \
-    }                                                                                                                          \
-                                                                                                                               \
-    [[nodiscard]] constexpr bool operator==(const vectorType& rhs) const                                                       \
-    {                                                                                                                          \
-        if (this == &rhs)                                                                                                      \
-            return true;                                                                                                       \
-                                                                                                                               \
-        const SizeT lhsSize = size();                                                                                          \
-                                                                                                                               \
-        if (lhsSize != rhs.size())                                                                                             \
-            return false;                                                                                                      \
-                                                                                                                               \
-        for (SizeT i = 0u; i < lhsSize; ++i)                                                                                   \
-            if (operator[](i) != rhs.operator[](i))                                                                            \
-                return false;                                                                                                  \
-                                                                                                                               \
-        return true;                                                                                                           \
-    }                                                                                                                          \
-                                                                                                                               \
-    /* NOLINTNEXTLINE(bugprone-macro-parentheses) */                                                                           \
-    [[gnu::always_inline]] constexpr friend void swap(vectorType& lhs, vectorType& rhs) noexcept                               \
-    {                                                                                                                          \
-        lhs.swap(rhs);                                                                                                         \
-    }                                                                                                                          \
-                                                                                                                               \
-    template <typename... Ts>                                                                                                  \
-    [[gnu::always_inline]] constexpr TItem& reEmplaceByIterator(TItem* const it, Ts&&... xs)                                   \
-    {                                                                                                                          \
-        ZA_ASSERT(it >= begin() && it < end());                                                                                \
-                                                                                                                               \
-        if constexpr (!ZA_IS_TRIVIALLY_DESTRUCTIBLE(TItem))                                                                    \
-            it->~TItem();                                                                                                      \
-                                                                                                                               \
-        return *(ZA_PLACEMENT_NEW(it) TItem(static_cast<Ts&&>(xs)...));                                                        \
-    }                                                                                                                          \
-                                                                                                                               \
-    template <typename... Ts>                                                                                                  \
-    [[gnu::always_inline]] constexpr TItem& reEmplaceByIndex(const SizeT index, Ts&&... xs)                                    \
-    {                                                                                                                          \
-        return reEmplaceByIterator(data() + index, static_cast<Ts&&>(xs)...);                                                  \
-    }                                                                                                                          \
-                                                                                                                               \
-    template <typename... TItems>                                                                                              \
-    [[gnu::always_inline]] constexpr void pushBackMultiple(TItems&&... items)                                                  \
-    {                                                                                                                          \
-        reserve(size() + sizeof...(items));                                                                                    \
-        unsafePushBackMultiple(static_cast<TItems&&>(items)...);                                                               \
-    }                                                                                                                          \
-                                                                                                                               \
-    [[gnu::always_inline]] constexpr void emplaceRange(const TItem* const ptr, const SizeT count)                              \
-    {                                                                                                                          \
-        reserve(size() + count);                                                                                               \
-        unsafeEmplaceBackRange(ptr, count);                                                                                    \
-    }                                                                                                                          \
-                                                                                                                               \
-    [[gnu::always_inline, gnu::flatten]] constexpr void unsafeEmplaceOther(const vectorType& rhs) noexcept                     \
-    {                                                                                                                          \
-        unsafeEmplaceBackRange(rhs.data(), rhs.size());                                                                        \
-    }                                                                                                                          \
-                                                                                                                               \
-    [[gnu::always_inline]] constexpr void assignRange(const TItem* const b, const TItem* const e)                              \
-    {                                                                                                                          \
-        ZA_ASSERT(b <= e);                                                                                                     \
-        ZA_ASSERT(b == e || (b != nullptr && e != nullptr)); /* only a non-empty range must be non-null */                     \
-                                                                                                                               \
-        const auto count = static_cast<SizeT>(e - b);                                                                          \
-                                                                                                                               \
-        clear();                                                                                                               \
-        reserve(count);                                                                                                        \
-                                                                                                                               \
-        if (count != 0u) /* avoid `memcpy(null, null, 0)` (UB) on the empty-range path */                                      \
-            priv::VectorUtils::copyRange(data(), b, e);                                                                        \
-                                                                                                                               \
-        unsafeSetSize(count);                                                                                                  \
-    }                                                                                                                          \
-                                                                                                                               \
-    [[gnu::always_inline]] constexpr void eraseAt(const SizeT index)                                                           \
-    {                                                                                                                          \
-        ZA_ASSERT(index < size());                                                                                             \
-        erase(data() + index);                                                                                                 \
-    }                                                                                                                          \
-                                                                                                                               \
+#define ZA_PRIV_DEFINE_COMMON_VECTOR_OPERATIONS(vectorType)                                                                         \
+                                                                                                                                    \
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr TItem& operator[](const SizeT i) noexcept ZA_LIFETIMEBOUND \
+    {                                                                                                                               \
+        ZA_ASSERT(i < size());                                                                                                      \
+        return *(data() + i);                                                                                                       \
+    }                                                                                                                               \
+                                                                                                                                    \
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const TItem& operator[](const SizeT i)                     \
+        const noexcept ZA_LIFETIMEBOUND                                                                                             \
+    {                                                                                                                               \
+        ZA_ASSERT(i < size());                                                                                                      \
+        return *(data() + i);                                                                                                       \
+    }                                                                                                                               \
+                                                                                                                                    \
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr TItem* begin() noexcept ZA_LIFETIMEBOUND                   \
+    {                                                                                                                               \
+        return data();                                                                                                              \
+    }                                                                                                                               \
+                                                                                                                                    \
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const TItem* begin() const noexcept ZA_LIFETIMEBOUND       \
+    {                                                                                                                               \
+        return data();                                                                                                              \
+    }                                                                                                                               \
+                                                                                                                                    \
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr TItem* end() noexcept ZA_LIFETIMEBOUND                     \
+    {                                                                                                                               \
+        return data() + size();                                                                                                     \
+    }                                                                                                                               \
+                                                                                                                                    \
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const TItem* end() const noexcept ZA_LIFETIMEBOUND         \
+    {                                                                                                                               \
+        return data() + size();                                                                                                     \
+    }                                                                                                                               \
+                                                                                                                                    \
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const TItem* cbegin() const noexcept ZA_LIFETIMEBOUND      \
+    {                                                                                                                               \
+        return data();                                                                                                              \
+    }                                                                                                                               \
+                                                                                                                                    \
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const TItem* cend() const noexcept ZA_LIFETIMEBOUND        \
+    {                                                                                                                               \
+        return data() + size();                                                                                                     \
+    }                                                                                                                               \
+                                                                                                                                    \
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr bool empty() const noexcept                                              \
+    {                                                                                                                               \
+        return size() == 0u;                                                                                                        \
+    }                                                                                                                               \
+                                                                                                                                    \
+    [[nodiscard]] constexpr bool operator==(const vectorType& rhs) const                                                            \
+    {                                                                                                                               \
+        if (this == &rhs)                                                                                                           \
+            return true;                                                                                                            \
+                                                                                                                                    \
+        const SizeT lhsSize = size();                                                                                               \
+                                                                                                                                    \
+        if (lhsSize != rhs.size())                                                                                                  \
+            return false;                                                                                                           \
+                                                                                                                                    \
+        for (SizeT i = 0u; i < lhsSize; ++i)                                                                                        \
+            if (operator[](i) != rhs.operator[](i))                                                                                 \
+                return false;                                                                                                       \
+                                                                                                                                    \
+        return true;                                                                                                                \
+    }                                                                                                                               \
+                                                                                                                                    \
+    /* NOLINTNEXTLINE(bugprone-macro-parentheses) */                                                                                \
+    [[gnu::always_inline]] constexpr friend void swap(vectorType& lhs, vectorType& rhs) noexcept                                    \
+    {                                                                                                                               \
+        lhs.swap(rhs);                                                                                                              \
+    }                                                                                                                               \
+                                                                                                                                    \
+    template <typename... Ts>                                                                                                       \
+    [[gnu::always_inline]] constexpr TItem& reEmplaceByIterator(TItem* const it, Ts&&... xs)                                        \
+    {                                                                                                                               \
+        ZA_ASSERT(it >= begin() && it < end());                                                                                     \
+                                                                                                                                    \
+        if constexpr (!ZA_IS_TRIVIALLY_DESTRUCTIBLE(TItem))                                                                         \
+            it->~TItem();                                                                                                           \
+                                                                                                                                    \
+        return *(ZA_PLACEMENT_NEW(it) TItem(static_cast<Ts&&>(xs)...));                                                             \
+    }                                                                                                                               \
+                                                                                                                                    \
+    template <typename... Ts>                                                                                                       \
+    [[gnu::always_inline]] constexpr TItem& reEmplaceByIndex(const SizeT index, Ts&&... xs)                                         \
+    {                                                                                                                               \
+        return reEmplaceByIterator(data() + index, static_cast<Ts&&>(xs)...);                                                       \
+    }                                                                                                                               \
+                                                                                                                                    \
+    template <typename... TItems>                                                                                                   \
+    [[gnu::always_inline]] constexpr void pushBackMultiple(TItems&&... items)                                                       \
+    {                                                                                                                               \
+        reserve(size() + sizeof...(items));                                                                                         \
+        unsafePushBackMultiple(static_cast<TItems&&>(items)...);                                                                    \
+    }                                                                                                                               \
+                                                                                                                                    \
+    [[gnu::always_inline]] constexpr void emplaceRange(const TItem* const ptr, const SizeT count)                                   \
+    {                                                                                                                               \
+        reserve(size() + count);                                                                                                    \
+        unsafeEmplaceBackRange(ptr, count);                                                                                         \
+    }                                                                                                                               \
+                                                                                                                                    \
+    [[gnu::always_inline, gnu::flatten]] constexpr void unsafeEmplaceOther(const vectorType& rhs) noexcept                          \
+    {                                                                                                                               \
+        unsafeEmplaceBackRange(rhs.data(), rhs.size());                                                                             \
+    }                                                                                                                               \
+                                                                                                                                    \
+    [[gnu::always_inline]] constexpr void assignRange(const TItem* const b, const TItem* const e)                                   \
+    {                                                                                                                               \
+        ZA_ASSERT(b <= e);                                                                                                          \
+        ZA_ASSERT(b == e || (b != nullptr && e != nullptr)); /* only a non-empty range must be non-null */                          \
+                                                                                                                                    \
+        const auto count = static_cast<SizeT>(e - b);                                                                               \
+                                                                                                                                    \
+        clear();                                                                                                                    \
+        reserve(count);                                                                                                             \
+                                                                                                                                    \
+        if (count != 0u) /* avoid `memcpy(null, null, 0)` (UB) on the empty-range path */                                           \
+            priv::VectorUtils::copyRange(data(), b, e);                                                                             \
+                                                                                                                                    \
+        unsafeSetSize(count);                                                                                                       \
+    }                                                                                                                               \
+                                                                                                                                    \
+    [[gnu::always_inline]] constexpr void eraseAt(const SizeT index)                                                                \
+    {                                                                                                                               \
+        ZA_ASSERT(index < size());                                                                                                  \
+        erase(data() + index);                                                                                                      \
+    }                                                                                                                               \
+                                                                                                                                    \
     static_assert(true)
 
 

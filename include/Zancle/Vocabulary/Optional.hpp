@@ -7,6 +7,7 @@
 // Headers
 ////////////////////////////////////////////////////////////
 #include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/Macros.hpp"
 #include "Zancle/Base/PlacementNew.hpp"
 
@@ -441,7 +442,7 @@ public:
     /// \return Reference to the contained value
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline]] constexpr T& value() &
+    [[nodiscard, gnu::always_inline]] constexpr T& value() & ZA_LIFETIMEBOUND
     {
         if (!m_engaged) [[unlikely]]
             priv::onBadOptionalAccess();
@@ -454,7 +455,7 @@ public:
     /// \brief Access the contained value, throwing if empty (const overload)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline]] constexpr const T& value() const&
+    [[nodiscard, gnu::always_inline]] constexpr const T& value() const& ZA_LIFETIMEBOUND
     {
         if (!m_engaged) [[unlikely]]
             priv::onBadOptionalAccess();
@@ -467,7 +468,7 @@ public:
     /// \brief Access the contained value, throwing if empty (rvalue overload)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline]] constexpr T&& value() &&
+    [[nodiscard, gnu::always_inline]] constexpr T&& value() && ZA_LIFETIMEBOUND
     {
         if (!m_engaged) [[unlikely]]
             priv::onBadOptionalAccess();
@@ -483,7 +484,7 @@ public:
     /// copying `defaultValue` in the empty case.
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T& valueOr(T& defaultValue) & noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T& valueOr(T& defaultValue ZA_LIFETIMEBOUND) & noexcept ZA_LIFETIMEBOUND
     {
         return m_engaged ? m_buffer.obj : defaultValue;
     }
@@ -493,7 +494,8 @@ public:
     /// \brief Return the contained value if engaged, otherwise `defaultValue` (const overload)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& valueOr(const T& defaultValue) const& noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& valueOr(
+        const T& defaultValue ZA_LIFETIMEBOUND) const& noexcept ZA_LIFETIMEBOUND
     {
         return m_engaged ? m_buffer.obj : defaultValue;
     }
@@ -503,7 +505,7 @@ public:
     /// \brief Return the contained value if engaged, otherwise `defaultValue` (rvalue overload)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T&& valueOr(T&& defaultValue) && noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T&& valueOr(T&& defaultValue ZA_LIFETIMEBOUND) && noexcept ZA_LIFETIMEBOUND
     {
         return ZA_MOVE(m_engaged ? m_buffer.obj : defaultValue);
     }
@@ -533,7 +535,7 @@ public:
     /// \brief Member access on the contained value (asserts engagement)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T* operator->() & noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T* operator->() & noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(m_engaged);
         return &m_buffer.obj;
@@ -544,7 +546,7 @@ public:
     /// \brief Member access on the contained value (const overload, asserts engagement)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T* operator->() const& noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T* operator->() const& noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(m_engaged);
         return &m_buffer.obj;
@@ -555,7 +557,7 @@ public:
     /// \brief Dereference the contained value (asserts engagement)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T& operator*() & noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T& operator*() & noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(m_engaged);
         return m_buffer.obj;
@@ -566,7 +568,7 @@ public:
     /// \brief Dereference the contained value (const overload)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& operator*() const& noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& operator*() const& noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(m_engaged);
         return m_buffer.obj;
@@ -577,7 +579,7 @@ public:
     /// \brief Dereference the contained value (rvalue overload)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T&& operator*() && noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T&& operator*() && noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(m_engaged);
         return ZA_MOVE(m_buffer.obj);
@@ -588,7 +590,7 @@ public:
     /// \brief Pointer to the contained value, or `nullptr` if empty
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T* asPtr() noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T* asPtr() noexcept ZA_LIFETIMEBOUND
     {
         return m_engaged ? &m_buffer.obj : nullptr;
     }
@@ -598,7 +600,7 @@ public:
     /// \brief Get a pointer to the contained value, or `nullptr` if empty (const overload)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T* asPtr() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T* asPtr() const noexcept ZA_LIFETIMEBOUND
     {
         return m_engaged ? &m_buffer.obj : nullptr;
     }

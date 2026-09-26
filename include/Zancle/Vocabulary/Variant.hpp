@@ -11,6 +11,7 @@
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/IndexSequence.hpp"
 #include "Zancle/Base/Launder.hpp"
+#include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/MakeIndexSequence.hpp"
 #include "Zancle/Base/PlacementNew.hpp"
 #include "Zancle/Base/ScopeGuard.hpp"
@@ -589,7 +590,7 @@ public:
     ///
     ////////////////////////////////////////////////////////////
     template <typename T, typename Self>
-    [[nodiscard, gnu::always_inline]] auto&& as(this Self&& self) noexcept
+    [[nodiscard, gnu::always_inline]] auto&& as(this Self&& self ZA_LIFETIMEBOUND) noexcept
     {
         ZA_VARIANT_STATIC_ASSERT_INDEX_VALIDITY(indexOf<T>);
         ZA_ASSERT(self.m_index == indexOf<T>);
@@ -605,7 +606,7 @@ public:
     ///
     ////////////////////////////////////////////////////////////
     template <SizeT I, typename Self>
-    [[nodiscard, gnu::always_inline]] auto&& getByIndex(this Self&& self) noexcept
+    [[nodiscard, gnu::always_inline]] auto&& getByIndex(this Self&& self ZA_LIFETIMEBOUND) noexcept
     {
         ZA_VARIANT_STATIC_ASSERT_INDEX_VALIDITY(I);
         ZA_ASSERT(self.m_index == I); // not via `as<T>()`, which would fail for duplicate alternatives

@@ -9,6 +9,7 @@
 #include "Zancle/Math/MinMaxMacros.hpp"
 
 #include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/Memcmp.hpp"
 #include "Zancle/Base/SizeT.hpp"
 #include "Zancle/Base/Strlen.hpp"
@@ -29,7 +30,7 @@ namespace za
 /// constructor from `nullptr` is deleted to catch accidental misuse.
 ///
 ////////////////////////////////////////////////////////////
-class StringView
+class ZA_GSL_POINTER(char) StringView
 {
 private:
     //////////////////////////////////////////

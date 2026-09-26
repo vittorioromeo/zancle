@@ -13,6 +13,7 @@
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/AssertAndAssume.hpp"
 #include "Zancle/Base/InitializerList.hpp"
+#include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/PlacementNew.hpp"
 #include "Zancle/Base/PtrDiffT.hpp"
 #include "Zancle/Base/SizeT.hpp"
@@ -44,7 +45,7 @@ namespace za
 ///
 ////////////////////////////////////////////////////////////
 template <typename TItem>
-class [[nodiscard]] Vector
+class [[nodiscard]] ZA_GSL_OWNER(TItem) Vector
 {
 private:
     ////////////////////////////////////////////////////////////
@@ -648,7 +649,7 @@ public:
     /// \brief Pointer to the underlying contiguous storage (or `nullptr` if empty and unallocated)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] TItem* data() noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] TItem* data() noexcept ZA_LIFETIMEBOUND
     {
         return m_data;
     }
@@ -658,7 +659,7 @@ public:
     /// \brief Pointer to the underlying contiguous storage (const overload)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] const TItem* data() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] const TItem* data() const noexcept ZA_LIFETIMEBOUND
     {
         return m_data;
     }
@@ -710,7 +711,7 @@ public:
     /// \brief Reference to the first element; asserts that the vector is non-empty
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] TItem& front() noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] TItem& front() noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(!empty());
         return *m_data;
@@ -721,7 +722,7 @@ public:
     /// \brief Reference to the first element (const overload)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] const TItem& front() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] const TItem& front() const noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(!empty());
         return *m_data;
@@ -732,7 +733,7 @@ public:
     /// \brief Reference to the last element; asserts that the vector is non-empty
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] TItem& back() noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] TItem& back() noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(!empty());
         return *(m_endSize - 1u);
@@ -743,7 +744,7 @@ public:
     /// \brief Reference to the last element (const overload)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] const TItem& back() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] const TItem& back() const noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(!empty());
         return *(m_endSize - 1u);

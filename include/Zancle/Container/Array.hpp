@@ -7,6 +7,7 @@
 // Headers
 ////////////////////////////////////////////////////////////
 #include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
 #include "Zancle/Trait/EnableTrivialRelocation.hpp"
@@ -27,7 +28,7 @@ namespace za
 ///
 ////////////////////////////////////////////////////////////
 template <typename T, SizeT N>
-struct [[nodiscard]] Array
+struct [[nodiscard]] ZA_GSL_OWNER(T) Array
 {
     ////////////////////////////////////////////////////////////
     ZA_ENABLE_TRIVIAL_RELOCATION_IF(ZA_IS_TRIVIALLY_RELOCATABLE(T));
@@ -58,7 +59,7 @@ struct [[nodiscard]] Array
     /// \brief Pointer to the underlying contiguous storage
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T* data() noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T* data() noexcept ZA_LIFETIMEBOUND
     {
         return elements;
     }
@@ -68,7 +69,7 @@ struct [[nodiscard]] Array
     /// \brief Pointer to the underlying contiguous storage (const overload)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T* data() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T* data() const noexcept ZA_LIFETIMEBOUND
     {
         return elements;
     }
@@ -78,7 +79,7 @@ struct [[nodiscard]] Array
     /// \brief Indexed element access (asserts `i < N`)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr T& operator[](const SizeT i) noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr T& operator[](const SizeT i) noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(i < N);
         return elements[i];
@@ -89,7 +90,7 @@ struct [[nodiscard]] Array
     /// \brief Indexed element access (const overload)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const T& operator[](const SizeT i) const noexcept
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const T& operator[](const SizeT i) const noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(i < N);
         return elements[i];
@@ -100,7 +101,7 @@ struct [[nodiscard]] Array
     /// \brief Iterator to the first element
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T* begin() noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T* begin() noexcept ZA_LIFETIMEBOUND
     {
         return elements;
     }
@@ -110,7 +111,7 @@ struct [[nodiscard]] Array
     /// \brief Iterator to the first element (const overload)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T* begin() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T* begin() const noexcept ZA_LIFETIMEBOUND
     {
         return elements;
     }
@@ -120,7 +121,7 @@ struct [[nodiscard]] Array
     /// \brief Iterator one past the last element
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T* end() noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T* end() noexcept ZA_LIFETIMEBOUND
     {
         return elements + N;
     }
@@ -130,7 +131,7 @@ struct [[nodiscard]] Array
     /// \brief Iterator one past the last element (const overload)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T* end() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T* end() const noexcept ZA_LIFETIMEBOUND
     {
         return elements + N;
     }
@@ -140,7 +141,7 @@ struct [[nodiscard]] Array
     /// \brief Constant iterator to the first element
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T* cbegin() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T* cbegin() const noexcept ZA_LIFETIMEBOUND
     {
         return elements;
     }
@@ -150,7 +151,7 @@ struct [[nodiscard]] Array
     /// \brief Constant iterator one past the last element
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T* cend() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T* cend() const noexcept ZA_LIFETIMEBOUND
     {
         return elements + N;
     }

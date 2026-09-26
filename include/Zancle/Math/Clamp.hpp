@@ -7,6 +7,7 @@
 // Headers
 ////////////////////////////////////////////////////////////
 #include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/LifetimeAttributes.hpp"
 
 
 namespace za
@@ -36,7 +37,9 @@ template <typename T>
 ////////////////////////////////////////////////////////////
 template <typename T>
     requires(__is_class(T))
-[[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& clamp(const T& value, const T& minValue, const T& maxValue) noexcept
+[[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& clamp(const T& value    ZA_LIFETIMEBOUND,
+                                                                      const T& minValue ZA_LIFETIMEBOUND,
+                                                                      const T& maxValue ZA_LIFETIMEBOUND) noexcept
 {
     ZA_ASSERT(!(maxValue < minValue));
 

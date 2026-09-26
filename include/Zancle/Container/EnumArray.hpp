@@ -7,6 +7,7 @@
 // Headers
 ////////////////////////////////////////////////////////////
 #include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
 #include "Zancle/Trait/IsEnum.hpp"
@@ -39,7 +40,7 @@ struct EnumArray
     /// No bounds checking is performed in release builds.
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr Value& operator[](const Enum key)
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr Value& operator[](const Enum key) ZA_LIFETIMEBOUND
     {
         const auto index = static_cast<SizeT>(key);
 
@@ -54,7 +55,7 @@ struct EnumArray
     /// No bounds checking is performed in release builds.
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const Value& operator[](const Enum key) const
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const Value& operator[](const Enum key) const ZA_LIFETIMEBOUND
     {
         const auto index = static_cast<SizeT>(key);
 
