@@ -53,6 +53,12 @@ endif()
 add_library(zancle-build-options INTERFACE)
 target_compile_features(zancle-build-options INTERFACE cxx_std_23)
 
+# Math wrappers (`za::sqrt`, ...) are inline and `gnu::const`: without this flag, e.g. `za::sqrt`
+# compiles to a compare, a branch, and a libm call (only to set `errno`) instead of a lone `sqrtss`.
+if(ZA_COMPILER_GCC OR ZA_COMPILER_CLANG)
+    target_compile_options(zancle-build-options INTERFACE -fno-math-errno)
+endif()
+
 
 # CPM (third-party dependency manager)
 include(cmake/CPM.cmake)
