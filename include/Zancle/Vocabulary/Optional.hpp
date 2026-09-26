@@ -235,7 +235,7 @@ public:
     ///
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline]] constexpr Optional& operator=(const Optional& rhs)
-        requires(!triviallyCopyAssignable && isCopyAssignable<T>)
+        requires(!triviallyCopyAssignable && isCopyAssignable<T> && isCopyConstructible<T>)
     {
         if (&rhs == this || (!m_engaged && !rhs.m_engaged))
             return *this;
@@ -274,7 +274,7 @@ public:
     ///
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline]] constexpr Optional& operator=(Optional&& rhs) noexcept
-        requires(!triviallyMoveAssignable && isMoveAssignable<T>)
+        requires(!triviallyMoveAssignable && isMoveAssignable<T> && isMoveConstructible<T>)
     {
         if (&rhs == this || (!m_engaged && !rhs.m_engaged))
             return *this;
@@ -684,11 +684,14 @@ template <typename T, typename... Args>
 /// \brief Construct an `Optional` from `f()` with element type deduced from its return type;
 ///        guaranteed copy elision means this works for non-movable types
 ///
+/// The element type is the decayed return type: a function returning a
+/// reference yields an `Optional` holding a copy of the referenced object.
+///
 ////////////////////////////////////////////////////////////
 template <typename F>
 [[nodiscard, gnu::always_inline]] inline constexpr auto makeOptionalFromFunc(F&& f)
 {
-    return Optional<decltype(ZA_FORWARD(f)())>{fromFunc, ZA_FORWARD(f)};
+    return Optional<ZA_REMOVE_CVREF(decltype(ZA_FORWARD(f)()))>{fromFunc, ZA_FORWARD(f)};
 }
 
 } // namespace za

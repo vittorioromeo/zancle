@@ -6,6 +6,7 @@
 #include "Zancle/Trait/IsCopyConstructible.hpp"
 #include "Zancle/Trait/IsMoveAssignable.hpp"
 #include "Zancle/Trait/IsMoveConstructible.hpp"
+#include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/IsTrivial.hpp"
 #include "Zancle/Trait/IsTriviallyCopyAssignable.hpp"
 #include "Zancle/Trait/IsTriviallyCopyConstructible.hpp"
@@ -118,6 +119,22 @@ struct DtorCounter
 };
 
 
+////////////////////////////////////////////////////////////
+// Copy-assignable, but not copy-constructible
+struct AssignOnly
+{
+    AssignOnly() = default;
+
+    AssignOnly(const AssignOnly&) = delete;
+
+    // NOLINTNEXTLINE(modernize-use-equals-default)
+    AssignOnly& operator=(const AssignOnly&)
+    {
+        return *this;
+    }
+};
+
+
 TEST_CASE("[Base] Base/Optional.hpp")
 {
     SECTION("Type traits")
@@ -180,6 +197,23 @@ TEST_CASE("[Base] Base/Optional.hpp")
         STATIC_CHECK(!ZA_IS_TRIVIALLY_DESTRUCTIBLE(DtorCounter));
         STATIC_CHECK(!ZA_IS_TRIVIALLY_COPY_ASSIGNABLE(za::Optional<DtorCounter>));
         STATIC_CHECK(!ZA_IS_TRIVIALLY_MOVE_ASSIGNABLE(za::Optional<DtorCounter>));
+
+        // Assignment may need to construct the value, so it requires constructibility
+        STATIC_CHECK(ZA_IS_COPY_ASSIGNABLE(AssignOnly));
+        STATIC_CHECK(!ZA_IS_COPY_ASSIGNABLE(za::Optional<AssignOnly>));
+    }
+
+    SECTION("makeOptionalFromFunc decays reference results")
+    {
+        int  x = 5;
+        auto o = za::makeOptionalFromFunc([&]() -> int& { return x; });
+
+        STATIC_CHECK(ZA_IS_SAME(decltype(o), za::Optional<int>));
+        REQUIRE(o.hasValue());
+        CHECK(*o == 5);
+
+        *o = 6;
+        CHECK(x == 5); // holds a copy
     }
 
     SECTION("Assigning an empty optional destroys the value (trivial assignment, non-trivial destructor)")
