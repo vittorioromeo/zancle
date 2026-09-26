@@ -181,7 +181,7 @@ struct Span
     /// pair of elements compares equal with `operator==`.
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline]] constexpr bool valueEquals(const T* rhsData, SizeT rhsSize) const
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr bool valueEquals(const T* rhsData, SizeT rhsSize) const
     {
         if (theSize != rhsSize)
             return false;
@@ -198,7 +198,7 @@ struct Span
     /// \brief Element-wise comparison with another span
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline]] constexpr bool valueEquals(const Span& rhs) const
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr bool valueEquals(const Span& rhs) const
     {
         return valueEquals(rhs.theData, rhs.theSize);
     }
