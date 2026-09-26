@@ -151,7 +151,7 @@ private:
 
 
     ////////////////////////////////////////////////////////////
-    using DiscriminatorType = unsigned char; // Support up to 255 alternatives
+    using DiscriminatorType = unsigned char; // Supports up to 254 alternatives (see static assertion above)
 
 
 public:
@@ -182,7 +182,7 @@ private:
     ////////////////////////////////////////////////////////////
 #define ZA_VARIANT_STATIC_ASSERT_INDEX_VALIDITY(I)                                             \
     static_assert((I) != ::za::badTypePackIndex, "Alternative type not supported by variant"); \
-    static_assert((I) >= 0 && (I) < alternativeCount, "Alternative index out of range")
+    static_assert((I) < alternativeCount, "Alternative index out of range")
 
 
     ////////////////////////////////////////////////////////////
