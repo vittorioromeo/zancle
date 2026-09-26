@@ -5,49 +5,30 @@
 
 namespace za
 {
+#ifdef __INT64_TYPE__ // GCC and Clang (including clang-cl and Emscripten)
+
 ////////////////////////////////////////////////////////////
 // 8 bits integer types
-using I8 = signed char;
-using U8 = unsigned char;
+using I8 = __INT8_TYPE__;
+using U8 = __UINT8_TYPE__;
 
-
-#if defined(__GNUC__) || defined(__clang__)
 
 ////////////////////////////////////////////////////////////
 // 16 bits integer types
-    #if __SIZEOF_SHORT__ == 2
-using I16 = short;
-using U16 = unsigned short;
-    #elif __SIZEOF_INT__ == 2
-using I16 = int;
-using U16 = unsigned int;
-    #else
-        #error "Could not determine a 16-bit integer type (GCC/Clang)."
-    #endif
+using I16 = __INT16_TYPE__;
+using U16 = __UINT16_TYPE__;
+
 
 ////////////////////////////////////////////////////////////
 // 32 bits integer types
-    #if __SIZEOF_INT__ == 4
-using I32 = int;
-using U32 = unsigned int;
-    #elif __SIZEOF_LONG__ == 4
-using I32 = long;
-using U32 = unsigned long;
-    #else
-        #error "Could not determine a 32-bit integer type (GCC/Clang)."
-    #endif
+using I32 = __INT32_TYPE__;
+using U32 = __UINT32_TYPE__;
+
 
 ////////////////////////////////////////////////////////////
 // 64 bits integer types
-    #if __SIZEOF_LONG_LONG__ == 8
-using I64 = long long;
-using U64 = unsigned long long;
-    #elif __SIZEOF_LONG__ == 8
-using I64 = long;
-using U64 = unsigned long;
-    #else
-        #error "Could not determine a 64-bit integer type (GCC/Clang)."
-    #endif
+using I64 = __INT64_TYPE__;
+using U64 = __UINT64_TYPE__;
 
 
 #else
@@ -55,6 +36,12 @@ using U64 = unsigned long;
 
 // Assume standard Windows data models (ILP32, LLP64) where:
 // char = 1, short = 2, int = 4, long = 4, long long = 8
+
+////////////////////////////////////////////////////////////
+// 8 bits integer types
+using I8 = signed char;
+using U8 = unsigned char;
+
 
 ////////////////////////////////////////////////////////////
 // 16 bits integer types
@@ -85,8 +72,10 @@ using U64 = unsigned long long;
 /// \brief Fixed-width integer aliases (`I8`/`U8` ... `I64`/`U64`)
 ///
 /// `<cstdint>` equivalents that do not require including the header.
-/// On GCC and Clang the types are picked from compiler-defined size
-/// macros; on other compilers (e.g. MSVC) the standard ILP32/LLP64 data
-/// model is assumed.
+/// On GCC and Clang the types are the compiler-predefined `__INTn_TYPE__`
+/// and `__UINTn_TYPE__`, i.e. exactly the same types as `std::intN_t` and
+/// `std::uintN_t` (e.g. `U64` is `unsigned long` on LP64 Linux, but
+/// `unsigned long long` on Windows, macOS, and Emscripten). On other
+/// compilers (e.g. MSVC) the standard ILP32/LLP64 data model is assumed.
 ///
 ////////////////////////////////////////////////////////////
