@@ -9,6 +9,8 @@
 
 #include "Zancle/Err/Err.hpp"
 
+#include "Zancle/Algorithm/Sort.hpp"
+
 #include "Zancle/Container/Vector.hpp"
 
 #include "Zancle/Geometry/Priv/Vec2Base.hpp"
@@ -19,6 +21,18 @@
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/Memcpy.hpp"
 #include "Zancle/Base/SizeT.hpp"
+
+// `NULL`, used by `stb_rect_pack.h` (freestanding, and much lighter than `<stdlib.h>`)
+#include <stddef.h> // NOLINT(modernize-deprecated-headers)
+
+// Use Zancle's sort and assertions instead of `qsort` and `assert`,
+// so that `<stdlib.h>` and `<assert.h>` are not pulled in
+#define STBRP_SORT(base, count, size, compare)                                               \
+    ::za::quickSort((base), (base) + (count), [](const stbrp_rect& a, const stbrp_rect& b) { \
+        return compare(&a, &b) < 0;                                                          \
+    })
+
+#define STBRP_ASSERT(...) ZA_ASSERT(__VA_ARGS__)
 
 #define STBRP_STATIC
 #define STB_RECT_PACK_IMPLEMENTATION
