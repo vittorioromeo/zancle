@@ -138,17 +138,16 @@ public:
     ////////////////////////////////////////////////////////////
     /// \brief Move-assign from a derived/related `UniquePtr`
     ///
-    /// Destroys the previously held object before stealing the new one.
+    /// Destroys the previously held object (with the previous deleter)
+    /// before stealing the new one. Self-assignment is a no-op.
     ///
     ////////////////////////////////////////////////////////////
     template <typename U, typename UDeleter>
     [[gnu::always_inline, gnu::flatten]] constexpr UniquePtr& operator=(UniquePtr<U, UDeleter>&& rhs) noexcept
         requires(isSame<T, U> || isBaseOf<T, U>)
     {
+        reset(rhs.release());
         (*static_cast<TDeleter*>(this)) = static_cast<UDeleter&&>(rhs);
-
-        reset(rhs.m_ptr);
-        rhs.m_ptr = nullptr;
 
         return *this;
     }
@@ -209,11 +208,15 @@ public:
     ////////////////////////////////////////////////////////////
     /// \brief Destroy the held object and optionally take ownership of `ptr`
     ///
+    /// The new pointer is stored before the old object is destroyed, so
+    /// that the destructor never observes a dangling pointer.
+    ///
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline, gnu::flatten]] constexpr void reset(T* const ptr = nullptr) noexcept
     {
-        static_cast<TDeleter*>(this)->operator()(m_ptr);
-        m_ptr = ptr;
+        T* const oldPtr = m_ptr;
+        m_ptr           = ptr;
+        static_cast<TDeleter*>(this)->operator()(oldPtr);
     }
 
 
