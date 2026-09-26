@@ -10,7 +10,7 @@
 
 
 ////////////////////////////////////////////////////////////
-/// \brief Define `&`, `|`, `^`, `~`, `&=`, `|=`, and `!` for a scoped enum
+/// \brief Define `&`, `|`, `^`, `~`, `&=`, `|=`, `^=`, and `!` for a scoped enum
 ///
 /// Generates the standard set of bitwise operators that operate on the
 /// enum's underlying type and return values back as the enum. Useful
@@ -58,6 +58,11 @@
     [[maybe_unused, gnu::always_inline]] inline constexpr enumType& operator&=(enumType& lhs, const enumType rhs) noexcept       \
     {                                                                                                                            \
         return lhs = (lhs & rhs);                                                                                                \
+    }                                                                                                                            \
+                                                                                                                                 \
+    [[maybe_unused, gnu::always_inline]] inline constexpr enumType& operator^=(enumType& lhs, const enumType rhs) noexcept       \
+    {                                                                                                                            \
+        return lhs = (lhs ^ rhs);                                                                                                \
     }                                                                                                                            \
                                                                                                                                  \
     static_assert(true)
