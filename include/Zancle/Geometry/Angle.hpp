@@ -114,6 +114,13 @@ public:
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr Angle wrapUnsigned() const
     {
+        // Fast path for the common case of an angle that is already wrapped (e.g. every `AutoWrapAngle`
+        // assignment of a bounded value): skips the division, with bit-identical results. Non-negative
+        // floats order like their bit patterns, while negative values and NaNs compare greater than `tau`,
+        // so `0 <= radians < tau` is a single, predictable unsigned comparison (`-0.f` takes the slow path).
+        if (__builtin_bit_cast(unsigned int, radians) < __builtin_bit_cast(unsigned int, za::tau)) [[likely]]
+            return *this;
+
         return Angle(za::positiveRemainder(radians, za::tau));
     }
 
