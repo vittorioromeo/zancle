@@ -103,6 +103,26 @@ constexpr I64 clockRunning = -9'223'372'036'854'775'807 - 1;
     return microseconds(nanoseconds / 1000); // truncates toward zero, like `std::chrono::duration_cast`
 }
 
+
+////////////////////////////////////////////////////////////
+/// \brief Report the time elapsed from `refPoint` to `endPoint`, and move `refPoint` so that
+///        a new measurement starts at `now`
+///
+/// `za::Time` only holds whole microseconds: the unreported sub-microsecond
+/// remainder is carried over into the new measurement instead of being
+/// dropped, so that the times reported by consecutive restarts add up to
+/// the real elapsed time (instead of losing ~0.5us per restart on average).
+///
+////////////////////////////////////////////////////////////
+[[nodiscard]] Time restartMeasurement(I64& refPoint, const I64 endPoint, const I64 now)
+{
+    const I64 elapsed  = endPoint - refPoint;
+    const I64 reported = elapsed / 1000 * 1000;
+
+    refPoint = now - (elapsed - reported);
+    return microseconds(reported / 1000);
+}
+
 } // namespace
 } // namespace za::priv
 
@@ -154,9 +174,11 @@ void Clock::stop()
 ////////////////////////////////////////////////////////////
 Time Clock::restart()
 {
-    const Time elapsed = getElapsedTime();
-    m_refPoint         = priv::monotonicNanoseconds();
-    m_stopPoint        = priv::clockRunning;
+    // Single clock reading: a second one would lose the time between the two
+    const I64  now     = priv::monotonicNanoseconds();
+    const Time elapsed = priv::restartMeasurement(m_refPoint, isRunning() ? now : m_stopPoint, now);
+
+    m_stopPoint = priv::clockRunning;
     return elapsed;
 }
 
@@ -164,9 +186,10 @@ Time Clock::restart()
 ////////////////////////////////////////////////////////////
 Time Clock::reset()
 {
-    const Time elapsed = getElapsedTime();
-    m_refPoint         = priv::monotonicNanoseconds();
-    m_stopPoint        = m_refPoint;
+    const I64  now     = priv::monotonicNanoseconds();
+    const Time elapsed = priv::restartMeasurement(m_refPoint, isRunning() ? now : m_stopPoint, now);
+
+    m_stopPoint = now;
     return elapsed;
 }
 

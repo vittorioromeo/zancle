@@ -78,6 +78,38 @@ TEST_CASE("[System] za::Clock")
         CHECK(!clock.isRunning());
     }
 
+    SECTION("Consecutive restarts add up to the real elapsed time")
+    {
+        // Previously, each `restart()` dropped the sub-microsecond remainder and the time
+        // between two clock readings: ~0.5us per call, i.e. ~5ms over 10'000 calls
+        const za::Clock reference;
+        za::Clock       clock;
+
+        za::Time sum;
+        for (int i = 0; i < 10'000; ++i)
+            sum += clock.restart();
+
+        const za::Time total = reference.getElapsedTime();
+
+        CHECK(sum <= total);
+        CHECK(total - sum < za::microseconds(500));
+    }
+
+    SECTION("restart() and reset() of a stopped clock")
+    {
+        za::Clock clock;
+        clock.stop();
+        const za::Time elapsed = clock.getElapsedTime();
+
+        za::ThisThread::sleepFor(za::milliseconds(1));
+        CHECK(clock.reset() == elapsed); // stopped: the sleep is not counted
+        CHECK(!clock.isRunning());
+        CHECK(clock.getElapsedTime() == za::Time{}); // only a sub-microsecond remainder is left
+
+        CHECK(clock.restart() == za::Time{});
+        CHECK(clock.isRunning());
+    }
+
     SECTION("now() never goes backward")
     {
         za::Time previous      = za::Clock::now();
