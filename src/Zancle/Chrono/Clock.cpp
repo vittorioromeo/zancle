@@ -45,6 +45,7 @@ namespace
 /// https://man7.org/linux/man-pages/man2/clock_gettime.2.html
 ///
 ////////////////////////////////////////////////////////////
+// TODO P0: test on Emscripten (resolution, monotonicity, and agreement with `std::chrono::steady_clock`)
 [[nodiscard]] I64 monotonicNanoseconds() noexcept
 {
 #if defined(ZA_SYSTEM_WINDOWS)
@@ -109,34 +110,23 @@ constexpr I64 clockRunning = -9'223'372'036'854'775'807 - 1;
 namespace za
 {
 ////////////////////////////////////////////////////////////
-struct Clock::Impl
+Clock::Clock() : m_refPoint{priv::monotonicNanoseconds()}, m_stopPoint{priv::clockRunning}
 {
-    I64 refPoint{priv::monotonicNanoseconds()}; //!< Time of last reset, in nanoseconds
-    I64 stopPoint{priv::clockRunning};          //!< Time of last stop, in nanoseconds
-};
-
-
-////////////////////////////////////////////////////////////
-Clock::Clock()                            = default;
-Clock::~Clock()                           = default;
-Clock::Clock(const Clock&)                = default;
-Clock& Clock::operator=(const Clock&)     = default;
-Clock::Clock(Clock&&) noexcept            = default;
-Clock& Clock::operator=(Clock&&) noexcept = default;
+}
 
 
 ////////////////////////////////////////////////////////////
 Time Clock::getElapsedTime() const
 {
-    const I64 endPoint = isRunning() ? priv::monotonicNanoseconds() : m_impl->stopPoint;
-    return priv::nanosecondsToTime(endPoint - m_impl->refPoint);
+    const I64 endPoint = isRunning() ? priv::monotonicNanoseconds() : m_stopPoint;
+    return priv::nanosecondsToTime(endPoint - m_refPoint);
 }
 
 
 ////////////////////////////////////////////////////////////
 bool Clock::isRunning() const
 {
-    return m_impl->stopPoint == priv::clockRunning;
+    return m_stopPoint == priv::clockRunning;
 }
 
 
@@ -146,8 +136,8 @@ void Clock::start()
     if (isRunning())
         return;
 
-    m_impl->refPoint += priv::monotonicNanoseconds() - m_impl->stopPoint;
-    m_impl->stopPoint = priv::clockRunning;
+    m_refPoint += priv::monotonicNanoseconds() - m_stopPoint;
+    m_stopPoint = priv::clockRunning;
 }
 
 
@@ -157,7 +147,7 @@ void Clock::stop()
     if (!isRunning())
         return;
 
-    m_impl->stopPoint = priv::monotonicNanoseconds();
+    m_stopPoint = priv::monotonicNanoseconds();
 }
 
 
@@ -165,8 +155,8 @@ void Clock::stop()
 Time Clock::restart()
 {
     const Time elapsed = getElapsedTime();
-    m_impl->refPoint   = priv::monotonicNanoseconds();
-    m_impl->stopPoint  = priv::clockRunning;
+    m_refPoint         = priv::monotonicNanoseconds();
+    m_stopPoint        = priv::clockRunning;
     return elapsed;
 }
 
@@ -175,8 +165,8 @@ Time Clock::restart()
 Time Clock::reset()
 {
     const Time elapsed = getElapsedTime();
-    m_impl->refPoint   = priv::monotonicNanoseconds();
-    m_impl->stopPoint  = m_impl->refPoint;
+    m_refPoint         = priv::monotonicNanoseconds();
+    m_stopPoint        = m_refPoint;
     return elapsed;
 }
 
