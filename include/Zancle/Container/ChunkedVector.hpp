@@ -12,17 +12,36 @@
 #include "Zancle/Base/InitializerList.hpp" // IWYU pragma: keep
 #include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/PlacementNew.hpp"
-#include "Zancle/Base/Prefetch.hpp"
 #include "Zancle/Base/PtrDiffT.hpp"
 #include "Zancle/Base/SizeT.hpp"
 #include "Zancle/Base/Swap.hpp"
 
 #include "Zancle/Trait/Conditional.hpp"
 #include "Zancle/Trait/EnableTrivialRelocation.hpp"
+#include "Zancle/Trait/IsReference.hpp"
+#include "Zancle/Trait/IsTriviallyDestructible.hpp"
 
 
+namespace za::priv
+{
 ////////////////////////////////////////////////////////////
-#define ZA_PREFETCH_FOR_READ(ptr) ZA_PREFETCH(ptr, /* read-only */ 0, /* high temporal locality (L1 cache) */ 3)
+/// \brief Default `BlockShift` for `ChunkedVector`
+///
+/// Returns the largest `shift` such that a block of `2^shift` items of
+/// `itemSize` bytes fits in 64 KiB (or `0` if a single item is larger).
+///
+////////////////////////////////////////////////////////////
+[[nodiscard]] consteval SizeT chunkedVectorDefaultBlockShift(const SizeT itemSize) noexcept
+{
+    SizeT shift = 0u;
+
+    while ((SizeT{2u} << shift) * itemSize <= SizeT{65'536u})
+        ++shift;
+
+    return shift;
+}
+
+} // namespace za::priv
 
 
 namespace za
@@ -33,7 +52,10 @@ namespace za
 /// ## Layout
 ///
 /// A growable directory (`TItem**`) of fixed-size contiguous blocks.
-/// Each block holds `2^BlockShift` elements (default 16 384).
+/// Each block holds `2^BlockShift` elements. By default, `BlockShift` is
+/// chosen so that a block occupies (at most) 64 KiB, e.g. 16 384 elements
+/// for a 4-byte `TItem`. The default requires `TItem` to be complete:
+/// specify `BlockShift` explicitly to use an incomplete `TItem`.
 ///
 ///     directory [ blk0* | blk1* | blk2* | ... ]
 ///                  |        |        |
@@ -48,7 +70,9 @@ namespace za
 /// `pushBack`/`emplaceBack` allocate a new block when the current one
 /// fills up, and geometrically grow the directory when it runs out of
 /// slots. Existing elements are never relocated, so pointers/references
-/// to elements remain valid across insertions.
+/// to elements remain valid across insertions. Consequently, inserting
+/// or resizing from a reference to an existing element (e.g.
+/// `resize(n, v[0])` or `pushBack(v[0])`) is supported.
 ///
 ///     pushBack / emplaceBack  -- amortized O(1)
 ///     operator[]              -- O(1)
@@ -56,19 +80,27 @@ namespace za
 ///
 /// ## Iteration
 ///
-/// The callback-based API (`forEach`, `forEachIndexed`, `forEachBlock`)
-/// loops over each block as a contiguous span, giving the compiler the
-/// same optimization opportunities as a flat-array traversal. Each
-/// method prefetches the next block pointer before entering the inner
-/// loop. Random-access iterators are also provided but cross a block
-/// boundary on every `operator[]` / dereference (one extra indirection
-/// compared to the callback path).
+/// The callback-based API (`forEach`, `forEachIndexed`, `forEachBlock`,
+/// `findIf`) loops over each block as a contiguous span, giving the
+/// compiler the same optimization opportunities as a flat-array traversal.
+///
+/// Random-access iterators are also provided. They cache a pointer to the
+/// current element: dereferencing is a plain pointer dereference, and
+/// `++`/`--` are a pointer bump that only consults the directory when
+/// crossing a block boundary. Arbitrary jumps (`+=`, `-=`, ...) recompute
+/// the element pointer through the directory.
+///
+/// Iterators refer to the container object (not only to its elements):
+/// they are invalidated by moving from/into or swapping the container,
+/// even though element addresses stay stable. Iterators to elements stay
+/// valid across insertions and `reserve`/`shrinkToFit`, but the
+/// past-the-end iterator is invalidated by any operation that changes
+/// the size or the capacity.
 ///
 ////////////////////////////////////////////////////////////
-template <typename TItem, SizeT BlockShift = 14u>
-class [[nodiscard]] ChunkedVector
+template <typename TItem, SizeT BlockShift = priv::chunkedVectorDefaultBlockShift(sizeof(TItem))>
+class [[nodiscard]] ZA_GSL_OWNER(TItem) ChunkedVector
 {
-    static_assert(BlockShift > 0u);
     static_assert(BlockShift < sizeof(SizeT) * 8u);
 
 private:
@@ -80,8 +112,9 @@ private:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::const]] static constexpr SizeT sizeToBlockCount(const SizeT n) noexcept
+    [[nodiscard, gnu::always_inline]] static constexpr SizeT sizeToBlockCount(const SizeT n) noexcept
     {
+        ZA_ASSERT(n <= static_cast<SizeT>(-1) - blockMask); // `n + blockMask` must not wrap around
         return (n + blockMask) >> blockShift;
     }
 
@@ -90,22 +123,6 @@ private:
     [[nodiscard, gnu::always_inline, gnu::const]] static constexpr SizeT minSizeT(const SizeT lhs, const SizeT rhs) noexcept
     {
         return lhs < rhs ? lhs : rhs;
-    }
-
-
-    ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline]] TItem* blockPtrAt(const SizeT blockIndex) noexcept
-    {
-        ZA_ASSERT(blockIndex < m_numBlocks);
-        return m_directory[blockIndex];
-    }
-
-
-    ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline]] const TItem* blockPtrAt(const SizeT blockIndex) const noexcept
-    {
-        ZA_ASSERT(blockIndex < m_numBlocks);
-        return m_directory[blockIndex];
     }
 
 
@@ -124,8 +141,28 @@ private:
 
 
     ////////////////////////////////////////////////////////////
+    /// \brief Pointer to slot `index`, or `nullptr` if its block is not allocated
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline, gnu::pure]] TItem* slotPtrOrNull(const SizeT index) noexcept
+    {
+        return index < capacity() ? slotPtrUnchecked(index) : nullptr;
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline, gnu::pure]] const TItem* slotPtrOrNull(const SizeT index) const noexcept
+    {
+        return index < capacity() ? slotPtrUnchecked(index) : nullptr;
+    }
+
+
+    ////////////////////////////////////////////////////////////
     [[nodiscard]] static TItem* allocateBlock()
     {
+        // Here rather than in the class body, so that the class can be instantiated with an incomplete `TItem`
+        static_assert(blockSize <= static_cast<SizeT>(-1) / sizeof(TItem), "Block byte size overflows `SizeT`");
+
         return priv::VectorUtils::allocate<TItem>(blockSize);
     }
 
@@ -178,105 +215,129 @@ private:
 
 
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline, gnu::flatten]] void ensureBlockCapacity(const SizeT targetBlockCount)
+    /// \brief Allocate blocks (and grow the directory) until `capacity() >= targetCapacity`
+    ///
+    /// Kept out of line so that the hot paths (`emplaceBack`, `reserve`)
+    /// only contain a capacity check.
+    ///
+    ////////////////////////////////////////////////////////////
+    [[gnu::cold, gnu::noinline]] void reserveImpl(const SizeT targetCapacity)
     {
-        if (targetBlockCount <= m_numBlocks)
-            return;
+        const SizeT targetBlockCount = sizeToBlockCount(targetCapacity);
+        ZA_ASSERT(targetBlockCount > m_numBlocks); // Should only be called to grow
 
-        if (m_directoryCapacity < targetBlockCount) [[unlikely]]
+        if (m_directoryCapacity < targetBlockCount)
             growDirectory(targetBlockCount);
 
         while (m_numBlocks < targetBlockCount)
-            m_directory[m_numBlocks++] = allocateBlock();
+        {
+            m_directory[m_numBlocks] = allocateBlock();
+            ++m_numBlocks;
+        }
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline, gnu::flatten]] void ensureCapacityForSize(const SizeT targetSize)
-    {
-        ensureBlockCapacity(sizeToBlockCount(targetSize));
-    }
-
-
+    /// \brief Invoke `fn(ptr, count)` for each contiguous run of slots in `[first, last)`
+    ///
+    /// Each run lies within a single block, so `fn` is invoked once per
+    /// block. Iteration stops early as soon as `fn` returns `false`.
+    ///
+    /// \return `false` if the iteration was stopped early, `true` otherwise
+    ///
     ////////////////////////////////////////////////////////////
-    void destroyIndexRange(SizeT first, const SizeT last) noexcept
+    template <typename F>
+    [[gnu::always_inline]] bool forEachChunk(this auto& self, SizeT first, const SizeT last, F&& fn)
     {
         while (first < last)
         {
-            const auto   blockIndex  = first >> blockShift;
-            const auto   blockOffset = first & blockMask;
-            const auto   chunk       = minSizeT(last - first, blockSize - blockOffset);
-            TItem* const blockPtr    = m_directory[blockIndex] + blockOffset;
+            const SizeT count = minSizeT(last - first, blockSize - (first & blockMask));
 
-            priv::VectorUtils::destroyRange(blockPtr, blockPtr + chunk);
-            first += chunk;
+            if (!fn(self.slotPtrUnchecked(first), count))
+                return false;
+
+            first += count;
         }
+
+        return true;
     }
 
 
     ////////////////////////////////////////////////////////////
-    void copyFromContiguousRange(SizeT targetIndex, const TItem* src, SizeT count)
+    void destroyIndexRange(const SizeT first, const SizeT last) noexcept
     {
-        while (count > 0u)
+        if constexpr (!ZA_IS_TRIVIALLY_DESTRUCTIBLE(TItem))
+            forEachChunk(first,
+                         last,
+                         [](TItem* const ptr, const SizeT count)
+            {
+                priv::VectorUtils::destroyRange(ptr, ptr + count);
+                return true;
+            });
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    void copyFromContiguousRange(const SizeT targetIndex, const TItem* src, const SizeT count)
+    {
+        forEachChunk(targetIndex,
+                     targetIndex + count,
+                     [&](TItem* const ptr, const SizeT chunk)
         {
-            const auto   blockIndex  = targetIndex >> blockShift;
-            const auto   blockOffset = targetIndex & blockMask;
-            const auto   chunk       = minSizeT(count, blockSize - blockOffset);
-            TItem* const blockPtr    = m_directory[blockIndex] + blockOffset;
-
-            priv::VectorUtils::copyRange(blockPtr, src, src + chunk);
-
-            targetIndex += chunk;
+            priv::VectorUtils::copyRange(ptr, src, src + chunk);
             src += chunk;
-            count -= chunk;
-        }
+            return true;
+        });
     }
 
 
     ////////////////////////////////////////////////////////////
     void copyFromOther(const ChunkedVector& rhs)
     {
-        if (rhs.m_size == 0u)
+        ZA_ASSERT(m_size == 0u);
+        reserve(rhs.m_size);
+
+        // Copy block by block: `m_size` is bumped after each block, so it never counts unconstructed elements
+        rhs.forEachChunk(0u,
+                         rhs.m_size,
+                         [&](const TItem* const ptr, const SizeT count)
         {
-            m_size = 0u;
-            return;
-        }
-
-        ensureCapacityForSize(rhs.m_size);
-
-        const SizeT fullBlocks = rhs.m_size >> blockShift;
-        const SizeT tail       = rhs.m_size & blockMask;
-
-        for (SizeT blockIndex = 0u; blockIndex < fullBlocks; ++blockIndex)
-            priv::VectorUtils::copyRange(m_directory[blockIndex],
-                                         rhs.m_directory[blockIndex],
-                                         rhs.m_directory[blockIndex] + blockSize);
-
-        if (tail > 0u)
-            priv::VectorUtils::copyRange(m_directory[fullBlocks],
-                                         rhs.m_directory[fullBlocks],
-                                         rhs.m_directory[fullBlocks] + tail);
-
-        m_size = rhs.m_size;
+            unsafeEmplaceBackRange(ptr, count);
+            return true;
+        });
     }
 
 
     ////////////////////////////////////////////////////////////
     template <typename... Ts>
-    void constructRange(SizeT first, const SizeT last, Ts&&... xs)
+    void constructRange(const SizeT first, const SizeT last, Ts&&... xs)
     {
-        while (first < last)
+        forEachChunk(first,
+                     last,
+                     [&](TItem* const ptr, const SizeT count)
         {
-            const auto   blockIndex  = first >> blockShift;
-            const auto   blockOffset = first & blockMask;
-            const auto   chunk       = minSizeT(last - first, blockSize - blockOffset);
-            TItem* const blockPtr    = m_directory[blockIndex] + blockOffset;
+            for (SizeT i = 0u; i < count; ++i)
+                ZA_PLACEMENT_NEW(ptr + i) TItem(xs...); // intentionally not forwarding
 
-            for (SizeT i = 0u; i < chunk; ++i)
-                ZA_PLACEMENT_NEW(blockPtr + i) TItem(xs...); // intentionally not forwarding
+            return true;
+        });
+    }
 
-            first += chunk;
-        }
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Destroy all elements and free all blocks and the directory
+    ///
+    /// Leaves the data members dangling: the caller must reassign them.
+    ///
+    ////////////////////////////////////////////////////////////
+    void releaseStorage() noexcept
+    {
+        destroyIndexRange(0u, m_size);
+
+        for (SizeT i = 0u; i < m_numBlocks; ++i)
+            deallocateBlock(m_directory[i]);
+
+        priv::VectorUtils::deallocate(m_directory, m_directoryCapacity);
     }
 
 
@@ -302,6 +363,17 @@ public:
 
 
     ////////////////////////////////////////////////////////////
+    /// \brief Random-access iterator caching a pointer to the current element
+    ///
+    /// Invariant: `m_ptr` points to slot `m_index` of `*m_owner`, or is
+    /// `nullptr` if that slot's block is not allocated (only possible for
+    /// the past-the-end position when `size() == capacity()`).
+    ///
+    /// Comparisons and differences are hidden friends: mixing mutable
+    /// and const iterators works in both directions through the implicit
+    /// mutable-to-const conversion.
+    ///
+    ////////////////////////////////////////////////////////////
     template <bool IsConst>
     class IteratorImpl
     {
@@ -316,23 +388,32 @@ public:
 
     private:
         owner_pointer m_owner{nullptr};
+        pointer       m_ptr{nullptr};
         SizeT         m_index{0u};
 
+
+        ////////////////////////////////////////////////////////////
+        [[gnu::always_inline]] void reloadPtr() noexcept
+        {
+            m_ptr = m_owner->slotPtrOrNull(m_index);
+        }
+
     public:
-        [[nodiscard]] IteratorImpl()                               = default;
-        [[nodiscard]] IteratorImpl(const IteratorImpl&)            = default;
-        [[nodiscard]] IteratorImpl& operator=(const IteratorImpl&) = default;
+        [[nodiscard]] IteratorImpl()                    = default;
+        [[nodiscard]] IteratorImpl(const IteratorImpl&) = default;
+        IteratorImpl& operator=(const IteratorImpl&)    = default;
 
 
         [[nodiscard, gnu::always_inline]] IteratorImpl(const IteratorImpl<false>& rhs) noexcept
             requires(IsConst)
-            : m_owner{rhs.m_owner}, m_index{rhs.m_index}
+            : m_owner{rhs.m_owner}, m_ptr{rhs.m_ptr}, m_index{rhs.m_index}
         {
         }
 
 
         [[nodiscard, gnu::always_inline]] IteratorImpl(owner_pointer owner, const SizeT index) noexcept :
             m_owner{owner},
+            m_ptr{owner->slotPtrOrNull(index)},
             m_index{index}
         {
         }
@@ -340,13 +421,13 @@ public:
 
         [[nodiscard, gnu::always_inline]] reference operator*() const noexcept
         {
-            return (*m_owner)[m_index];
+            return *m_ptr;
         }
 
 
         [[nodiscard, gnu::always_inline]] pointer operator->() const noexcept
         {
-            return &(*m_owner)[m_index];
+            return m_ptr;
         }
 
 
@@ -359,6 +440,12 @@ public:
         [[gnu::always_inline]] IteratorImpl& operator++() noexcept
         {
             ++m_index;
+
+            if ((m_index & blockMask) == 0u) [[unlikely]] // Entered the next block
+                reloadPtr();
+            else
+                ++m_ptr;
+
             return *this;
         }
 
@@ -366,14 +453,24 @@ public:
         [[gnu::always_inline]] IteratorImpl operator++(int) noexcept
         {
             const IteratorImpl result = *this;
-            ++m_index;
+            ++*this;
             return result;
         }
 
 
         [[gnu::always_inline]] IteratorImpl& operator--() noexcept
         {
-            --m_index;
+            if ((m_index & blockMask) == 0u) [[unlikely]] // Leaving the current block
+            {
+                --m_index;
+                reloadPtr();
+            }
+            else
+            {
+                --m_index;
+                --m_ptr;
+            }
+
             return *this;
         }
 
@@ -381,7 +478,7 @@ public:
         [[gnu::always_inline]] IteratorImpl operator--(int) noexcept
         {
             const IteratorImpl result = *this;
-            --m_index;
+            --*this;
             return result;
         }
 
@@ -389,6 +486,7 @@ public:
         [[gnu::always_inline]] IteratorImpl& operator+=(const difference_type delta) noexcept
         {
             m_index = static_cast<SizeT>(static_cast<difference_type>(m_index) + delta);
+            reloadPtr();
             return *this;
         }
 
@@ -399,57 +497,63 @@ public:
         }
 
 
-        [[nodiscard, gnu::always_inline]] IteratorImpl operator+(const difference_type delta) const noexcept
+        [[nodiscard, gnu::always_inline]] friend IteratorImpl operator+(IteratorImpl it, const difference_type delta) noexcept
         {
-            IteratorImpl result = *this;
-            result += delta;
-            return result;
+            it += delta;
+            return it;
         }
 
 
-        [[nodiscard, gnu::always_inline]] IteratorImpl operator-(const difference_type delta) const noexcept
+        [[nodiscard, gnu::always_inline]] friend IteratorImpl operator+(const difference_type delta, IteratorImpl it) noexcept
         {
-            IteratorImpl result = *this;
-            result -= delta;
-            return result;
+            it += delta;
+            return it;
         }
 
 
-        [[nodiscard, gnu::always_inline]] difference_type operator-(const IteratorImpl& rhs) const noexcept
+        [[nodiscard, gnu::always_inline]] friend IteratorImpl operator-(IteratorImpl it, const difference_type delta) noexcept
         {
-            ZA_ASSERT(m_owner == rhs.m_owner);
-            return static_cast<difference_type>(m_index) - static_cast<difference_type>(rhs.m_index);
+            it -= delta;
+            return it;
         }
 
 
-        [[nodiscard, gnu::always_inline]] bool operator==(const IteratorImpl& rhs) const noexcept
+        [[nodiscard, gnu::always_inline]] friend difference_type operator-(const IteratorImpl& lhs, const IteratorImpl& rhs) noexcept
         {
-            return m_owner == rhs.m_owner && m_index == rhs.m_index;
+            ZA_ASSERT(lhs.m_owner == rhs.m_owner);
+            return static_cast<difference_type>(lhs.m_index) - static_cast<difference_type>(rhs.m_index);
         }
 
 
-        [[nodiscard, gnu::always_inline]] bool operator<(const IteratorImpl& rhs) const noexcept
+        [[nodiscard, gnu::always_inline]] friend bool operator==(const IteratorImpl& lhs, const IteratorImpl& rhs) noexcept
         {
-            ZA_ASSERT(m_owner == rhs.m_owner);
-            return m_index < rhs.m_index;
+            ZA_ASSERT(lhs.m_owner == rhs.m_owner);
+            return lhs.m_index == rhs.m_index;
         }
 
 
-        [[nodiscard, gnu::always_inline]] bool operator<=(const IteratorImpl& rhs) const noexcept
+        [[nodiscard, gnu::always_inline]] friend bool operator<(const IteratorImpl& lhs, const IteratorImpl& rhs) noexcept
         {
-            return !(rhs < *this);
+            ZA_ASSERT(lhs.m_owner == rhs.m_owner);
+            return lhs.m_index < rhs.m_index;
         }
 
 
-        [[nodiscard, gnu::always_inline]] bool operator>(const IteratorImpl& rhs) const noexcept
+        [[nodiscard, gnu::always_inline]] friend bool operator<=(const IteratorImpl& lhs, const IteratorImpl& rhs) noexcept
         {
-            return rhs < *this;
+            return !(rhs < lhs);
         }
 
 
-        [[nodiscard, gnu::always_inline]] bool operator>=(const IteratorImpl& rhs) const noexcept
+        [[nodiscard, gnu::always_inline]] friend bool operator>(const IteratorImpl& lhs, const IteratorImpl& rhs) noexcept
         {
-            return !(*this < rhs);
+            return rhs < lhs;
+        }
+
+
+        [[nodiscard, gnu::always_inline]] friend bool operator>=(const IteratorImpl& lhs, const IteratorImpl& rhs) noexcept
+        {
+            return !(lhs < rhs);
         }
     };
 
@@ -466,31 +570,33 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] explicit ChunkedVector(const SizeT initialSize)
+    // Note: the non-default constructors delegate to the default one, so that
+    // the destructor releases the allocated storage if their body throws.
+    ////////////////////////////////////////////////////////////
+
+
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] explicit ChunkedVector(const SizeT initialSize) : ChunkedVector()
     {
         resize(initialSize);
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] explicit ChunkedVector(const SizeT initialSize, const TItem& value)
+    [[nodiscard]] explicit ChunkedVector(const SizeT initialSize, const TItem& value) : ChunkedVector()
     {
         resize(initialSize, value);
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] explicit ChunkedVector(const TItem* const srcBegin, const TItem* const srcEnd)
+    [[nodiscard]] explicit ChunkedVector(const TItem* const srcBegin, const TItem* const srcEnd) : ChunkedVector()
     {
         ZA_ASSERT(srcBegin <= srcEnd);
         const auto srcCount = static_cast<SizeT>(srcEnd - srcBegin);
 
-        if (srcCount == 0u)
-            return;
-
         reserve(srcCount);
-        copyFromContiguousRange(0u, srcBegin, srcCount);
-        m_size = srcCount;
+        unsafeEmplaceBackRange(srcBegin, srcCount);
     }
 
 
@@ -504,17 +610,12 @@ public:
     ////////////////////////////////////////////////////////////
     ~ChunkedVector()
     {
-        clear();
-
-        for (SizeT i = 0u; i < m_numBlocks; ++i)
-            deallocateBlock(m_directory[i]);
-
-        priv::VectorUtils::deallocate(m_directory, m_directoryCapacity);
+        releaseStorage();
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline]] ChunkedVector(const ChunkedVector& rhs)
+    [[nodiscard]] ChunkedVector(const ChunkedVector& rhs) : ChunkedVector()
     {
         copyFromOther(rhs);
     }
@@ -553,12 +654,7 @@ public:
         if (this == &rhs)
             return *this;
 
-        clear();
-
-        for (SizeT i = 0u; i < m_numBlocks; ++i)
-            deallocateBlock(m_directory[i]);
-
-        priv::VectorUtils::deallocate(m_directory, m_directoryCapacity);
+        releaseStorage();
 
         m_directory         = rhs.m_directory;
         m_size              = rhs.m_size;
@@ -575,7 +671,14 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline]] void resize(const SizeT newSize, auto&&... args)
+    /// \brief Resize to `newSize`, constructing new elements from `args...`
+    ///
+    /// `args...` are passed as lvalues to every new element's constructor.
+    /// They may refer to existing elements (e.g. `resize(n, v[0])`), as
+    /// growing never relocates existing elements.
+    ///
+    ////////////////////////////////////////////////////////////
+    void resize(const SizeT newSize, auto&&... args)
     {
         const auto oldSize = m_size;
 
@@ -605,18 +708,19 @@ public:
     template <typename... Ts>
     [[gnu::always_inline, gnu::flatten]] TItem& emplaceBack(Ts&&... xs)
     {
-        if (m_size >= capacity()) [[unlikely]]
-            reserveMore(1u);
+        if (m_size == capacity()) [[unlikely]]
+            reserveImpl(m_size + 1u);
 
-        TItem* const slot = slotPtrUnchecked(m_size);
+        // Construct before bumping the size, so that a throwing constructor leaves the size unchanged
+        TItem& result = *(ZA_PLACEMENT_NEW(slotPtrUnchecked(m_size)) TItem(static_cast<Ts&&>(xs)...));
         ++m_size;
 
-        return *(ZA_PLACEMENT_NEW(slot) TItem(static_cast<Ts&&>(xs)...));
+        return result;
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline]] void shrinkToFit()
+    void shrinkToFit()
     {
         const SizeT requiredBlocks = sizeToBlockCount(m_size);
 
@@ -635,21 +739,22 @@ public:
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline]] void reserve(const SizeT targetCapacity)
     {
-        ensureCapacityForSize(targetCapacity);
+        if (capacity() < targetCapacity) [[unlikely]]
+            reserveImpl(targetCapacity);
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline, gnu::flatten]] void reserveMore(const SizeT n)
+    [[gnu::always_inline]] void reserveMore(const SizeT n)
     {
         reserve(m_size + n);
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline, gnu::flatten]] void unsafeEmplaceBackRange(const TItem* const ptr, const SizeT count) noexcept
+    [[gnu::always_inline]] void unsafeEmplaceBackRange(const TItem* const ptr, const SizeT count)
     {
-        ZA_ASSERT(ptr != nullptr);
+        ZA_ASSERT(count == 0u || ptr != nullptr);
         ZA_ASSERT(m_size + count <= capacity());
 
         copyFromContiguousRange(m_size, ptr, count);
@@ -658,7 +763,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline, gnu::flatten]] void clear() noexcept
+    [[gnu::always_inline]] void clear() noexcept
     {
         destroyIndexRange(0u, m_size);
         m_size = 0u;
@@ -685,10 +790,11 @@ public:
     {
         ZA_ASSERT(m_size < capacity());
 
-        TItem* const slot = slotPtrUnchecked(m_size);
+        // Construct before bumping the size, so that a throwing constructor leaves the size unchanged
+        TItem& result = *(ZA_PLACEMENT_NEW(slotPtrUnchecked(m_size)) TItem(static_cast<Ts&&>(xs)...));
         ++m_size;
 
-        return *(ZA_PLACEMENT_NEW(slot) TItem(static_cast<Ts&&>(xs)...));
+        return result;
     }
 
 
@@ -714,16 +820,15 @@ public:
     {
         ZA_ASSERT(!empty());
         --m_size;
-        priv::VectorUtils::destroyRange(slotPtrUnchecked(m_size), slotPtrUnchecked(m_size) + 1);
+
+        if constexpr (!ZA_IS_TRIVIALLY_DESTRUCTIBLE(TItem))
+            slotPtrUnchecked(m_size)->~TItem();
     }
 
 
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline]] void swap(ChunkedVector& rhs) noexcept
     {
-        if (this == &rhs)
-            return;
-
         za::genericSwap(m_directory, rhs.m_directory);
         za::genericSwap(m_size, rhs.m_size);
         za::genericSwap(m_numBlocks, rhs.m_numBlocks);
@@ -805,30 +910,21 @@ public:
         if (m_size != rhs.m_size)
             return false;
 
-        const SizeT fullBlocks = m_size >> blockShift;
-        const SizeT tail       = m_size & blockMask;
+        SizeT index = 0u;
 
-        for (SizeT blockIndex = 0u; blockIndex < fullBlocks; ++blockIndex)
+        return forEachChunk(0u,
+                            m_size,
+                            [&](const TItem* const lhsPtr, const SizeT count)
         {
-            const TItem* const lp = m_directory[blockIndex];
-            const TItem* const rp = rhs.m_directory[blockIndex];
+            const TItem* const rhsPtr = rhs.slotPtrUnchecked(index);
+            index += count;
 
-            for (SizeT i = 0u; i < blockSize; ++i)
-                if (lp[i] != rp[i])
+            for (SizeT i = 0u; i < count; ++i)
+                if (lhsPtr[i] != rhsPtr[i])
                     return false;
-        }
 
-        if (tail > 0u)
-        {
-            const TItem* const lp = m_directory[fullBlocks];
-            const TItem* const rp = rhs.m_directory[fullBlocks];
-
-            for (SizeT i = 0u; i < tail; ++i)
-                if (lp[i] != rp[i])
-                    return false;
-        }
-
-        return true;
+            return true;
+        });
     }
 
 
@@ -872,126 +968,96 @@ public:
 
 
     ////////////////////////////////////////////////////////////
+    /// \brief Invoke `fn(item)` for each element, in order
+    ///
+    ////////////////////////////////////////////////////////////
     template <typename F>
     [[gnu::always_inline]] void forEach(this auto&& self, F&& fn)
     {
-        if (self.m_size == 0u)
-            return;
-
-        const SizeT fullBlocks = self.m_size >> blockShift;
-        const SizeT tail       = self.m_size & blockMask;
-
-        for (SizeT blockIndex = 0u; blockIndex < fullBlocks; ++blockIndex)
+        self.forEachChunk(0u,
+                          self.m_size,
+                          [&](auto* ptr, const SizeT count)
         {
-            auto* const blockPtr = self.blockPtrAt(blockIndex);
+            auto& f = fn; // Local alias: avoids reloading the capture per element in debug builds
 
-            if (blockIndex + 1u < self.m_numBlocks)
-                ZA_PREFETCH_FOR_READ(self.m_directory[blockIndex + 1u]);
+            for (auto* const end = ptr + count; ptr != end; ++ptr)
+                f(*ptr);
 
-            for (SizeT i = 0u; i < blockSize; ++i)
-                fn(blockPtr[i]);
-        }
-
-        if (tail > 0u)
-        {
-            auto* const blockPtr = self.blockPtrAt(fullBlocks);
-
-            for (SizeT i = 0u; i < tail; ++i)
-                fn(blockPtr[i]);
-        }
+            return true;
+        });
     }
 
 
+    ////////////////////////////////////////////////////////////
+    /// \brief Invoke `fn(index, item)` for each element, in order
+    ///
     ////////////////////////////////////////////////////////////
     template <typename F>
     [[gnu::always_inline]] void forEachIndexed(this auto&& self, F&& fn)
     {
-        if (self.m_size == 0u)
-            return;
+        SizeT baseIndex = 0u;
 
-        const SizeT fullBlocks = self.m_size >> blockShift;
-        const SizeT tail       = self.m_size & blockMask;
-        SizeT       baseIndex  = 0u;
-
-        for (SizeT blockIndex = 0u; blockIndex < fullBlocks; ++blockIndex)
+        self.forEachChunk(0u,
+                          self.m_size,
+                          [&](auto* const ptr, const SizeT count)
         {
-            auto* const blockPtr = self.blockPtrAt(blockIndex);
+            auto& f = fn; // Local alias: avoids reloading the capture per element in debug builds
 
-            if (blockIndex + 1u < self.m_numBlocks)
-                ZA_PREFETCH_FOR_READ(self.m_directory[blockIndex + 1u]);
+            for (SizeT i = 0u; i < count; ++i)
+                f(baseIndex + i, ptr[i]);
 
-            for (SizeT i = 0u; i < blockSize; ++i)
-                fn(baseIndex + i, blockPtr[i]);
-
-            baseIndex += blockSize;
-        }
-
-        if (tail > 0u)
-        {
-            auto* const blockPtr = self.blockPtrAt(fullBlocks);
-
-            for (SizeT i = 0u; i < tail; ++i)
-                fn(baseIndex + i, blockPtr[i]);
-        }
+            baseIndex += count;
+            return true;
+        });
     }
 
 
+    ////////////////////////////////////////////////////////////
+    /// \brief Invoke `fn(blockBegin, blockEnd)` for each block's contiguous range of elements, in order
+    ///
     ////////////////////////////////////////////////////////////
     template <typename F>
     [[gnu::always_inline]] void forEachBlock(this auto&& self, F&& fn)
     {
-        if (self.m_size == 0u)
-            return;
-
-        const SizeT fullBlocks = self.m_size >> blockShift;
-        const SizeT tail       = self.m_size & blockMask;
-
-        for (SizeT blockIndex = 0u; blockIndex < fullBlocks; ++blockIndex)
+        self.forEachChunk(0u,
+                          self.m_size,
+                          [&](auto* const ptr, const SizeT count)
         {
-            if (blockIndex + 1u < self.m_numBlocks)
-                ZA_PREFETCH_FOR_READ(self.m_directory[blockIndex + 1u]);
-
-            auto* const blockPtr = self.blockPtrAt(blockIndex);
-            fn(blockPtr, blockPtr + blockSize);
-        }
-
-        if (tail > 0u)
-        {
-            auto* const blockPtr = self.blockPtrAt(fullBlocks);
-            fn(blockPtr, blockPtr + tail);
-        }
+            fn(ptr, ptr + count);
+            return true;
+        });
     }
 
 
     ////////////////////////////////////////////////////////////
-    template <typename TPredicate>
-    [[nodiscard]] auto findIf(this auto&& self, TPredicate&& predicate) -> decltype(self.blockPtrAt(0u))
+    /// \brief Pointer to the first element satisfying `predicate`, or `nullptr`
+    ///
+    /// Only callable on lvalues: the result points into the container.
+    ///
+    ////////////////////////////////////////////////////////////
+    template <typename TSelf, typename TPredicate>
+        requires(za::isReference<TSelf>)
+    [[nodiscard]] auto findIf(this TSelf&& self, TPredicate&& predicate) -> decltype(self.slotPtrUnchecked(0u))
     {
-        const SizeT fullBlocks = self.m_size >> blockShift;
-        const SizeT tail       = self.m_size & blockMask;
+        decltype(self.slotPtrUnchecked(0u)) result = nullptr;
 
-        for (SizeT blockIndex = 0u; blockIndex < fullBlocks; ++blockIndex)
+        self.forEachChunk(0u,
+                          self.m_size,
+                          [&](auto* ptr, const SizeT count)
         {
-            auto* const blockPtr = self.blockPtrAt(blockIndex);
+            auto& pred = predicate; // Local alias: avoids reloading the capture per element in debug builds
 
-            if (blockIndex + 1u < self.m_numBlocks)
-                ZA_PREFETCH_FOR_READ(self.m_directory[blockIndex + 1u]);
+            for (auto* const end = ptr + count; ptr != end; ++ptr)
+                if (pred(*ptr))
+                {
+                    result = ptr;
+                    return false;
+                }
 
-            for (SizeT i = 0u; i < blockSize; ++i)
-                if (predicate(blockPtr[i]))
-                    return blockPtr + i;
-        }
+            return true;
+        });
 
-        if (tail > 0u)
-        {
-            auto* const blockPtr = self.blockPtrAt(fullBlocks);
-
-            for (SizeT i = 0u; i < tail; ++i)
-                if (predicate(blockPtr[i]))
-                    return blockPtr + i;
-        }
-
-        return nullptr;
+        return result;
     }
 
 
@@ -999,13 +1065,9 @@ public:
     template <typename TResult, typename F>
     [[nodiscard]] TResult reduce(TResult init, F&& fn) const
     {
-        forEach([&](const TItem& x) { init = fn(init, x); });
+        forEach([&](const TItem& x) { init = fn(static_cast<TResult&&>(init), x); });
         return init;
     }
 };
 
 } // namespace za
-
-
-////////////////////////////////////////////////////////////
-#undef ZA_PREFETCH_FOR_READ
