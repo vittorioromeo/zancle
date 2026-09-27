@@ -76,6 +76,19 @@ TEST_CASE("[System] za::Time")
             STATIC_CHECK(time.asMicroseconds() == 42'000);
         }
 
+        SECTION("Construct from milliseconds beyond the 32-bit microsecond range")
+        {
+            constexpr za::Time time = za::milliseconds(3'000'000); // 50 minutes
+            STATIC_CHECK(time.asMicroseconds() == 3'000'000'000);
+            STATIC_CHECK(za::milliseconds(-2'147'483'647 - 1).asMicroseconds() == -2'147'483'648'000);
+        }
+
+        SECTION("asMilliseconds beyond the 32-bit millisecond range")
+        {
+            constexpr za::Time time = za::microseconds(3'000'000'000'000); // ~34.7 days
+            STATIC_CHECK(time.asMilliseconds() == 3'000'000'000);
+        }
+
         SECTION("Construct from microseconds")
         {
             constexpr za::Time time = za::microseconds(987'654);
@@ -140,31 +153,20 @@ TEST_CASE("[System] za::Time")
         STATIC_CHECK(za::TimeChronoUtil::toDuration(za::TimeChronoUtil::fromDuration(1us)) == 1us);
     }
 
-    SECTION("Conversion to duration")
+    SECTION("toCustomDuration()")
     {
-        STATIC_CHECK(za::TimeChronoUtil::toDuration(za::seconds(0)) == 0s);
-        STATIC_CHECK(za::TimeChronoUtil::toDuration(za::milliseconds(0)) == 0ms);
-        STATIC_CHECK(za::TimeChronoUtil::toDuration(za::microseconds(0)) == 0us);
+        using Ms     = std::chrono::duration<long long, std::milli>;
+        using Sec    = std::chrono::duration<long long>;
+        using FloatS = std::chrono::duration<float>;
 
-        STATIC_CHECK(za::TimeChronoUtil::toDuration(za::seconds(-1)) == -1s);
-        STATIC_CHECK(za::TimeChronoUtil::toDuration(za::milliseconds(-1)) == -1ms);
-        STATIC_CHECK(za::TimeChronoUtil::toDuration(za::microseconds(-1)) == -1us);
+        // Coarser integer durations truncate toward zero
+        STATIC_CHECK(za::TimeChronoUtil::toCustomDuration<long long, std::milli>(za::microseconds(5999)) == Ms{5});
+        STATIC_CHECK(za::TimeChronoUtil::toCustomDuration<long long, std::milli>(za::microseconds(-5999)) == Ms{-5});
+        STATIC_CHECK(za::TimeChronoUtil::toCustomDuration<long long, std::ratio<1>>(za::milliseconds(2500)) == Sec{2});
 
-        STATIC_CHECK(za::TimeChronoUtil::toDuration(za::seconds(1)) == 1s);
-        STATIC_CHECK(za::TimeChronoUtil::toDuration(za::milliseconds(1)) == 1ms);
-        STATIC_CHECK(za::TimeChronoUtil::toDuration(za::microseconds(1)) == 1us);
-
-        STATIC_CHECK(za::TimeChronoUtil::toDuration(za::seconds(-10)) == -10s);
-        STATIC_CHECK(za::TimeChronoUtil::toDuration(za::milliseconds(-10)) == -10ms);
-        STATIC_CHECK(za::TimeChronoUtil::toDuration(za::microseconds(-10)) == -10us);
-
-        STATIC_CHECK(za::TimeChronoUtil::toDuration(za::seconds(10)) == 10s);
-        STATIC_CHECK(za::TimeChronoUtil::toDuration(za::milliseconds(10)) == 10ms);
-        STATIC_CHECK(za::TimeChronoUtil::toDuration(za::microseconds(10)) == 10us);
-
-        STATIC_CHECK(za::TimeChronoUtil::toDuration(za::TimeChronoUtil::fromDuration(1s)) == 1s);
-        STATIC_CHECK(za::TimeChronoUtil::toDuration(za::TimeChronoUtil::fromDuration(1ms)) == 1ms);
-        STATIC_CHECK(za::TimeChronoUtil::toDuration(za::TimeChronoUtil::fromDuration(1us)) == 1us);
+        // Finer and floating-point durations are exact
+        STATIC_CHECK(za::TimeChronoUtil::toCustomDuration<long long, std::nano>(za::microseconds(3)) == 3000ns);
+        STATIC_CHECK(za::TimeChronoUtil::toCustomDuration<float, std::ratio<1>>(za::milliseconds(1500)) == FloatS{1.5f});
     }
 
     SECTION("Zero time")

@@ -46,11 +46,14 @@ public:
     ////////////////////////////////////////////////////////////
     /// \brief Convert `time` to a custom `std::chrono::duration<Rep, Period>`
     ///
+    /// Conversions to a coarser integer duration truncate toward zero,
+    /// like `std::chrono::duration_cast`.
+    ///
     ////////////////////////////////////////////////////////////
     template <typename Rep, typename Period>
     [[nodiscard]] static constexpr std::chrono::duration<Rep, Period> toCustomDuration(const Time time)
     {
-        return std::chrono::microseconds(time.asMicroseconds());
+        return std::chrono::duration_cast<std::chrono::duration<Rep, Period>>(toDuration(time));
     }
 };
 

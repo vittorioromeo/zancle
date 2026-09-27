@@ -188,7 +188,7 @@ za::Time ImGuiToast::getElapsedTime()
 ////////////////////////////////////////////////////////////
 ImGuiToastPhase ImGuiToast::getPhase()
 {
-    const za::I32 elapsed = getElapsedTime().asMilliseconds();
+    const za::I64 elapsed = getElapsedTime().asMilliseconds();
 
     if (elapsed > NOTIFY_FADE_IN_OUT_TIME + this->dismissTime + NOTIFY_FADE_IN_OUT_TIME)
         return ImGuiToastPhase::Expired;
@@ -207,7 +207,7 @@ ImGuiToastPhase ImGuiToast::getPhase()
 float ImGuiToast::getFadePercent()
 {
     const ImGuiToastPhase phase   = getPhase();
-    const za::I32         elapsed = getElapsedTime().asMilliseconds();
+    const za::I64         elapsed = getElapsedTime().asMilliseconds();
 
     if (phase == ImGuiToastPhase::FadeIn)
         return (static_cast<float>(elapsed) / static_cast<float>(NOTIFY_FADE_IN_OUT_TIME)) * NOTIFY_OPACITY;

@@ -44,9 +44,9 @@ public:
     /// \see `asSeconds`, `asMicroseconds`
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr za::I32 asMilliseconds() const
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr za::I64 asMilliseconds() const
     {
-        return static_cast<za::I32>(m_microseconds / 1000);
+        return m_microseconds / 1000;
     }
 
 
@@ -167,7 +167,7 @@ public:
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::pure]] friend constexpr Time operator*(const Time lhs, const float rhs)
     {
-        return Time(static_cast<za::I64>(static_cast<float>(lhs.m_microseconds) * rhs));
+        return Time(floatToMicroseconds(static_cast<float>(lhs.m_microseconds) * rhs));
     }
 
 
@@ -228,7 +228,7 @@ public:
     [[nodiscard, gnu::always_inline, gnu::pure]] friend constexpr Time operator/(const Time lhs, const float rhs)
     {
         ZA_ASSERT(rhs != 0 && "Time::operator/ cannot divide by 0");
-        return Time(static_cast<za::I64>(static_cast<float>(lhs.m_microseconds) / rhs));
+        return Time(floatToMicroseconds(static_cast<float>(lhs.m_microseconds) / rhs));
     }
 
 
@@ -305,6 +305,22 @@ public:
 
 private:
     ////////////////////////////////////////////////////////////
+    /// \brief Convert a floating-point number of microseconds, which must be representable as `za::I64`
+    ///
+    /// Converting NaN, infinity, or an out-of-range value to an integer is undefined behavior.
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline, gnu::pure]] static constexpr za::I64 floatToMicroseconds(const float amount)
+    {
+        // `2^63` is exactly representable as `float`; NaN fails both comparisons
+        ZA_ASSERT(amount >= -9'223'372'036'854'775'808.f && amount < 9'223'372'036'854'775'808.f &&
+                  "za::Time value is NaN, infinite, or out of range");
+
+        return static_cast<za::I64>(amount);
+    }
+
+
+    ////////////////////////////////////////////////////////////
     /// \brief Construct from microseconds
     ///
     /// Prefer the `za::microseconds`, `za::milliseconds`, and
@@ -331,7 +347,7 @@ private:
 ////////////////////////////////////////////////////////////
 [[nodiscard, gnu::always_inline, gnu::pure]] constexpr Time seconds(const float amount)
 {
-    return Time(static_cast<za::I64>(amount * 1'000'000.f));
+    return Time(Time::floatToMicroseconds(amount * 1'000'000.f));
 }
 
 ////////////////////////////////////////////////////////////
@@ -342,7 +358,7 @@ private:
 ////////////////////////////////////////////////////////////
 [[nodiscard, gnu::always_inline, gnu::pure]] constexpr Time milliseconds(const za::I32 amount)
 {
-    return Time(amount * 1000);
+    return Time(static_cast<za::I64>(amount) * 1000); // `za::I32` arithmetic would overflow after ~35.8 minutes
 }
 
 
@@ -380,7 +396,7 @@ private:
 /// Usage example:
 /// \code
 /// za::Time t1 = za::seconds(0.1f);
-/// za::I32 milli = t1.asMilliseconds(); // 100
+/// za::I64 milli = t1.asMilliseconds(); // 100
 ///
 /// za::Time t2 = za::milliseconds(30);
 /// za::I64 micro = t2.asMicroseconds(); // 30'000
