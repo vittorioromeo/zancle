@@ -269,7 +269,7 @@ public:
     /// \brief Ratio of two times as a floating-point value
     ///
     ////////////////////////////////////////////////////////////
-    friend constexpr float operator/(const Time lhs, const Time rhs)
+    [[nodiscard, gnu::always_inline, gnu::pure]] friend constexpr float operator/(const Time lhs, const Time rhs)
     {
         ZA_ASSERT(rhs.m_microseconds != 0 && "Time::operator/ cannot divide by 0");
         return static_cast<float>(lhs.m_microseconds) / static_cast<float>(rhs.m_microseconds);

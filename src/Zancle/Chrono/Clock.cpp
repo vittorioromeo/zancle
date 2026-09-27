@@ -45,7 +45,8 @@ namespace
 /// https://man7.org/linux/man-pages/man2/clock_gettime.2.html
 ///
 ////////////////////////////////////////////////////////////
-// TODO P0: test on Emscripten (resolution, monotonicity, and agreement with `std::chrono::steady_clock`)
+// TODO P0: test on Emscripten in browsers, which coarsen `performance.now()` (only verified under node,
+//          with Emscripten 6.0.10: 1us resolution, monotonic, agrees with `std::chrono::steady_clock`)
 [[nodiscard]] I64 monotonicNanoseconds() noexcept
 {
 #if defined(ZA_SYSTEM_WINDOWS)
