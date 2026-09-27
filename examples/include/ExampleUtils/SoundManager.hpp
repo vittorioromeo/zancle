@@ -94,7 +94,7 @@ struct [[nodiscard]] SoundManager
         if (soundsBeingPlayed.size() >= maxSounds)
             return false;
 
-        soundsBeingPlayed.emplaceBack(playbackDevice, ls.buffer, ls.settings).play();
+        soundsBeingPlayed.unsafeEmplaceBack(playbackDevice, ls.buffer, ls.settings).play(); // capacity checked above
         return true;
     }
 };

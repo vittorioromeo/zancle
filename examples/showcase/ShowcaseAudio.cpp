@@ -74,8 +74,8 @@ void ExampleAudio::imgui()
                 else
                     m_activeSounds.reEmplaceByIterator(it, playbackDevice, m_sbByteMeow).play();
             }
-            else if (m_activeSounds.size() < 32u)
-                m_activeSounds.emplaceBack(playbackDevice, m_sbByteMeow).play();
+            else if (m_activeSounds.size() < m_activeSounds.capacity())
+                m_activeSounds.unsafeEmplaceBack(playbackDevice, m_sbByteMeow).play();
         }
 
         ImGui::SameLine();

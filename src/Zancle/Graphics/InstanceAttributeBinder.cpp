@@ -152,7 +152,7 @@ void InstanceAttributeBinder::uploadData(VBOHandle& vboHandle, const void* const
             return;
         }
 
-        m_touchedVBOHandles.emplaceBack(&vboHandle);
+        m_touchedVBOHandles.unsafeEmplaceBack(&vboHandle); // capacity checked above
     }
 }
 
@@ -178,7 +178,8 @@ void InstanceAttributeBinder::setup(
         return;
     }
 
-    m_deferredSetups.emplaceBack(DeferredSetup{
+    // Capacity checked above
+    m_deferredSetups.unsafeEmplaceBack(DeferredSetup{
         .vboHandle  = m_currentVBOHandle,
         .location   = location,
         .size       = size,

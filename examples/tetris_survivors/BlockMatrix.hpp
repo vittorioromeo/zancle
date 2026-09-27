@@ -106,7 +106,7 @@ inline ShapeBlockPositionVector findDownmostBlocks(const BlockMatrix& shape)
             if (shape.at(x, y).hasValue())
             {
                 foundLastRow = true;
-                result.emplaceBack(x, y);
+                result.unsafeEmplaceBack(x, y); // only one row is scanned: at most `shapeDimension` blocks
             }
         }
 
@@ -132,7 +132,7 @@ inline ShapeBlockPositionVector findDownmostBlocks(const BlockMatrix& shape)
             if (shape.at(x, y).hasValue())
             {
                 foundFirstRow = true;
-                result.emplaceBack(x, y);
+                result.unsafeEmplaceBack(x, y); // only one row is scanned: at most `shapeDimension` blocks
             }
         }
 

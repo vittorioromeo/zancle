@@ -91,10 +91,13 @@ void MiniaudioUtils::SoundBase::processEffect(const float** const framesIn,
 ////////////////////////////////////////////////////////////
 void MiniaudioUtils::SoundBase::setChannelMap(const ChannelMap& channelMap)
 {
+    static_assert(SoundChannelCount <= static_cast<unsigned int>(MA_CHANNEL_POSITION_COUNT),
+                  "`soundChannelMap` must be able to hold every channel of a `ChannelMap`");
+
     soundChannelMap.clear();
 
     for (const SoundChannel channel : channelMap)
-        soundChannelMap.pushBack(priv::MiniaudioUtils::soundChannelToMiniaudioChannel(channel));
+        soundChannelMap.unsafeEmplaceBack(priv::MiniaudioUtils::soundChannelToMiniaudioChannel(channel));
 
     // We don't need to set the pointer again as it's stable
 }

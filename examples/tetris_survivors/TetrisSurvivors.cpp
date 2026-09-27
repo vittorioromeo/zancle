@@ -2451,7 +2451,7 @@ private:
         const auto addRowIfNotExistent = [&](const za::SizeT row)
         {
             if (za::find(trulyClearedRows.begin(), trulyClearedRows.end(), row) == trulyClearedRows.end())
-                trulyClearedRows.pushBack(row);
+                trulyClearedRows.unsafeEmplaceBack(row); // subset of `clearLines.rows`, same capacity
         };
 
         for (za::SizeT y : clearLines.rows)
