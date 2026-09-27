@@ -16,7 +16,7 @@ namespace za
 ///
 ////////////////////////////////////////////////////////////
 template <typename ForwardIt>
-[[nodiscard, gnu::always_inline, gnu::pure]] constexpr SizeT countTruthy(ForwardIt rangeBegin, const ForwardIt rangeEnd)
+[[nodiscard, gnu::always_inline]] constexpr SizeT countTruthy(ForwardIt rangeBegin, const ForwardIt rangeEnd)
 {
     SizeT result = 0u;
 
@@ -33,7 +33,7 @@ template <typename ForwardIt>
 ///
 ////////////////////////////////////////////////////////////
 template <typename ForwardIt, typename T>
-[[nodiscard, gnu::always_inline, gnu::pure]] constexpr SizeT count(ForwardIt rangeBegin, const ForwardIt rangeEnd, const T& value)
+[[nodiscard, gnu::always_inline]] constexpr SizeT count(ForwardIt rangeBegin, const ForwardIt rangeEnd, const T& value)
 {
     SizeT result = 0u;
 
@@ -50,9 +50,7 @@ template <typename ForwardIt, typename T>
 ///
 ////////////////////////////////////////////////////////////
 template <typename ForwardIt, typename Predicate>
-[[nodiscard, gnu::always_inline, gnu::pure]] constexpr SizeT countIf(ForwardIt       rangeBegin,
-                                                                     const ForwardIt rangeEnd,
-                                                                     Predicate&&     predicate)
+[[nodiscard, gnu::always_inline]] constexpr SizeT countIf(ForwardIt rangeBegin, const ForwardIt rangeEnd, Predicate&& predicate)
 {
     SizeT result = 0u;
 

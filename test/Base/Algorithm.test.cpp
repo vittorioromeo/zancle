@@ -1,5 +1,7 @@
 #include "Tst/Tst.hpp"
 
+#include "Zancle/String/String.hpp"
+
 #include "Zancle/Algorithm/AdjacentFind.hpp"
 #include "Zancle/Algorithm/AllOf.hpp"
 #include "Zancle/Algorithm/AnyOf.hpp"
@@ -8,11 +10,43 @@
 #include "Zancle/Algorithm/Erase.hpp"
 #include "Zancle/Algorithm/Find.hpp"
 #include "Zancle/Algorithm/IsSorted.hpp"
+#include "Zancle/Algorithm/MaxElement.hpp"
 #include "Zancle/Algorithm/Remove.hpp"
 #include "Zancle/Algorithm/Rotate.hpp"
+#include "Zancle/Algorithm/Shuffle.hpp"
 #include "Zancle/Algorithm/SwapAndPop.hpp"
+#include "Zancle/Algorithm/Unique.hpp"
 
 #include "Zancle/Container/Vector.hpp"
+
+
+namespace
+{
+namespace AlgorithmTest // for unity builds
+{
+////////////////////////////////////////////////////////////
+struct NoDefaultCtor
+{
+    int value;
+
+    explicit NoDefaultCtor(const int v) : value{v}
+    {
+    }
+};
+
+
+////////////////////////////////////////////////////////////
+[[nodiscard]] constexpr int copyAtCompileTime()
+{
+    const int values[]{1, 2, 3};
+    int       target[3]{};
+
+    za::copy(values, values + 3, target);
+    return target[0] + target[1] * 10 + target[2] * 100;
+}
+
+} // namespace AlgorithmTest
+} // namespace
 
 
 TEST_CASE("[Base] Base/Algorithm/*.hpp")
@@ -28,6 +62,143 @@ TEST_CASE("[Base] Base/Algorithm/*.hpp")
         CHECK(target[1] == 1);
         CHECK(target[2] == 2);
         CHECK(target[3] == 3);
+    }
+
+    SECTION("Copy: memmove path")
+    {
+        // Empty ranges, including null ones
+        int* const nullPtr = nullptr;
+        CHECK(za::copy(nullPtr, nullPtr, nullPtr) == nullptr);
+
+        // Overlapping, with the destination before the source (allowed, like `std::copy`)
+        int values[]{0, 1, 2, 3, 4, 5};
+        CHECK(za::copy(values + 2, values + 6, values) == values + 4);
+        CHECK(values[0] == 2);
+        CHECK(values[1] == 3);
+        CHECK(values[2] == 4);
+        CHECK(values[3] == 5);
+
+        // Usable in constant expressions
+        STATIC_CHECK(AlgorithmTest::copyAtCompileTime() == 321);
+    }
+
+    SECTION("Copy: non-trivial elements")
+    {
+        const za::String values[]{"a", "long string that is not stored inline, hopefully"};
+        za::String       target[2];
+
+        CHECK(za::copy(values, values + 2, target) == target + 2);
+        CHECK(target[0] == values[0]);
+        CHECK(target[1] == values[1]);
+    }
+
+    SECTION("CountTruthy")
+    {
+        const int values[]{0, 1, 0, 2, 3, 0};
+
+        CHECK(za::countTruthy(values, values + 6) == 3u);
+        CHECK(za::countTruthy(values, values) == 0u);
+        CHECK(za::countTruthy(values, values + 1) == 0u);
+
+        const bool flags[]{true, true, false};
+        CHECK(za::countTruthy(flags, flags + 3) == 2u);
+    }
+
+    SECTION("MaxElement")
+    {
+        const int values[]{3, 7, 1, 7, 2};
+
+        CHECK(za::maxElement(values, values) == values); // empty: `last`
+        CHECK(za::maxElement(values, values + 1) == values);
+        CHECK(za::maxElement(values, values + 5) == values + 1); // first of the ties
+
+        const auto greater = [](const int a, const int b) { return a > b; };
+        CHECK(za::maxElement(values, values + 5, greater) == values + 2); // i.e. the minimum
+    }
+
+    SECTION("Unique")
+    {
+        int values[]{1, 1, 2, 2, 2, 3, 1, 1, 4};
+
+        int* const newEnd = za::unique(values, values + 9);
+
+        REQUIRE(newEnd == values + 5);
+        CHECK(values[0] == 1);
+        CHECK(values[1] == 2);
+        CHECK(values[2] == 3);
+        CHECK(values[3] == 1); // only consecutive duplicates are removed
+        CHECK(values[4] == 4);
+
+        CHECK(za::unique(values, values) == values);
+        CHECK(za::unique(values, values + 1) == values + 1);
+
+        int allSame[]{5, 5, 5};
+        CHECK(za::unique(allSame, allSame + 3) == allSame + 1);
+
+        za::Vector<za::String> strings{"a", "a", "b", "c", "c"};
+        strings.erase(za::unique(strings.begin(), strings.end()), strings.end());
+        CHECK((strings == za::Vector<za::String>{"a", "b", "c"}));
+    }
+
+    SECTION("Shuffle")
+    {
+        int values[]{0, 1, 2, 3, 4, 5, 6, 7};
+
+        // Always picking the lowest index is a valid (if unlucky) RNG: it rotates left by one
+        za::SizeT nCalls = 0u;
+        za::shuffle(values,
+                    values + 8,
+                    [&](const za::SizeT min, const za::SizeT max)
+        {
+            CHECK(min == 0u);
+            CHECK(max == 7u - nCalls); // Fisher-Yates bounds shrink by one each step
+            ++nCalls;
+            return min;
+        });
+
+        CHECK(nCalls == 7u);
+        CHECK(values[0] == 1);
+        CHECK(values[1] == 2);
+        CHECK(values[7] == 0);
+
+        // Picking the highest index leaves the range untouched
+        za::shuffle(values, values + 8, [](za::SizeT, const za::SizeT max) { return max; });
+        CHECK(values[0] == 1);
+        CHECK(values[1] == 2);
+        CHECK(values[7] == 0);
+
+        // A pseudo-random RNG produces a permutation
+        unsigned int state = 42u;
+        za::shuffle(values,
+                    values + 8,
+                    [&](const za::SizeT min, const za::SizeT max)
+        {
+            state = state * 1'664'525u + 1'013'904'223u;
+            return min + (state >> 8u) % (max - min + 1u);
+        });
+
+        bool seen[8]{};
+        for (const int v : values)
+            seen[v] = true;
+
+        for (const bool s : seen)
+            CHECK(s);
+
+        // Empty and single-element ranges never call the RNG
+        za::shuffle(values,
+                    values,
+                    [](za::SizeT, za::SizeT) -> za::SizeT
+        {
+            FAIL_CHECK("unexpected call");
+            return 0u;
+        });
+        za::shuffle(values,
+                    values + 1,
+                    [](za::SizeT, za::SizeT) -> za::SizeT
+        {
+            FAIL_CHECK("unexpected call");
+            return 0u;
+        });
     }
 
     SECTION("Find/FindIf/AnyOf")
@@ -197,6 +368,19 @@ TEST_CASE("[Base] Base/Algorithm/*.hpp")
         removedCount = za::vectorSwapAndPopIf(v, isOdd);
         CHECK(removedCount == 0);
         CHECK(v.empty());
+    }
+
+    SECTION("VectorSwapAndPopIf: elements without a default constructor")
+    {
+        za::Vector<AlgorithmTest::NoDefaultCtor> v;
+        for (int i = 0; i < 6; ++i)
+            v.emplaceBack(i);
+
+        CHECK(za::vectorSwapAndPopIf(v, [](const auto& x) { return x.value % 3 == 0; }) == 2u);
+        REQUIRE(v.size() == 4u);
+
+        for (const auto& x : v)
+            CHECK(x.value % 3 != 0);
     }
 
 

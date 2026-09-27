@@ -31,8 +31,8 @@ template <typename Vector, typename Predicate>
         vector[i] = ZA_MOVE(vector[currentSize]);
     }
 
-    vector.resize(currentSize);
-    return static_cast<SizeT>(initialSize - currentSize);
+    vector.erase(vector.begin() + currentSize, vector.end());
+    return initialSize - currentSize;
 }
 
 } // namespace za

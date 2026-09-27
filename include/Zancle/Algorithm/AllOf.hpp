@@ -10,9 +10,7 @@ namespace za
 ///
 ////////////////////////////////////////////////////////////
 template <typename ForwardIt, typename Predicate>
-[[nodiscard, gnu::always_inline, gnu::pure]] constexpr bool allOf(ForwardIt       rangeBegin,
-                                                                  const ForwardIt rangeEnd,
-                                                                  Predicate&&     predicate) noexcept
+[[nodiscard, gnu::always_inline]] constexpr bool allOf(ForwardIt rangeBegin, const ForwardIt rangeEnd, Predicate&& predicate)
 {
     for (; rangeBegin != rangeEnd; ++rangeBegin)
         if (!predicate(*rangeBegin))

@@ -10,9 +10,7 @@ namespace za
 ///
 ////////////////////////////////////////////////////////////
 template <typename ForwardIt, typename T>
-[[nodiscard, gnu::always_inline, gnu::pure]] constexpr ForwardIt find(ForwardIt       rangeBegin,
-                                                                      const ForwardIt rangeEnd,
-                                                                      const T&        target) noexcept
+[[nodiscard, gnu::always_inline]] constexpr ForwardIt find(ForwardIt rangeBegin, const ForwardIt rangeEnd, const T& target)
 {
     for (; rangeBegin != rangeEnd; ++rangeBegin)
         if (*rangeBegin == target)
@@ -27,9 +25,7 @@ template <typename ForwardIt, typename T>
 ///
 ////////////////////////////////////////////////////////////
 template <typename ForwardIt, typename Predicate>
-[[nodiscard, gnu::always_inline, gnu::pure]] constexpr ForwardIt findIf(ForwardIt       rangeBegin,
-                                                                        const ForwardIt rangeEnd,
-                                                                        Predicate&&     predicate) noexcept
+[[nodiscard, gnu::always_inline]] constexpr ForwardIt findIf(ForwardIt rangeBegin, const ForwardIt rangeEnd, Predicate&& predicate)
 {
     for (; rangeBegin != rangeEnd; ++rangeBegin)
         if (predicate(*rangeBegin))
