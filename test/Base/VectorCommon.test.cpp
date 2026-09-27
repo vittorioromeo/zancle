@@ -455,6 +455,51 @@ TEST_CASE("[Base] Vector family: traits")
 
 
 ////////////////////////////////////////////////////////////
+TEST_CASE("[Base] InPlaceVector: checked operations accept exactly full capacity")
+{
+    // Exceeding the capacity aborts (even in release builds), so only the boundary is tested here
+
+    SECTION("Constructors")
+    {
+        CHECK(za::InPlaceVector<int, 3>(3u).size() == 3u);
+        CHECK(za::InPlaceVector<int, 3>(3u, 7).back() == 7);
+        CHECK(za::InPlaceVector<int, 3>{1, 2, 3}.back() == 3);
+    }
+
+    SECTION("Element-adding operations")
+    {
+        za::InPlaceVector<int, 4> v;
+
+        v.reserve(4u);
+        v.pushBack(1);
+        v.emplaceBack(2);
+        v.emplace(v.begin(), 0);
+        v.reserveMore(1u);
+        v.insert(v.end(), 3);
+        v.reserveMore(0u);
+
+        REQUIRE(v.size() == 4u);
+        CHECK(v[0] == 0);
+        CHECK(v[3] == 3);
+
+        v.clear();
+        v.pushBackMultiple(1, 2);
+        v.emplaceBackRange(v.data(), 2u);
+        CHECK(v.size() == 4u);
+        CHECK(v[3] == 2);
+
+        v.resize(1u);
+        v.resize(4u);
+        CHECK(v.size() == 4u);
+
+        const int src[]{5, 6, 7, 8};
+        v.assignRange(src, src + 4);
+        CHECK(v.back() == 8);
+    }
+}
+
+
+////////////////////////////////////////////////////////////
 TEST_CASE("[Base] SmallVector: inline/heap transitions keep the live count balanced")
 {
     using namespace VectorCommonTest;

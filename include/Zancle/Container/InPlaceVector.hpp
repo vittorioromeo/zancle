@@ -9,6 +9,7 @@
 #include "Zancle/Container/Priv/SwapUnequalRanges.hpp"
 #include "Zancle/Container/Priv/VectorUtils.hpp"
 
+#include "Zancle/Base/Abort.hpp"
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/InitializerList.hpp" // IWYU pragma: keep
 #include "Zancle/Base/LifetimeAttributes.hpp"
@@ -21,6 +22,26 @@
 #include "Zancle/Trait/IsTriviallyRelocatable.hpp"
 
 
+namespace za::priv
+{
+////////////////////////////////////////////////////////////
+/// \brief Called when a checked `InPlaceVector` operation would exceed its capacity
+///
+/// Reports an assertion failure in debug builds, and aborts in all builds.
+///
+////////////////////////////////////////////////////////////
+[[noreturn, gnu::cold, gnu::noinline]] inline void inPlaceVectorCapacityExceeded() noexcept
+{
+#ifdef ZA_DEBUG
+    priv::assertFailure("InPlaceVector capacity exceeded", __FILE__, __LINE__);
+#else
+    za::abort();
+#endif
+}
+
+} // namespace za::priv
+
+
 namespace za
 {
 ////////////////////////////////////////////////////////////
@@ -29,8 +50,9 @@ namespace za
 /// `InPlaceVector<T, N>` provides the usual `Vector` interface but
 /// stores all elements in a fixed-size aligned buffer of capacity `N`.
 /// It never allocates and `capacity()` always returns `N`. Attempting
-/// to grow past `N` is a programming error, caught by debug assertions
-/// on every operation that adds elements.
+/// to grow past `N` is a programming error: checked operations (e.g.
+/// `pushBack`, `emplace`, `resize`, `reserve`) abort the program in all
+/// builds, while `unsafe*` operations only assert in debug builds.
 ///
 /// \note Although its members are declared `constexpr`, `InPlaceVector`
 ///       is not yet usable in constant evaluation: `data()` requires a
@@ -94,7 +116,7 @@ public:
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     [[nodiscard]] constexpr explicit InPlaceVector(const SizeT initialSize) : m_size{initialSize}
     {
-        ZA_ASSERT(initialSize <= N);
+        checkCapacity(initialSize);
         priv::VectorUtils::defaultConstructRange(data(), data() + initialSize);
     }
 
@@ -103,7 +125,7 @@ public:
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     [[nodiscard]] constexpr explicit InPlaceVector(const SizeT initialSize, const TItem& value) : m_size{initialSize}
     {
-        ZA_ASSERT(initialSize <= N);
+        checkCapacity(initialSize);
         priv::VectorUtils::copyConstructRange(data(), data() + initialSize, value);
     }
 
@@ -114,7 +136,7 @@ public:
     {
         ZA_ASSERT(srcBegin <= srcEnd);
         const auto srcCount = static_cast<SizeT>(srcEnd - srcBegin);
-        ZA_ASSERT(srcCount <= N);
+        checkCapacity(srcCount);
 
         if (srcCount != 0u) // avoid `memcpy(dst, null, 0)` (UB) for an empty range
             priv::VectorUtils::copyRange(data(), srcBegin, srcEnd);
@@ -191,7 +213,7 @@ public:
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline]] constexpr void resize(const SizeT newSize, auto&&... args)
     {
-        ZA_ASSERT(newSize <= N);
+        checkCapacity(newSize);
 
         const auto   oldSize        = m_size;
         TItem* const currentDataPtr = data();
@@ -215,6 +237,7 @@ public:
     [[gnu::always_inline]] constexpr TItem* emplace(const TItem* const pos, Ts&&... xs)
     {
         ZA_ASSERT(pos >= begin() && pos <= end());
+        checkCapacity(m_size + 1u);
 
         const auto index = static_cast<SizeT>(pos - data());
 
@@ -246,6 +269,7 @@ public:
     template <typename T = TItem>
     [[gnu::always_inline]] constexpr TItem& pushBack(T&& x)
     {
+        checkCapacity(m_size + 1u);
         return unsafeEmplaceBack(static_cast<T&&>(x));
     }
 
@@ -254,6 +278,7 @@ public:
     template <typename... Ts>
     [[gnu::always_inline]] constexpr TItem& emplaceBack(Ts&&... xs)
     {
+        checkCapacity(m_size + 1u);
         return unsafeEmplaceBack(static_cast<Ts&&>(xs)...);
     }
 
@@ -266,18 +291,19 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline, gnu::flatten]] constexpr void reserve([[maybe_unused]] const SizeT targetCapacity)
+    [[gnu::always_inline]] constexpr void reserve(const SizeT targetCapacity)
     {
-        ZA_ASSERT(targetCapacity <= N);
-        // no-op, just for compatibility
+        checkCapacity(targetCapacity); // otherwise a no-op, just for compatibility
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline, gnu::flatten]] constexpr void reserveMore([[maybe_unused]] const SizeT n)
+    [[gnu::always_inline]] constexpr void reserveMore(const SizeT n)
     {
-        ZA_ASSERT(size() + n <= N);
-        // no-op, just for compatibility
+        if (n > N - m_size) [[unlikely]] // cannot wrap around, unlike `m_size + n > N`
+            priv::inPlaceVectorCapacityExceeded();
+
+        // otherwise a no-op, just for compatibility
     }
 
     ////////////////////////////////////////////////////////////
@@ -447,24 +473,34 @@ public:
 
 private:
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline]] constexpr void reserveExact([[maybe_unused]] const SizeT targetCapacity)
+    [[gnu::always_inline]] static constexpr void checkCapacity(const SizeT requiredCapacity) noexcept
     {
-        ZA_ASSERT(targetCapacity <= N);
+        if (requiredCapacity > N) [[unlikely]]
+            priv::inPlaceVectorCapacityExceeded();
     }
 
 
     ////////////////////////////////////////////////////////////
+    [[gnu::always_inline]] constexpr void reserveExact(const SizeT targetCapacity) noexcept
+    {
+        checkCapacity(targetCapacity);
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    // Only called by `pushBackMultiple` when the items do not fit
     template <typename... TItems>
-    [[gnu::always_inline]] constexpr void growAndPushBackMultiple(TItems&&... items)
+    [[noreturn, gnu::always_inline]] constexpr void growAndPushBackMultiple(TItems&&...) noexcept
     {
-        unsafePushBackMultiple(static_cast<TItems&&>(items)...); // asserts on capacity
+        priv::inPlaceVectorCapacityExceeded();
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline]] constexpr void growAndEmplaceBackRange(const TItem* const ptr, const SizeT count)
+    // Only called by `emplaceBackRange` when the range does not fit
+    [[noreturn, gnu::always_inline]] constexpr void growAndEmplaceBackRange(const TItem*, SizeT) noexcept
     {
-        unsafeEmplaceBackRange(ptr, count); // asserts on capacity
+        priv::inPlaceVectorCapacityExceeded();
     }
 
 
