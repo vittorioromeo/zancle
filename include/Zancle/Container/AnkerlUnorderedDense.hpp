@@ -45,11 +45,6 @@
 #    define ANKERL_UNORDERED_DENSE_PACK(decl) __pragma(pack(push, 1)) decl __pragma(pack(pop))
 #endif
 
-// defined in unordered_dense.cpp
-#if !defined(ANKERL_UNORDERED_DENSE_EXPORT)
-#    define ANKERL_UNORDERED_DENSE_EXPORT
-#endif
-
 #include "Zancle/Base/Abort.hpp"
 #include "Zancle/Base/Memcpy.hpp"
 #include "Zancle/Base/Memset.hpp"
@@ -66,6 +61,7 @@
 #include "Zancle/Base/Swap.hpp"
 #include "Zancle/Trait/Conditional.hpp"
 #include "Zancle/Trait/DeclVal.hpp"
+#include "Zancle/Trait/EnableTrivialRelocation.hpp"
 #include "Zancle/Trait/IsConstructible.hpp"
 #include "Zancle/Trait/IsConvertible.hpp"
 #include "Zancle/Trait/IsEnum.hpp"
@@ -74,14 +70,16 @@
 #include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/IsTriviallyCopyable.hpp"
 #include "Zancle/Trait/IsTriviallyDestructible.hpp"
+#include "Zancle/Trait/IsTriviallyRelocatable.hpp"
 #include "Zancle/Trait/IsVoid.hpp"
 #include "Zancle/Trait/RemoveCVRef.hpp"
 #include "Zancle/Trait/UnderlyingType.hpp"
 #include "Zancle/Base/UIntPtrT.hpp"
 #include "Zancle/Container/Vector.hpp"
 
-#    if defined(_MSC_VER) && defined(_M_X64)
-#        include <intrin.h>
+#    if defined(_MSC_VER) && defined(_M_X64) && !defined(__SIZEOF_INT128__)
+// Declared directly instead of including the heavy `<intrin.h>`.
+extern "C" unsigned __int64 _umul128(unsigned __int64, unsigned __int64, unsigned __int64*);
 #        pragma intrinsic(_umul128)
 #    endif
 
@@ -93,51 +91,40 @@ namespace detail {
 
     template <typename A, typename B>
     struct pair {
+        ZA_ENABLE_TRIVIAL_RELOCATION_IF(za::isTriviallyRelocatable<A> && za::isTriviallyRelocatable<B>);
+
         A first;
         B second;
 
         pair() = default;
 
         template <typename U1, typename U2>
+            requires(!za::isSame<za::RemoveCVRefIndirect<U1>, piecewise_fn>)
         pair(U1&& a, U2&& b)
             : first(ZA_FORWARD(a))
             , second(ZA_FORWARD(b))
         { }
 
-        template <typename... Args1, typename... Args2>
-        pair(piecewise_fn, auto&& f0, auto&& f1)
-            : first(ZA_FORWARD(f0)())
-            , second(ZA_FORWARD(f1)())
+        // Direct-initializes both members (like `std::pair`'s piecewise constructor): no C-style casts
+        // for single arguments, and `second` is value-initialized when `args` is empty.
+        template <typename K, typename... Args>
+        pair(piecewise_fn, K&& k, Args&&... args)
+            : first(ZA_FORWARD(k))
+            , second(ZA_FORWARD(args)...)
         { }
     };
 
     template <typename T>
     using vector = za::Vector<T>;
 
-template <typename I>
-concept subtractable = requires(const I& a, const I& b) {
-    { b - a };
-};
-
 template <typename Iter>
-constexpr za::PtrDiffT my_distance(Iter first, Iter last)
+[[gnu::always_inline]] constexpr za::PtrDiffT my_distance(Iter first, Iter last)
 {
-    if constexpr (subtractable<Iter>)
-    {
-        return static_cast<za::PtrDiffT>(last - first);
-    }
-    else
-    {
-        za::PtrDiffT count = 0;
-        while (first != last)
-        {
-            ++first;
-            ++count;
-        }
-        return count;
-    }
+    return static_cast<za::PtrDiffT>(last - first);
 }
 
+// Only used by the (currently disabled) `segmented_vector` below.
+#if 0
 template <typename T>
 class my_allocator {
 public:
@@ -230,15 +217,13 @@ public:
         return true; // All stateless allocators are equal
     }
 };
+#endif
 
-
-template<class T = void>
-struct EqualTo;
 
 template<typename T>
 struct EqualTo
 {
-  constexpr bool operator()(const T& x, const T& y) const { return x == y; }
+  [[nodiscard, gnu::always_inline]] constexpr bool operator()(const T& x, const T& y) const { return x == y; }
 };
 
 } // namespace detail
@@ -250,7 +235,7 @@ struct EqualTo
 // hardcodes seed and the secret, reformats the code, and clang-tidy fixes.
 namespace detail::wyhash {
 
-inline void mum(za::U64* a, za::U64* b) {
+[[gnu::always_inline]] inline void mum(za::U64* a, za::U64* b) {
 #    if defined(__SIZEOF_INT128__)
     __uint128_t r = *a;
     r *= *b;
@@ -350,13 +335,13 @@ inline void mum(za::U64* a, za::U64* b) {
     return mix(secret[1] ^ len, mix(a ^ secret[1], b ^ seed));
 }
 
-[[nodiscard]] inline auto hash(za::U64 x) -> za::U64 {
+[[nodiscard, gnu::always_inline]] inline auto hash(za::U64 x) -> za::U64 {
     return detail::wyhash::mix(x, za::U64(0x9E3779B97F4A7C15));
 }
 
 } // namespace detail::wyhash
 
-ANKERL_UNORDERED_DENSE_EXPORT template <typename T, typename Enable = void>
+template <typename T, typename Enable = void>
 struct hash {
     auto operator()(T const& obj) const noexcept(noexcept(za::declVal<std::hash<T>>().operator()(za::declVal<T const&>())))
         -> za::U64 {
@@ -377,58 +362,48 @@ struct hash<T> {
 template <class T>
 struct hash<T*> {
     using is_avalanching = void;
-    auto operator()(T* ptr) const noexcept -> za::U64 {
+    [[nodiscard, gnu::always_inline]] auto operator()(T* ptr) const noexcept -> za::U64 {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
         return detail::wyhash::hash(reinterpret_cast<za::UIntPtrT>(ptr));
     }
 };
 
-/*
-template <class T>
-struct hash<std::unique_ptr<T>> {
-    using is_avalanching = void;
-    auto operator()(std::unique_ptr<T> const& ptr) const noexcept -> za::U64 {
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-        return detail::wyhash::hash(reinterpret_cast<za::UIntPtrT>(ptr.get()));
-    }
-};
-
-template <class T>
-struct hash<std::shared_ptr<T>> {
-    using is_avalanching = void;
-    auto operator()(std::shared_ptr<T> const& ptr) const noexcept -> za::U64 {
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-        return detail::wyhash::hash(reinterpret_cast<za::UIntPtrT>(ptr.get()));
-    }
-};
-*/
-
 template <typename Enum>
     requires ZA_IS_ENUM(Enum)
 struct hash<Enum> {
     using is_avalanching = void;
-    auto operator()(Enum e) const noexcept -> za::U64 {
+    [[nodiscard, gnu::always_inline]] auto operator()(Enum e) const noexcept -> za::U64 {
         using underlying = ZA_UNDERLYING_TYPE(Enum);
         return detail::wyhash::hash(static_cast<underlying>(e));
     }
 };
 
+namespace detail {
+
+// Contiguous ranges exposing `data()`/`size()` (strings, string views, vectors, ...) whose elements can be
+// hashed by their raw bytes: equal elements must have equal object representations (no padding bytes, no
+// `+0.0`/`-0.0`, no owning pointers). Holds for all character and integer types.
+template <typename T>
+concept byte_hashable_range = requires(const T& r) {
+    r.data();
+    r.size();
+} && __has_unique_object_representations(ZA_REMOVE_CVREF(decltype(*za::declVal<const T&>().data())));
+
+} // namespace detail
+
 template <typename StringLike>
-    requires requires (const StringLike& stringLike) {
-        stringLike.data();
-        stringLike.size();
-    }
+    requires detail::byte_hashable_range<StringLike>
 struct hash<StringLike> {
     using is_avalanching = void;
-    auto operator()(const StringLike& stringLike) const noexcept -> za::U64 {
-        return detail::wyhash::hash(stringLike.data(), sizeof(ZA_REMOVE_CVREF(decltype(stringLike[0]))) * stringLike.size());
+    [[nodiscard, gnu::always_inline]] auto operator()(const StringLike& stringLike) const noexcept -> za::U64 {
+        return detail::wyhash::hash(stringLike.data(), sizeof(*stringLike.data()) * stringLike.size());
     }
 };
 
-// Strong-typedef-like wrappers (e.g. types produced by `TSURV_DEFINE_STRONG_TYPEDEF`):
-// any type that exposes `T::UnderlyingType` and a `toUnderlying()` accessor returning
-// something convertible to `za::U64` is hashed by running the underlying value
-// through wyhash. Tagged avalanching to skip the second-stage mix.
+// Strong-typedef-like wrappers: any type that exposes `T::UnderlyingType` and a
+// `toUnderlying()` accessor returning something convertible to `za::U64` is hashed
+// by running the underlying value through wyhash. Tagged avalanching to skip the
+// second-stage mix.
 template <typename StrongTypedef>
     requires requires (const StrongTypedef& s) {
         typename StrongTypedef::UnderlyingType;
@@ -436,69 +411,19 @@ template <typename StrongTypedef>
     }
 struct hash<StrongTypedef> {
     using is_avalanching = void;
-    auto operator()(const StrongTypedef& value) const noexcept -> za::U64 {
+    [[nodiscard, gnu::always_inline]] auto operator()(const StrongTypedef& value) const noexcept -> za::U64 {
         return detail::wyhash::hash(static_cast<za::U64>(value.toUnderlying()));
     }
 };
 
-/*
-template <typename... Args>
-struct tuple_hash_helper {
-    // Converts the value into 64bit. If it is an integral type, just cast it. Mixing is doing the rest.
-    // If it isn't an integral we need to hash it.
-    template <typename Arg>
-    [[nodiscard]] constexpr static auto to64(Arg const& arg) -> za::U64 {
-        if constexpr (ZA_IS_INTEGRAL(Arg) || ZA_IS_ENUM(Arg)) {
-            return static_cast<za::U64>(arg);
-        } else {
-            return hash<Arg>{}(arg);
-        }
-    }
-
-    [[nodiscard]] static auto mix64(za::U64 state, za::U64 v) -> za::U64 {
-        return detail::wyhash::mix(state + v, za::U64{0x9ddfea08eb382d69});
-    }
-
-    // Creates a buffer that holds all the data from each element of the tuple. If possible we memcpy the data directly. If
-    // not, we hash the object and use this for the array. Size of the array is known at compile time, and memcpy is optimized
-    // away, so filling the buffer is highly efficient. Finally, call wyhash with this buffer.
-    template <typename T, za::SizeT... Idx>
-    [[nodiscard]] static auto calc_hash(T const& t, za::IndexSequence<Idx...>) noexcept -> za::U64 {
-        auto h = za::U64{};
-        (..., (h = mix64(h, to64(std::get<Idx>(t)))));
-        return h;
-    }
-};
-*/
-
-/*
-template <typename... Args>
-struct hash<std::tuple<Args...>> : tuple_hash_helper<Args...> {
-    using is_avalanching = void;
-    auto operator()(std::tuple<Args...> const& t) const noexcept -> za::U64 {
-        return tuple_hash_helper<Args...>::calc_hash(t, ZA_INDEX_SEQUENCE_FOR(Args){});
-    }
-};
-*/
-
-/*
-template <typename A, typename B>
-struct hash<detail::pair<A, B>> : tuple_hash_helper<A, B> {
-    using is_avalanching = void;
-    auto operator()(detail::pair<A, B> const& t) const noexcept -> za::U64 {
-        return tuple_hash_helper<A, B>::calc_hash(t, ZA_MAKE_INDEX_SEQUENCE(2){});
-    }
-};
-*/
-
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
-#    define ANKERL_UNORDERED_DENSE_HASH_STATICCAST(T)                    \
-        template <>                                                      \
-        struct hash<T> {                                                 \
-            using is_avalanching = void;                                 \
-            auto operator()(T const& obj) const noexcept -> za::U64 {   \
-                return detail::wyhash::hash(static_cast<za::U64>(obj)); \
-            }                                                            \
+#    define ANKERL_UNORDERED_DENSE_HASH_STATICCAST(T)                                          \
+        template <>                                                                            \
+        struct hash<T> {                                                                       \
+            using is_avalanching = void;                                                       \
+            [[nodiscard, gnu::always_inline]] auto operator()(T const& obj) const noexcept -> za::U64 { \
+                return detail::wyhash::hash(static_cast<za::U64>(obj));                        \
+            }                                                                                  \
         }
 
 #    if defined(__GNUC__) && !defined(__clang__)
@@ -543,35 +468,41 @@ ANKERL_UNORDERED_DENSE_HASH_STATICCAST(unsigned long long);
 namespace detail::wyhash {
 
 template <typename Float>
-[[nodiscard]] inline auto hashFloat(Float v) noexcept -> za::U64 {
+[[nodiscard, gnu::always_inline]] inline auto hashFloat(Float v) noexcept -> za::U64 {
     if constexpr (sizeof(Float) == sizeof(za::U32)) {
         // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
         za::U32 bits;
         ZA_MEMCPY(&bits, &v, sizeof(bits));
-        // Branchless "zero out bits iff value is +-0.0":
         // `bits << 1` strips the sign; the result is 0 only for +0.0/-0.0
         // (subnormals/Inf/NaN all have a non-zero exponent or mantissa).
-        // `-U32{cond}` is 0 (when cond is false) or 0xFFFFFFFF (when true).
-        bits &= -za::U32{(bits << 1) != 0u};
+        if ((bits << 1) == 0u)
+            bits = 0u;
         return hash(static_cast<za::U64>(bits));
     } else if constexpr (sizeof(Float) == sizeof(za::U64)) {
         // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
         za::U64 bits;
         ZA_MEMCPY(&bits, &v, sizeof(bits));
-        bits &= -za::U64{(bits << 1) != 0u};
+        if ((bits << 1) == 0u)
+            bits = 0u;
         return hash(bits);
     } else {
         // Wider than 64 bits (e.g. x87 80-bit `long double` stored in 12/16
         // bytes, or IEEE-754 binary128). The sign-bit position differs
-        // between x87 (bit 79) and IEEE quad (bit 127), so the branchless
-        // bit-twiddling above isn't portable here; fall back to the FP
-        // compare. This branch is rare in practice -- most code uses
-        // `float`/`double`.
+        // between x87 (bit 79) and IEEE quad (bit 127), so the bit-twiddling
+        // above isn't portable here; fall back to the FP compare. This branch
+        // is rare in practice -- most code uses `float`/`double`.
         if (v == Float{0})
             return hash(za::U64{0});
 
-        za::U64             buf[2]{};
-        constexpr za::SizeT n = sizeof(Float) < sizeof(buf) ? sizeof(Float) : sizeof(buf);
+        za::U64 buf[2]{};
+#    if defined(__LDBL_MANT_DIG__) && __LDBL_MANT_DIG__ == 64
+        // x87 80-bit extended precision: only the first 10 bytes hold the value,
+        // the rest is padding with unspecified contents that must not be hashed.
+        constexpr za::SizeT valueBytes = ZA_IS_SAME(Float, long double) ? 10u : sizeof(Float);
+#    else
+        constexpr za::SizeT valueBytes = sizeof(Float);
+#    endif
+        constexpr za::SizeT n = valueBytes < sizeof(buf) ? valueBytes : sizeof(buf);
         ZA_MEMCPY(buf, &v, n);
         return hash(buf[0] ^ buf[1]);
     }
@@ -580,13 +511,13 @@ template <typename Float>
 } // namespace detail::wyhash
 
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
-#    define ANKERL_UNORDERED_DENSE_HASH_FLOAT(T)                          \
-        template <>                                                      \
-        struct hash<T> {                                                 \
-            using is_avalanching = void;                                 \
-            auto operator()(T const& obj) const noexcept -> za::U64 { \
-                return detail::wyhash::hashFloat(obj);                   \
-            }                                                            \
+#    define ANKERL_UNORDERED_DENSE_HASH_FLOAT(T)                                               \
+        template <>                                                                            \
+        struct hash<T> {                                                                       \
+            using is_avalanching = void;                                                       \
+            [[nodiscard, gnu::always_inline]] auto operator()(T const& obj) const noexcept -> za::U64 { \
+                return detail::wyhash::hashFloat(obj);                                         \
+            }                                                                                  \
         }
 
 ANKERL_UNORDERED_DENSE_HASH_FLOAT(float);
@@ -650,6 +581,10 @@ struct base_table_type_set
 
 } // namespace detail
 
+// `segmented_vector` and the `segmented_map`/`segmented_set` aliases built on it are currently disabled: they are
+// unused, do not compile against `za::Vector` (`popBack`/`shrinkToFit` mismatches) and the defaulted move constructor
+// leaves the source owning the same blocks. Kept (instead of deleted) for possible future use.
+#if 0
 // Very much like std::deque, but faster for indexing (in most cases). As of now this doesn't implement the full
 // detail::vector API, but merely what's necessary to work as an underlying container for ankerl::unordered_dense::{map,
 // set}. It allocates blocks of equal size and puts them into the m_blocks vector. That means it can grow simply by
@@ -687,7 +622,6 @@ private:
         return f;
     }
 
-    using self_t                                = segmented_vector<T, MaxSegmentSizeBytes>;
     static constexpr auto num_bits              = num_bits_closest(MaxSegmentSizeBytes, sizeof(T));
     static constexpr auto num_elements_in_block = 1U << num_bits;
     static constexpr auto mask                  = num_elements_in_block - 1U;
@@ -1079,6 +1013,7 @@ public:
         m_blocks.shrinkToFit();
     }
 };
+#endif
 
 namespace detail
 {
@@ -1094,14 +1029,23 @@ template <class Key,
 class table : public za::Conditional<is_map_v<T>, base_table_type_map<T>, base_table_type_set>
 {
     using underlying_value_type     = typename za::Conditional<is_map_v<T>, detail::pair<Key, T>, Key>;
+#if 0 // segmented containers are currently disabled, see `segmented_vector`
     using underlying_container_type = za::
         Conditional<IsSegmented, segmented_vector<underlying_value_type>, detail::vector<underlying_value_type>>;
+#else
+    static_assert(!IsSegmented, "segmented containers are currently disabled, see `segmented_vector`");
+    using underlying_container_type = detail::vector<underlying_value_type>;
+#endif
 
 public:
     using value_container_type = underlying_container_type;
 
 private:
+#if 0 // segmented containers are currently disabled, see `segmented_vector`
     using default_bucket_container_type = za::Conditional<IsSegmented, segmented_vector<Bucket>, detail::vector<Bucket>>;
+#else
+    using default_bucket_container_type = detail::vector<Bucket>;
+#endif
 
     using bucket_container_type = za::Conditional<ZA_IS_SAME(BucketContainer, detail::default_container_t),
                                                         default_bucket_container_type,
@@ -1111,6 +1055,11 @@ private:
     static constexpr float        default_max_load_factor = 0.8F;
 
 public:
+    // No self-references: relocatable by `memcpy` whenever all members are.
+    ZA_ENABLE_TRIVIAL_RELOCATION_IF(za::isTriviallyRelocatable<value_container_type> &&
+                                    za::isTriviallyRelocatable<bucket_container_type> &&
+                                    za::isTriviallyRelocatable<Hash> && za::isTriviallyRelocatable<KeyEqual>);
+
     using key_type        = Key;
     using value_type      = typename value_container_type::value_type;
     using size_type       = typename value_container_type::size_type;
@@ -1144,36 +1093,36 @@ private:
 
     // Branchless wraparound using `bucket_count - 1` as a mask
     // (bucket counts are always powers of two -- see `calc_num_buckets`).
-    [[nodiscard]] auto next(value_idx_type bucket_idx) const -> value_idx_type
+    [[nodiscard, gnu::always_inline]] auto next(value_idx_type bucket_idx) const -> value_idx_type
     {
         return static_cast<value_idx_type>((bucket_idx + 1U) & m_bucket_idx_mask);
     }
 
     // Helper to access bucket through pointer types
-    [[nodiscard]] static constexpr auto at(bucket_container_type& bucket, za::SizeT offset) -> Bucket&
+    [[nodiscard, gnu::always_inline]] static constexpr auto at(bucket_container_type& bucket, za::SizeT offset) -> Bucket&
     {
         return bucket[offset];
     }
 
-    [[nodiscard]] static constexpr auto at(const bucket_container_type& bucket, za::SizeT offset) -> const Bucket&
+    [[nodiscard, gnu::always_inline]] static constexpr auto at(const bucket_container_type& bucket, za::SizeT offset) -> const Bucket&
     {
         return bucket[offset];
     }
 
     // use the dist_inc and dist_dec functions so that uint16_t types work without warning
-    [[nodiscard]] static constexpr auto dist_inc(dist_and_fingerprint_type x) -> dist_and_fingerprint_type
+    [[nodiscard, gnu::always_inline]] static constexpr auto dist_inc(dist_and_fingerprint_type x) -> dist_and_fingerprint_type
     {
         return static_cast<dist_and_fingerprint_type>(x + Bucket::dist_inc);
     }
 
-    [[nodiscard]] static constexpr auto dist_dec(dist_and_fingerprint_type x) -> dist_and_fingerprint_type
+    [[nodiscard, gnu::always_inline]] static constexpr auto dist_dec(dist_and_fingerprint_type x) -> dist_and_fingerprint_type
     {
         return static_cast<dist_and_fingerprint_type>(x - Bucket::dist_inc);
     }
 
     // The goal of mixed_hash is to always produce a high quality 64bit hash.
     template <typename K>
-    [[nodiscard, gnu::pure]] constexpr auto mixed_hash(const K& key) const -> za::U64
+    [[nodiscard, gnu::pure, gnu::always_inline]] constexpr auto mixed_hash(const K& key) const -> za::U64
     {
         if constexpr (requires { typename Hash::is_avalanching; })
         {
@@ -1196,17 +1145,17 @@ private:
         }
     }
 
-    [[nodiscard]] constexpr auto dist_and_fingerprint_from_hash(za::U64 hash) const -> dist_and_fingerprint_type
+    [[nodiscard, gnu::always_inline]] constexpr auto dist_and_fingerprint_from_hash(za::U64 hash) const -> dist_and_fingerprint_type
     {
         return Bucket::dist_inc | (static_cast<dist_and_fingerprint_type>(hash) & Bucket::fingerprint_mask);
     }
 
-    [[nodiscard]] constexpr auto bucket_idx_from_hash(za::U64 hash) const -> value_idx_type
+    [[nodiscard, gnu::always_inline]] constexpr auto bucket_idx_from_hash(za::U64 hash) const -> value_idx_type
     {
         return static_cast<value_idx_type>(hash >> m_shifts);
     }
 
-    [[nodiscard]] static constexpr auto get_key(const value_type& vt) -> const key_type&
+    [[nodiscard, gnu::always_inline]] static constexpr auto get_key(const value_type& vt) -> const key_type&
     {
         if constexpr (is_map_v<T>)
         {
@@ -1219,7 +1168,7 @@ private:
     }
 
     template <typename K>
-    [[nodiscard]] auto next_while_less(const K& key) const -> Bucket
+    [[nodiscard, gnu::always_inline]] auto next_while_less(const K& key) const -> Bucket
     {
         auto hash                 = mixed_hash(key);
         auto dist_and_fingerprint = dist_and_fingerprint_from_hash(hash);
@@ -1306,7 +1255,7 @@ private:
     /**
      * True when no element can be added any more without increasing the size
      */
-    [[nodiscard]] auto is_full() const -> bool
+    [[nodiscard, gnu::always_inline]] auto is_full() const -> bool
     {
         return size() > m_max_bucket_capacity;
     }
@@ -1335,7 +1284,10 @@ private:
         }
         else
         {
-            m_buckets.resize(num_buckets);
+            // Left uninitialized on purpose: every caller immediately clears (`clear_buckets`,
+            // `clear_and_fill_buckets_from_values`) or overwrites (`copy_buckets`) all buckets.
+            m_buckets.reserve(num_buckets);
+            m_buckets.unsafeSetSize(num_buckets);
         }
         if (num_buckets == max_bucket_count())
         {
@@ -1501,8 +1453,8 @@ private:
                 return do_place_element(dist_and_fingerprint,
                                         bucket_idx,
                                         detail::piecewise_fn{}, //
-                                        [&] { return Key(ZA_FORWARD(key)); },
-                                        [&] { return T(ZA_FORWARD(args)...); });
+                                        ZA_FORWARD(key),
+                                        ZA_FORWARD(args)...);
             }
             dist_and_fingerprint = dist_inc(dist_and_fingerprint);
             bucket_idx           = next(bucket_idx);
@@ -1559,7 +1511,7 @@ private:
     }
 
     template <typename K>
-    auto do_find(const K& key) const -> const_iterator
+    [[gnu::always_inline]] auto do_find(const K& key) const -> const_iterator
     {
         return const_cast<table*>(this)->do_find(key); // NOLINT(cppcoreguidelines-pro-type-const-cast)
     }
@@ -1615,8 +1567,22 @@ public:
         insert(first, last);
     }
 
-    table(const table& other)     = default;
-    table(table&& other) noexcept = default;
+    table(const table& other) = default;
+
+    // Like upstream, the moved-from table is left equivalent to a default-constructed one (usable, with buckets).
+    table(table&& other) noexcept :
+        m_values(ZA_MOVE(other.m_values)),
+        m_buckets(ZA_MOVE(other.m_buckets)),
+        m_max_bucket_capacity(za::exchange(other.m_max_bucket_capacity, za::SizeT{0})),
+        m_bucket_idx_mask(za::exchange(other.m_bucket_idx_mask, za::SizeT{0})),
+        m_max_load_factor(za::exchange(other.m_max_load_factor, default_max_load_factor)),
+        m_hash(za::exchange(other.m_hash, {})),
+        m_equal(za::exchange(other.m_equal, {})),
+        m_shifts(za::exchange(other.m_shifts, initial_shifts))
+    {
+        other.allocate_buckets_from_shift();
+        other.clear_buckets();
+    }
 
     table(std::initializer_list<value_type> ilist,
           za::SizeT                   bucket_count = 0,
@@ -1668,7 +1634,9 @@ public:
             m_hash                = za::exchange(other.m_hash, {});
             m_equal               = za::exchange(other.m_equal, {});
 
-            // map "other" is now already usable, it's empty.
+            // leave "other" usable and empty, like a default-constructed table
+            other.allocate_buckets_from_shift();
+            other.clear_buckets();
         }
         return *this;
     }
@@ -1682,44 +1650,44 @@ public:
 
     // iterators ////////////////////////////////////////////////////////////
 
-    auto begin() noexcept -> iterator
+    [[gnu::always_inline]] auto begin() noexcept -> iterator
     {
         return m_values.begin();
     }
 
-    auto begin() const noexcept -> const_iterator
+    [[gnu::always_inline]] auto begin() const noexcept -> const_iterator
     {
         return m_values.begin();
     }
 
-    auto cbegin() const noexcept -> const_iterator
+    [[gnu::always_inline]] auto cbegin() const noexcept -> const_iterator
     {
         return m_values.cbegin();
     }
 
-    auto end() noexcept -> iterator
+    [[gnu::always_inline]] auto end() noexcept -> iterator
     {
         return m_values.end();
     }
 
-    auto cend() const noexcept -> const_iterator
+    [[gnu::always_inline]] auto cend() const noexcept -> const_iterator
     {
         return m_values.cend();
     }
 
-    auto end() const noexcept -> const_iterator
+    [[gnu::always_inline]] auto end() const noexcept -> const_iterator
     {
         return m_values.end();
     }
 
     // capacity /////////////////////////////////////////////////////////////
 
-    [[nodiscard]] auto empty() const noexcept -> bool
+    [[nodiscard, gnu::always_inline]] auto empty() const noexcept -> bool
     {
         return m_values.empty();
     }
 
-    [[nodiscard]] auto size() const noexcept -> za::SizeT
+    [[nodiscard, gnu::always_inline]] auto size() const noexcept -> za::SizeT
     {
         return m_values.size();
     }
@@ -1867,42 +1835,42 @@ public:
 
     template <class M, typename Q = T>
     auto insert_or_assign(const Key& key, M&& mapped) -> detail::pair<iterator, bool>
-        requires(is_map_v<Q>)
+        requires(is_map_v<Q> && za::isConstructible<Q, M &&>)
     {
         return do_insert_or_assign(key, ZA_FORWARD(mapped));
     }
 
     template <class M, typename Q = T>
     auto insert_or_assign(Key&& key, M&& mapped) -> detail::pair<iterator, bool>
-        requires(is_map_v<Q>)
+        requires(is_map_v<Q> && za::isConstructible<Q, M &&>)
     {
         return do_insert_or_assign(ZA_MOVE(key), ZA_FORWARD(mapped));
     }
 
     template <typename K, typename M, typename Q = T, typename H = Hash, typename KE = KeyEqual>
     auto insert_or_assign(K&& key, M&& mapped) -> detail::pair<iterator, bool>
-        requires(is_map_v<Q> && is_transparent_v<H, KE>)
+        requires(is_map_v<Q> && is_transparent_v<H, KE> && za::isConstructible<Key, K &&> && za::isConstructible<Q, M &&>)
     {
         return do_insert_or_assign(ZA_FORWARD(key), ZA_FORWARD(mapped));
     }
 
     template <class M, typename Q = T>
     auto insert_or_assign(const_iterator /*hint*/, const Key& key, M&& mapped) -> iterator
-        requires(is_map_v<Q>)
+        requires(is_map_v<Q> && za::isConstructible<Q, M &&>)
     {
         return do_insert_or_assign(key, ZA_FORWARD(mapped)).first;
     }
 
     template <class M, typename Q = T>
     auto insert_or_assign(const_iterator /*hint*/, Key&& key, M&& mapped) -> iterator
-        requires(is_map_v<Q>)
+        requires(is_map_v<Q> && za::isConstructible<Q, M &&>)
     {
         return do_insert_or_assign(ZA_MOVE(key), ZA_FORWARD(mapped)).first;
     }
 
     template <typename K, typename M, typename Q = T, typename H = Hash, typename KE = KeyEqual>
     auto insert_or_assign(const_iterator /*hint*/, K&& key, M&& mapped) -> iterator
-        requires(is_map_v<Q> && is_transparent_v<H, KE>)
+        requires(is_map_v<Q> && is_transparent_v<H, KE> && za::isConstructible<Key, K &&> && za::isConstructible<Q, M &&>)
     {
         return do_insert_or_assign(ZA_FORWARD(key), ZA_FORWARD(mapped)).first;
     }
@@ -1976,43 +1944,45 @@ public:
     }
 
     template <class... Args, typename Q = T>
-    auto try_emplace(const Key& key, Args&&... args) -> detail::pair<iterator, bool>
-        requires(is_map_v<Q>)
+    [[gnu::always_inline]] auto try_emplace(const Key& key, Args&&... args) -> detail::pair<iterator, bool>
+        requires(is_map_v<Q> && za::isConstructible<Q, Args &&...>)
     {
         return do_try_emplace(key, ZA_FORWARD(args)...);
     }
 
     template <class... Args, typename Q = T>
-    auto try_emplace(Key&& key, Args&&... args) -> detail::pair<iterator, bool>
-        requires(is_map_v<Q>)
+    [[gnu::always_inline]] auto try_emplace(Key&& key, Args&&... args) -> detail::pair<iterator, bool>
+        requires(is_map_v<Q> && za::isConstructible<Q, Args &&...>)
     {
         return do_try_emplace(ZA_MOVE(key), ZA_FORWARD(args)...);
     }
 
     template <class... Args, typename Q = T>
     auto try_emplace(const_iterator /*hint*/, const Key& key, Args&&... args) -> iterator
-        requires(is_map_v<Q>)
+        requires(is_map_v<Q> && za::isConstructible<Q, Args &&...>)
     {
         return do_try_emplace(key, ZA_FORWARD(args)...).first;
     }
 
     template <class... Args, typename Q = T>
     auto try_emplace(const_iterator /*hint*/, Key&& key, Args&&... args) -> iterator
-        requires(is_map_v<Q>)
+        requires(is_map_v<Q> && za::isConstructible<Q, Args &&...>)
     {
         return do_try_emplace(ZA_MOVE(key), ZA_FORWARD(args)...).first;
     }
 
     template <typename K, typename... Args, typename Q = T, typename H = Hash, typename KE = KeyEqual>
-    auto try_emplace(K&& key, Args&&... args) -> detail::pair<iterator, bool>
-        requires(is_map_v<Q> && is_transparent_v<H, KE> && is_neither_convertible_v<K &&, iterator, const_iterator>)
+    [[gnu::always_inline]] auto try_emplace(K&& key, Args&&... args) -> detail::pair<iterator, bool>
+        requires(is_map_v<Q> && is_transparent_v<H, KE> && is_neither_convertible_v<K &&, iterator, const_iterator> &&
+                 za::isConstructible<Key, K &&> && za::isConstructible<Q, Args &&...>)
     {
         return do_try_emplace(ZA_FORWARD(key), ZA_FORWARD(args)...);
     }
 
     template <typename K, typename... Args, typename Q = T, typename H = Hash, typename KE = KeyEqual>
     auto try_emplace(const_iterator /*hint*/, K&& key, Args&&... args) -> iterator
-        requires(is_map_v<Q> && is_transparent_v<H, KE> && is_neither_convertible_v<K &&, iterator, const_iterator>)
+        requires(is_map_v<Q> && is_transparent_v<H, KE> && is_neither_convertible_v<K &&, iterator, const_iterator> &&
+                 za::isConstructible<Key, K &&> && za::isConstructible<Q, Args &&...>)
     {
         return do_try_emplace(ZA_FORWARD(key), ZA_FORWARD(args)...).first;
     }
@@ -2105,7 +2075,7 @@ public:
         }
 
         auto tmp = za::Optional<value_type>{};
-        do_erase(bucket_idx, [&tmp](value_type&& val) { tmp = ZA_MOVE(val); });
+        do_erase(bucket_idx, [&tmp](value_type&& val) { tmp.emplace(ZA_MOVE(val)); });
         return ZA_MOVE(tmp).value();
     }
 
@@ -2150,7 +2120,7 @@ public:
         return begin() + idx_first;
     }
 
-    auto erase(const Key& key) -> za::SizeT
+    [[gnu::always_inline]] auto erase(const Key& key) -> za::SizeT
     {
         return do_erase_key(key, [](value_type&& /*unused*/) {});
     }
@@ -2158,7 +2128,7 @@ public:
     auto extract(const Key& key) -> za::Optional<value_type>
     {
         auto tmp = za::Optional<value_type>{};
-        do_erase_key(key, [&tmp](value_type&& val) { tmp = ZA_MOVE(val); });
+        do_erase_key(key, [&tmp](value_type&& val) { tmp.emplace(ZA_MOVE(val)); });
         return tmp;
     }
 
@@ -2174,7 +2144,7 @@ public:
         requires(is_transparent_v<H, KE>)
     {
         auto tmp = za::Optional<value_type>{};
-        do_erase_key(ZA_FORWARD(key), [&tmp](value_type&& val) { tmp = ZA_MOVE(val); });
+        do_erase_key(ZA_FORWARD(key), [&tmp](value_type&& val) { tmp.emplace(ZA_MOVE(val)); });
         return tmp;
     }
 
@@ -2228,21 +2198,21 @@ public:
     }
 
     template <typename Q = T>
-    auto operator[](const Key& key) -> Q&
+    [[gnu::always_inline]] auto operator[](const Key& key) -> Q&
         requires(is_map_v<Q>)
     {
         return try_emplace(key).first->second;
     }
 
     template <typename Q = T>
-    auto operator[](Key&& key) -> Q&
+    [[gnu::always_inline]] auto operator[](Key&& key) -> Q&
         requires(is_map_v<Q>)
     {
         return try_emplace(ZA_MOVE(key)).first->second;
     }
 
     template <typename K, typename Q = T, typename H = Hash, typename KE = KeyEqual>
-    auto operator[](K&& key) -> Q&
+    [[gnu::always_inline]] auto operator[](K&& key) -> Q&
         requires(is_map_v<Q> && is_transparent_v<H, KE>)
     {
         return try_emplace(ZA_FORWARD(key)).first->second;
@@ -2260,37 +2230,37 @@ public:
         return find(key) == end() ? 0 : 1;
     }
 
-    auto find(const Key& key) -> iterator
+    [[gnu::always_inline]] auto find(const Key& key) -> iterator
     {
         return do_find(key);
     }
 
-    auto find(const Key& key) const -> const_iterator
+    [[gnu::always_inline]] auto find(const Key& key) const -> const_iterator
     {
         return do_find(key);
     }
 
     template <class K, class H = Hash, class KE = KeyEqual>
-    auto find(const K& key) -> iterator
+    [[gnu::always_inline]] auto find(const K& key) -> iterator
         requires(is_transparent_v<H, KE>)
     {
         return do_find(key);
     }
 
     template <class K, class H = Hash, class KE = KeyEqual>
-    auto find(const K& key) const -> const_iterator
+    [[gnu::always_inline]] auto find(const K& key) const -> const_iterator
         requires(is_transparent_v<H, KE>)
     {
         return do_find(key);
     }
 
-    auto contains(const Key& key) const -> bool
+    [[gnu::always_inline]] auto contains(const Key& key) const -> bool
     {
         return find(key) != end();
     }
 
     template <class K, class H = Hash, class KE = KeyEqual>
-    auto contains(const K& key) const -> bool
+    [[gnu::always_inline]] auto contains(const K& key) const -> bool
         requires(is_transparent_v<H, KE>)
     {
         return find(key) != end();
@@ -2441,72 +2411,64 @@ public:
         }
         return true;
     }
+
+    // Erases all elements satisfying `pred`, returns the number of erased elements. Found via ADL:
+    // `erase_if(map, pred)` (replaces upstream's `std::erase_if` overload, which is UB to declare).
+    template <typename Pred>
+    friend auto erase_if(table& map, Pred pred) -> za::SizeT
+    {
+        // going back to front because erase() invalidates the end iterator
+        const auto old_size = map.size();
+        auto       idx      = old_size;
+        while (idx)
+        {
+            --idx;
+            auto it = map.begin() + static_cast<difference_type>(idx);
+            if (pred(*it))
+            {
+                map.erase(it);
+            }
+        }
+
+        return old_size - map.size();
+    }
 };
 
 } // namespace detail
 
-ANKERL_UNORDERED_DENSE_EXPORT template <class Key,
-                                        class T,
-                                        class Hash            = hash<Key>,
-                                        class KeyEqual        = detail::EqualTo<Key>,
-                                        class Bucket          = bucket_type::standard,
-                                        class BucketContainer = detail::default_container_t>
+template <class Key,
+          class T,
+          class Hash            = hash<Key>,
+          class KeyEqual        = detail::EqualTo<Key>,
+          class Bucket          = bucket_type::standard,
+          class BucketContainer = detail::default_container_t>
 using map = detail::table<Key, T, Hash, KeyEqual, Bucket, BucketContainer, false>;
 
-ANKERL_UNORDERED_DENSE_EXPORT template <class Key,
-                                        class T,
-                                        class Hash            = hash<Key>,
-                                        class KeyEqual        = detail::EqualTo<Key>,
-                                        class Bucket          = bucket_type::standard,
-                                        class BucketContainer = detail::default_container_t>
-using segmented_map = detail::table<Key, T, Hash, KeyEqual, Bucket, BucketContainer, true>;
-
-ANKERL_UNORDERED_DENSE_EXPORT template <class Key,
-                                        class Hash            = hash<Key>,
-                                        class KeyEqual        = detail::EqualTo<Key>,
-                                        class Bucket          = bucket_type::standard,
-                                        class BucketContainer = detail::default_container_t>
+template <class Key,
+          class Hash            = hash<Key>,
+          class KeyEqual        = detail::EqualTo<Key>,
+          class Bucket          = bucket_type::standard,
+          class BucketContainer = detail::default_container_t>
 using set = detail::table<Key, void, Hash, KeyEqual, Bucket, BucketContainer, false>;
 
-ANKERL_UNORDERED_DENSE_EXPORT template <class Key,
-                                        class Hash            = hash<Key>,
-                                        class KeyEqual        = detail::EqualTo<Key>,
-                                        class Bucket          = bucket_type::standard,
-                                        class BucketContainer = detail::default_container_t>
+#if 0 // segmented containers are currently disabled, see `segmented_vector`
+template <class Key,
+          class T,
+          class Hash            = hash<Key>,
+          class KeyEqual        = detail::EqualTo<Key>,
+          class Bucket          = bucket_type::standard,
+          class BucketContainer = detail::default_container_t>
+using segmented_map = detail::table<Key, T, Hash, KeyEqual, Bucket, BucketContainer, true>;
+
+template <class Key,
+          class Hash            = hash<Key>,
+          class KeyEqual        = detail::EqualTo<Key>,
+          class Bucket          = bucket_type::standard,
+          class BucketContainer = detail::default_container_t>
 using segmented_set = detail::table<Key, void, Hash, KeyEqual, Bucket, BucketContainer, true>;
+#endif
 
 } // namespace ankerl::unordered_dense::inline v4_8_1
-
-
-// std extensions ////////////////////////////////////////////////////////////
-
-namespace std
-{ // NOLINT(cert-dcl58-cpp)
-
-ANKERL_UNORDERED_DENSE_EXPORT template <class Key, class T, class Hash, class KeyEqual, class Bucket, class Pred, class BucketContainer, bool IsSegmented>
-// NOLINTNEXTLINE(cert-dcl58-cpp)
-auto erase_if(ankerl::unordered_dense::detail::table<Key, T, Hash, KeyEqual, Bucket, BucketContainer, IsSegmented>& map,
-              Pred pred) -> za::SizeT
-{
-    using map_t = ankerl::unordered_dense::detail::table<Key, T, Hash, KeyEqual, Bucket, BucketContainer, IsSegmented>;
-
-    // going back to front because erase() invalidates the end iterator
-    const auto old_size = map.size();
-    auto       idx      = old_size;
-    while (idx)
-    {
-        --idx;
-        auto it = map.begin() + static_cast<typename map_t::difference_type>(idx);
-        if (pred(*it))
-        {
-            map.erase(it);
-        }
-    }
-
-    return old_size - map.size();
-}
-
-} // namespace std
 
 
 // NOLINTEND(readability-identifier-naming)
