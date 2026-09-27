@@ -794,7 +794,7 @@ SDLWindowImpl::SDLWindowImpl(const char* const context, void* const sdlWindow, c
     }
 
     // Get the initial sensor states
-    for (Vec3f& vec : m_impl->sensorValue.data)
+    for (Vec3f& vec : m_impl->sensorValue.elements)
         vec = {0.f, 0.f, 0.f};
 
     // Register the window in the global map

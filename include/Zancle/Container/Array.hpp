@@ -11,6 +11,7 @@
 #include "Zancle/Base/SizeT.hpp"
 
 #include "Zancle/Trait/EnableTrivialRelocation.hpp"
+#include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/IsTriviallyRelocatable.hpp"
 
 
@@ -25,6 +26,10 @@ namespace za
 /// allowed.
 ///
 /// All accessors assert in debug builds when given an out-of-bounds index.
+///
+/// Structured bindings (`auto [a, b] = arr;`) are not supported, as
+/// they would require specializing the `std::tuple_size` /
+/// `std::tuple_element` protocol (and thus including standard headers).
 ///
 ////////////////////////////////////////////////////////////
 template <typename T, SizeT N>
@@ -49,7 +54,7 @@ struct [[nodiscard]] ZA_GSL_OWNER(T) Array
     /// \brief Number of elements in the array (always `N`)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::const]] constexpr SizeT size() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::const]] static constexpr SizeT size() noexcept
     {
         return N;
     }
@@ -79,7 +84,7 @@ struct [[nodiscard]] ZA_GSL_OWNER(T) Array
     /// \brief Indexed element access (asserts `i < N`)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr T& operator[](const SizeT i) noexcept ZA_LIFETIMEBOUND
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T& operator[](const SizeT i) noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(i < N);
         return elements[i];
@@ -90,7 +95,7 @@ struct [[nodiscard]] ZA_GSL_OWNER(T) Array
     /// \brief Indexed element access (const overload)
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const T& operator[](const SizeT i) const noexcept ZA_LIFETIMEBOUND
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& operator[](const SizeT i) const noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(i < N);
         return elements[i];
@@ -168,8 +173,13 @@ struct [[nodiscard]] ZA_GSL_OWNER(T) Array
 ////////////////////////////////////////////////////////////
 /// \brief Deduction guide enabling `Array{a, b, c}` syntax
 ///
+/// All elements must have the same type (like `std::array`), so that
+/// e.g. `Array{1.0f, 0.1}` is rejected instead of silently deducing
+/// `Array<float, 2>` and narrowing the remaining elements.
+///
 ////////////////////////////////////////////////////////////
 template <typename T, typename... Elements>
+    requires(za::isSame<T, Elements> && ...)
 Array(T, Elements...) -> Array<T, 1 + sizeof...(Elements)>;
 
 } // namespace za

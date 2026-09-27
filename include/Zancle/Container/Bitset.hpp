@@ -12,8 +12,6 @@
 #include "Zancle/Base/Popcountll.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
-#include "Zancle/Trait/EnableTrivialRelocation.hpp"
-
 
 namespace za
 {
@@ -60,10 +58,6 @@ class [[nodiscard]] Bitset
 
 
 public:
-    ////////////////////////////////////////////////////////////
-    ZA_ENABLE_TRIVIAL_RELOCATION;
-
-
     ////////////////////////////////////////////////////////////
     using size_type = SizeT;
 
@@ -158,9 +152,9 @@ public:
     ////////////////////////////////////////////////////////////
     /// \brief Set bit `i` to `value`
     ///
-    /// Branchless: sets the bit if `value` is `true`, clears it
-    /// otherwise. Useful when you have a `bool` in hand and don't
-    /// want to spell out the if-else.
+    /// Branchless (even at `-O0`): sets the bit if `value` is `true`,
+    /// clears it otherwise. Useful when you have a `bool` in hand and
+    /// don't want to spell out the if-else.
     ///
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline]] constexpr void setBit(const SizeT i, const bool value) noexcept
@@ -168,10 +162,9 @@ public:
         ZA_ASSERT(i < N);
 
         const SizeT w = wordOf(i);
-        const U64   m = maskOf(i);
 
-        // `(m_words[w] & ~m) | (mask if value else 0)`.
-        m_words[w] = (m_words[w] & ~m) | (value ? m : U64{0});
+        // Clear the bit, then OR in `value` (0 or 1) shifted into place.
+        m_words[w] = (m_words[w] & ~maskOf(i)) | (U64{value} << (i % bitsPerWord));
     }
 
 
@@ -267,7 +260,7 @@ public:
     /// \brief `true` iff no bits are set
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::pure]] constexpr bool none() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr bool none() const noexcept
     {
         return !any();
     }
@@ -277,9 +270,13 @@ public:
     /// \brief Index of the lowest set bit, or `N` if there are none
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::pure]] constexpr SizeT findFirstSet() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr SizeT findFirstSet() const noexcept
     {
-        return findNextSet(0u);
+        for (SizeT w = 0u; w < wordCount; ++w)
+            if (m_words[w] != 0u)
+                return w * bitsPerWord + static_cast<SizeT>(ZA_CTZLL(m_words[w]));
+
+        return N;
     }
 
 
@@ -415,50 +412,9 @@ public:
     [[gnu::always_inline]] constexpr Bitset& operator<<=(const SizeT n) noexcept
     {
         if constexpr (N <= bitsPerWord) // Single-word fast path
-        {
             m_words[0] = (n >= N) ? U64{0} : ((m_words[0] << n) & lastWordMask);
-            return *this;
-        }
-
-        if (n >= N)
-        {
-            resetAll();
-            return *this;
-        }
-
-        if (n == 0u)
-            return *this;
-
-        const SizeT wordShift = n / bitsPerWord;
-        const SizeT bitShift  = n % bitsPerWord;
-
-        if (bitShift == 0u)
-        {
-            // Pure word shift, high-to-low to allow in-place rewriting.
-            for (SizeT i = wordCount; i-- > wordShift;)
-                m_words[i] = m_words[i - wordShift];
-        }
         else
-        {
-            const SizeT inv = bitsPerWord - bitShift;
-
-            // For i > wordShift: combine the shifted source word with
-            // the carry-over from the next-lower source word.
-            for (SizeT i = wordCount; i-- > wordShift + 1u;)
-                m_words[i] = (m_words[i - wordShift] << bitShift) | (m_words[i - wordShift - 1u] >> inv);
-
-            // For i == wordShift: only the shifted-in m_words[0]; no carry.
-            m_words[wordShift] = m_words[0] << bitShift;
-        }
-
-        // Zero the now-vacated low words.
-        for (SizeT i = 0u; i < wordShift; ++i)
-            m_words[i] = 0u;
-
-        // Trailing-zero invariant: any bits that crossed the high end
-        // must be masked off.
-        if constexpr (remainder != 0u)
-            m_words[wordCount - 1u] &= lastWordMask;
+            shiftLeftMultiWord(n);
 
         return *this;
     }
@@ -478,47 +434,10 @@ public:
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline]] constexpr Bitset& operator>>=(const SizeT n) noexcept
     {
-        if constexpr (N <= bitsPerWord)
-        {
+        if constexpr (N <= bitsPerWord) // Single-word fast path
             m_words[0] = (n >= N) ? U64{0} : (m_words[0] >> n);
-            return *this;
-        }
-
-        if (n >= N)
-        {
-            resetAll();
-            return *this;
-        }
-
-        if (n == 0u)
-            return *this;
-
-        const SizeT wordShift = n / bitsPerWord;
-        const SizeT bitShift  = n % bitsPerWord;
-
-        if (bitShift == 0u)
-        {
-            // Pure word shift, low-to-high to allow in-place rewriting.
-            for (SizeT i = 0u; i + wordShift < wordCount; ++i)
-                m_words[i] = m_words[i + wordShift];
-        }
         else
-        {
-            const SizeT inv = bitsPerWord - bitShift;
-
-            // For i + wordShift + 1 < wordCount: combine the shifted
-            // source word with the carry-down from the next-higher one.
-            for (SizeT i = 0u; i + wordShift + 1u < wordCount; ++i)
-                m_words[i] = (m_words[i + wordShift] >> bitShift) | (m_words[i + wordShift + 1u] << inv);
-
-            // For i + wordShift == wordCount - 1: only the shifted-down
-            // trailing word; no carry-down.
-            m_words[wordCount - 1u - wordShift] = m_words[wordCount - 1u] >> bitShift;
-        }
-
-        // Zero the now-vacated high words.
-        for (SizeT i = wordCount - wordShift; i < wordCount; ++i)
-            m_words[i] = 0u;
+            shiftRightMultiWord(n);
 
         return *this;
     }
@@ -558,6 +477,102 @@ public:
 
 
 private:
+    ////////////////////////////////////////////////////////////
+    /// \brief Multi-word implementation of `operator<<=`
+    ///
+    /// Deliberately not `always_inline`, to keep call sites small.
+    ///
+    ////////////////////////////////////////////////////////////
+    constexpr void shiftLeftMultiWord(const SizeT n) noexcept
+    {
+        if (n >= N)
+        {
+            resetAll();
+            return;
+        }
+
+        if (n == 0u)
+            return;
+
+        const SizeT wordShift = n / bitsPerWord;
+        const SizeT bitShift  = n % bitsPerWord;
+
+        if (bitShift == 0u)
+        {
+            // Pure word shift, high-to-low to allow in-place rewriting.
+            for (SizeT i = wordCount; i-- > wordShift;)
+                m_words[i] = m_words[i - wordShift];
+        }
+        else
+        {
+            const SizeT inv = bitsPerWord - bitShift;
+
+            // For i > wordShift: combine the shifted source word with
+            // the carry-over from the next-lower source word.
+            for (SizeT i = wordCount; i-- > wordShift + 1u;)
+                m_words[i] = (m_words[i - wordShift] << bitShift) | (m_words[i - wordShift - 1u] >> inv);
+
+            // For i == wordShift: only the shifted-in m_words[0]; no carry.
+            m_words[wordShift] = m_words[0] << bitShift;
+        }
+
+        // Zero the now-vacated low words.
+        for (SizeT i = 0u; i < wordShift; ++i)
+            m_words[i] = 0u;
+
+        // Trailing-zero invariant: any bits that crossed the high end
+        // must be masked off.
+        if constexpr (remainder != 0u)
+            m_words[wordCount - 1u] &= lastWordMask;
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Multi-word implementation of `operator>>=`
+    ///
+    /// Deliberately not `always_inline`, to keep call sites small.
+    ///
+    ////////////////////////////////////////////////////////////
+    constexpr void shiftRightMultiWord(const SizeT n) noexcept
+    {
+        if (n >= N)
+        {
+            resetAll();
+            return;
+        }
+
+        if (n == 0u)
+            return;
+
+        const SizeT wordShift = n / bitsPerWord;
+        const SizeT bitShift  = n % bitsPerWord;
+
+        if (bitShift == 0u)
+        {
+            // Pure word shift, low-to-high to allow in-place rewriting.
+            for (SizeT i = 0u; i + wordShift < wordCount; ++i)
+                m_words[i] = m_words[i + wordShift];
+        }
+        else
+        {
+            const SizeT inv = bitsPerWord - bitShift;
+
+            // For i + wordShift + 1 < wordCount: combine the shifted
+            // source word with the carry-down from the next-higher one.
+            for (SizeT i = 0u; i + wordShift + 1u < wordCount; ++i)
+                m_words[i] = (m_words[i + wordShift] >> bitShift) | (m_words[i + wordShift + 1u] << inv);
+
+            // For i + wordShift == wordCount - 1: only the shifted-down
+            // trailing word; no carry-down.
+            m_words[wordCount - 1u - wordShift] = m_words[wordCount - 1u] >> bitShift;
+        }
+
+        // Zero the now-vacated high words.
+        for (SizeT i = wordCount - wordShift; i < wordCount; ++i)
+            m_words[i] = 0u;
+    }
+
+
     ////////////////////////////////////////////////////////////
     // Member data
     ////////////////////////////////////////////////////////////

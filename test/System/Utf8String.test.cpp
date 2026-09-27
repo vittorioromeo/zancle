@@ -8,8 +8,10 @@
 
 #include "Zancle/String/String.hpp"
 #include "Zancle/String/StringView.hpp"
+#include "Zancle/String/Utf.hpp"
 #include "Zancle/String/Utf8StringCodepoints.hpp"
 
+#include "Zancle/Container/BackInserter.hpp"
 #include "Zancle/Container/Vector.hpp"
 
 #include "Zancle/Base/InitializerList.hpp"
@@ -864,3 +866,14 @@ TEST_CASE("[System] za::Utf8String - FmtAppendMixin (appendFmt / appendArg)")
 
 } // namespace Utf8StringTest
 } // namespace
+
+
+TEST_CASE("[System] za::Utf8String - as a sink for Utf<X>::toUtf8")
+{
+    const char32_t codepoints[] = {U'a', U'é', U'€', U'\U0001F600'};
+
+    za::Utf8String result;
+    za::Utf<32>::toUtf8(codepoints, codepoints + 4, za::BackInserter{result});
+
+    CHECK(result == za::Utf8String{u8"aé€\U0001F600"});
+}

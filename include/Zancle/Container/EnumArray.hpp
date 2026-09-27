@@ -7,10 +7,14 @@
 // Headers
 ////////////////////////////////////////////////////////////
 #include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/IntTypes.hpp"
 #include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
+#include "Zancle/Trait/EnableTrivialRelocation.hpp"
 #include "Zancle/Trait/IsEnum.hpp"
+#include "Zancle/Trait/IsTriviallyRelocatable.hpp"
+#include "Zancle/Trait/UnderlyingType.hpp"
 
 
 namespace za
@@ -23,29 +27,40 @@ namespace za
 /// underlying enum value is converted to its integer representation,
 /// which must be in `[0, Count)` (asserted in debug builds).
 ///
+/// An aggregate (like `za::Array`), propagating trivial relocatability
+/// from `Value`. Zero-sized arrays are not allowed.
+///
 /// Useful for tables keyed by an enum class, e.g. per-event-type or
 /// per-shader-channel state.
 ///
 ////////////////////////////////////////////////////////////
 template <typename Enum, typename Value, SizeT Count>
-struct EnumArray
+struct [[nodiscard]] ZA_GSL_OWNER(Value) EnumArray
 {
     ////////////////////////////////////////////////////////////
+    ZA_ENABLE_TRIVIAL_RELOCATION_IF(ZA_IS_TRIVIALLY_RELOCATABLE(Value));
+
+
+    ////////////////////////////////////////////////////////////
     static_assert(ZA_IS_ENUM(Enum));
+    static_assert(Count > 0, "Zero-sized enum arrays are not supported");
 
 
     ////////////////////////////////////////////////////////////
-    /// \brief Returns a reference to the element associated to specified \a key
+    /// \brief Convert `key` to an index, asserting it is in `[0, Count)`
     ///
-    /// No bounds checking is performed in release builds.
+    /// Goes through the underlying type and `U64` so that wide
+    /// underlying types cannot silently truncate on 32-bit `SizeT`,
+    /// and negative values of signed underlying types wrap to huge
+    /// values that fail the range assertion.
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr Value& operator[](const Enum key) ZA_LIFETIMEBOUND
+    [[nodiscard, gnu::always_inline, gnu::pure]] static constexpr SizeT indexOf(const Enum key) noexcept
     {
-        const auto index = static_cast<SizeT>(key);
+        const auto index = static_cast<U64>(static_cast<ZA_UNDERLYING_TYPE(Enum)>(key));
 
         ZA_ASSERT(index < Count);
-        return data[index];
+        return static_cast<SizeT>(index);
     }
 
 
@@ -55,12 +70,21 @@ struct EnumArray
     /// No bounds checking is performed in release builds.
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const Value& operator[](const Enum key) const ZA_LIFETIMEBOUND
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr Value& operator[](const Enum key) noexcept ZA_LIFETIMEBOUND
     {
-        const auto index = static_cast<SizeT>(key);
+        return elements[indexOf(key)];
+    }
 
-        ZA_ASSERT(index < Count);
-        return data[index];
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Returns a reference to the element associated to specified \a key
+    ///
+    /// No bounds checking is performed in release builds.
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const Value& operator[](const Enum key) const noexcept ZA_LIFETIMEBOUND
+    {
+        return elements[indexOf(key)];
     }
 
 
@@ -70,7 +94,7 @@ struct EnumArray
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline]] constexpr void fill(const Value& fillValue)
     {
-        for (Value& value : data)
+        for (Value& value : elements)
             value = fillValue;
     }
 
@@ -79,7 +103,7 @@ struct EnumArray
     /// \brief Underlying contiguous storage; exposed publicly to remain an aggregate
     ///
     ////////////////////////////////////////////////////////////
-    Value data[Count];
+    Value elements[Count];
 };
 
 } // namespace za

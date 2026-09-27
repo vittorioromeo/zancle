@@ -728,3 +728,320 @@ TEST_CASE("[Base] za::Bitset - shift round-trip is monotonic for small shifts")
     CHECK(!b.test(127)); // dropped: 127 + 16 = 143 >= 128
     CHECK(b.count() == 4u);
 }
+
+
+////////////////////////////////////////////////////////////
+// Shifts are usable in constant expressions (both paths).
+////////////////////////////////////////////////////////////
+static_assert((Bitset<8>{0b0000'0110u} << 2u).toU64() == 0b0001'1000u);
+static_assert((Bitset<8>{0b1100'0000u} << 1u).toU64() == 0b1000'0000u); // top bit dropped
+static_assert((Bitset<8>{0b0000'0110u} >> 1u).toU64() == 0b0000'0011u);
+
+static_assert([]
+{
+    Bitset<130> b;
+    b.set(1);
+    b.set(129);
+
+    b <<= 70u; // 1 -> 71, 129 dropped
+    if (b.count() != 1u || !b.test(71))
+        return false;
+
+    b >>= 71u; // 71 -> 0
+    return b.count() == 1u && b.test(0);
+}());
+
+
+namespace
+{
+namespace BitsetTest // for unity builds
+{
+////////////////////////////////////////////////////////////
+/// Naive reference model: one `bool` per bit.
+////////////////////////////////////////////////////////////
+template <SizeT N>
+struct NaiveBits
+{
+    bool bits[N]{};
+
+    void shiftLeft(const SizeT n)
+    {
+        for (SizeT i = N; i-- > 0u;)
+            bits[i] = (i >= n) ? bits[i - n] : false;
+    }
+
+    void shiftRight(const SizeT n)
+    {
+        for (SizeT i = 0u; i < N; ++i)
+            bits[i] = (i + n < N) ? bits[i + n] : false;
+    }
+};
+
+
+////////////////////////////////////////////////////////////
+/// Deterministic pseudo-random pattern (LCG) written to both models.
+////////////////////////////////////////////////////////////
+template <SizeT N>
+void fillPattern(Bitset<N>& b, NaiveBits<N>& model, U64 seed)
+{
+    for (SizeT i = 0u; i < N; ++i)
+    {
+        seed             = seed * 6'364'136'223'846'793'005ull + 1'442'695'040'888'963'407ull;
+        const bool value = ((seed >> 33u) & 1u) != 0u;
+
+        b.setBit(i, value);
+        model.bits[i] = value;
+    }
+}
+
+
+////////////////////////////////////////////////////////////
+template <SizeT N>
+[[nodiscard]] bool matches(const Bitset<N>& b, const NaiveBits<N>& model)
+{
+    SizeT expectedCount = 0u;
+
+    for (SizeT i = 0u; i < N; ++i)
+    {
+        if (b.test(i) != model.bits[i])
+            return false;
+
+        expectedCount += model.bits[i] ? 1u : 0u;
+    }
+
+    // Also catches stray bits in the unused part of the trailing word.
+    return b.count() == expectedCount;
+}
+
+
+////////////////////////////////////////////////////////////
+template <SizeT N>
+void checkShiftsAgainstModel(const SizeT n)
+{
+    for (U64 seed = 1u; seed <= 4u; ++seed)
+    {
+        {
+            Bitset<N>    b;
+            NaiveBits<N> model;
+            fillPattern(b, model, seed);
+
+            b <<= n;
+            model.shiftLeft(n < N ? n : N);
+            CHECK(matches(b, model));
+        }
+
+        {
+            Bitset<N>    b;
+            NaiveBits<N> model;
+            fillPattern(b, model, seed);
+
+            b >>= n;
+            model.shiftRight(n < N ? n : N);
+            CHECK(matches(b, model));
+        }
+    }
+}
+
+} // namespace BitsetTest
+} // namespace
+
+
+////////////////////////////////////////////////////////////
+TEST_CASE("[Base] za::Bitset - single-word shifts (N <= 64)")
+{
+    using namespace BitsetTest;
+
+    SECTION("N == 1")
+    {
+        const Bitset<1> b{1u};
+        CHECK(static_cast<bool>((b << 0u) == b));
+        CHECK(static_cast<bool>((b >> 0u) == b));
+        CHECK((b << 1u).none());
+        CHECK((b >> 1u).none());
+        CHECK((b << 64u).none());
+        CHECK((b >> 999u).none());
+
+        checkShiftsAgainstModel<1>(0u);
+        checkShiftsAgainstModel<1>(1u);
+    }
+
+    SECTION("N == 8")
+    {
+        const Bitset<8> b{0b1000'0001u};
+        CHECK((b << 1u).toU64() == 0b0000'0010u); // bit 7 dropped
+        CHECK((b >> 1u).toU64() == 0b0100'0000u); // bit 0 dropped
+        CHECK((b << 7u).toU64() == 0b1000'0000u);
+        CHECK((b >> 7u).toU64() == 0b0000'0001u);
+        CHECK((b << 8u).none());
+        CHECK((b >> 8u).none());
+
+        for (SizeT n = 0u; n <= 9u; ++n)
+            checkShiftsAgainstModel<8>(n);
+    }
+
+    SECTION("N == 63")
+    {
+        Bitset<63> b;
+        b.setAll();
+
+        const Bitset<63> l = b << 1u;
+        CHECK(l.count() == 62u); // trailing-zero invariant: bit 63 must not be set
+        CHECK(!l.test(0));
+        CHECK(l.test(62));
+
+        const Bitset<63> r = b >> 62u;
+        CHECK(r.count() == 1u);
+        CHECK(r.test(0));
+
+        constexpr SizeT amounts[]{0u, 1u, 31u, 62u, 63u, 64u, 100u};
+        for (const SizeT n : amounts)
+            checkShiftsAgainstModel<63>(n);
+    }
+
+    SECTION("N == 64")
+    {
+        const Bitset<64> b{0x80'00'00'00'00'00'00'01ull};
+        CHECK((b << 1u).toU64() == 0x2ull);
+        CHECK((b >> 1u).toU64() == 0x40'00'00'00'00'00'00'00ull);
+        CHECK((b << 63u).toU64() == 0x80'00'00'00'00'00'00'00ull);
+        CHECK((b >> 63u).toU64() == 0x1ull);
+        CHECK((b << 64u).none()); // must not perform a (UB) shift by the word width
+        CHECK((b >> 64u).none());
+
+        constexpr SizeT amounts[]{0u, 1u, 32u, 63u, 64u, 65u};
+        for (const SizeT n : amounts)
+            checkShiftsAgainstModel<64>(n);
+    }
+}
+
+
+////////////////////////////////////////////////////////////
+TEST_CASE("[Base] za::Bitset - multi-word shifts match a naive model")
+{
+    using namespace BitsetTest;
+
+    SECTION("Bitset<200>, whole-word + partial shift (n == 70)")
+    {
+        checkShiftsAgainstModel<200>(70u);
+    }
+
+    SECTION("Bitset<200>, assorted shift amounts")
+    {
+        constexpr SizeT amounts[]{0u, 1u, 63u, 64u, 65u, 127u, 128u, 130u, 199u, 200u, 500u};
+        for (const SizeT n : amounts)
+            checkShiftsAgainstModel<200>(n);
+    }
+
+    SECTION("Bitset<65> and Bitset<128>, every shift amount")
+    {
+        for (SizeT n = 0u; n <= 130u; ++n)
+        {
+            checkShiftsAgainstModel<65>(n);
+            checkShiftsAgainstModel<128>(n);
+        }
+    }
+}
+
+
+////////////////////////////////////////////////////////////
+TEST_CASE("[Base] za::Bitset - U64 constructor for N > 64")
+{
+    constexpr U64 pattern = 0xDE'AD'BE'EF'CA'FE'BA'BEull;
+
+    const Bitset<200> b{pattern};
+
+    CHECK(b.count() == static_cast<SizeT>(ZA_POPCOUNTLL(pattern)));
+
+    for (SizeT i = 0u; i < 64u; ++i)
+        CHECK(b.test(i) == (((pattern >> i) & 1u) != 0u));
+
+    for (SizeT i = 64u; i < 200u; ++i)
+        CHECK(!b.test(i));
+
+    CHECK(b.findNextSet(64u) == 200u);
+}
+
+
+////////////////////////////////////////////////////////////
+TEST_CASE("[Base] za::Bitset - findNextSet in the partial trailing word")
+{
+    Bitset<70> b;
+
+    CHECK(b.findNextSet(64u) == 70u);
+    CHECK(b.findNextSet(69u) == 70u);
+
+    b.set(69);
+    CHECK(b.findFirstSet() == 69u);
+    CHECK(b.findNextSet(0u) == 69u);
+    CHECK(b.findNextSet(64u) == 69u);
+    CHECK(b.findNextSet(69u) == 69u);
+    CHECK(b.findNextSet(70u) == 70u);
+
+    b.set(65);
+    CHECK(b.findFirstSet() == 65u);
+    CHECK(b.findNextSet(64u) == 65u);
+    CHECK(b.findNextSet(66u) == 69u);
+
+    // The unused bits of the trailing word must never be reported as set.
+    Bitset<70> c;
+    c.flipAll();
+    c.reset(69);
+    CHECK(c.findNextSet(69u) == 70u);
+}
+
+
+////////////////////////////////////////////////////////////
+TEST_CASE("[Base] za::Bitset - operator~ on single-word sizes")
+{
+    {
+        const Bitset<1> n = ~Bitset<1>{};
+        CHECK(n.count() == 1u);
+        CHECK(n.all());
+        CHECK(n.toU64() == 1u);
+    }
+
+    {
+        const Bitset<8> n = ~Bitset<8>{0b0000'0001u};
+        CHECK(n.count() == 7u);
+        CHECK(n.toU64() == 0xFEu);
+    }
+
+    {
+        const Bitset<63> n = ~Bitset<63>{};
+        CHECK(n.count() == 63u);
+        CHECK(n.all());
+        CHECK(n.toU64() == 0x7F'FF'FF'FF'FF'FF'FF'FFull);
+    }
+
+    {
+        const Bitset<64> n = ~Bitset<64>{};
+        CHECK(n.count() == 64u);
+        CHECK(n.all());
+        CHECK(n.toU64() == ~U64{0});
+    }
+}
+
+
+////////////////////////////////////////////////////////////
+TEST_CASE("[Base] za::Bitset - setBit does not disturb neighbouring bits")
+{
+    Bitset<130> b;
+    b.setAll();
+
+    b.setBit(64, false);
+    CHECK(b.count() == 129u);
+    CHECK(!b.test(64));
+    CHECK(b.test(63));
+    CHECK(b.test(65));
+
+    b.setBit(64, true);
+    CHECK(b.all());
+
+    b.setBit(129, false);
+    CHECK(!b.test(129));
+    CHECK(b.count() == 129u);
+
+    b.setBit(129, true);
+    CHECK(b.test(129));
+    CHECK(b.all());
+}
