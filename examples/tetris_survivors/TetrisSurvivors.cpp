@@ -596,7 +596,7 @@ struct DynamicPerk
     ////////////////////////////////////////////////////////////
     void apply()
     {
-        pendingEffects.emplaceRange(effects.begin(), effects.size());
+        pendingEffects.emplaceBackRange(effects.begin(), effects.size());
     }
 };
 

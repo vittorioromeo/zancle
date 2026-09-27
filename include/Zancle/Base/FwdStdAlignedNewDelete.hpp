@@ -21,6 +21,10 @@ enum class align_val_t : decltype(sizeof(0));
 ////////////////////////////////////////////////////////////
 void* operator new(decltype(sizeof(0)), std::align_val_t); // NOLINT(readability-redundant-declaration)
 void  operator delete(void*, std::align_val_t) noexcept;   // NOLINT(readability-redundant-declaration)
+void operator delete(void*, decltype(sizeof(0)), std::align_val_t) noexcept; // NOLINT(readability-redundant-declaration)
+
+// Not implicitly declared by every compiler configuration (e.g. Clang without sized deallocation enabled)
+void operator delete(void*, decltype(sizeof(0))) noexcept; // NOLINT(readability-redundant-declaration)
 
 
 ////////////////////////////////////////////////////////////

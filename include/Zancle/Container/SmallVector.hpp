@@ -6,12 +6,10 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/Container/Priv/SwapUnequalRanges.hpp"
 #include "Zancle/Container/Priv/VectorUtils.hpp"
 
-#include "Zancle/Math/MinMaxMacros.hpp"
-
 #include "Zancle/Base/Assert.hpp"
-#include "Zancle/Base/AssertAndAssume.hpp"
 #include "Zancle/Base/InitializerList.hpp" // IWYU pragma: keep
 #include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/PlacementNew.hpp"
@@ -32,8 +30,12 @@ namespace za
 /// Behaves like `Vector` but reserves space inside the object for `N`
 /// elements, avoiding any heap allocation when `size() <= N`. Once the
 /// vector grows past `N`, storage is moved to the heap and the inline
-/// buffer becomes unused until `shrinkToFit()` brings the size back
-/// below the threshold.
+/// buffer becomes unused until `shrinkToFit()` is called with
+/// `size() <= N`.
+///
+/// Growth follows the same policy as `Vector` (geometric, floored at 4,
+/// constructors and assignments allocate exactly), and growing
+/// operations accept arguments referencing existing elements.
 ///
 /// Implementation note: `m_heapData == nullptr` encodes "currently
 /// inline" -- after a `memcpy`, the recomputed inline-storage pointer
@@ -51,9 +53,10 @@ class [[nodiscard]] ZA_GSL_OWNER(TItem) SmallVector // NOLINT(cppcoreguidelines-
 
 private:
     ////////////////////////////////////////////////////////////
-    // `m_heapData == nullptr` means "using inline storage".
-    // This makes SmallVector trivially relocatable: after memcpy,
-    // nullptr still means "use my own inline storage" (recomputed from `this`).
+    // `m_heapData == nullptr` means "using inline storage". This bookkeeping
+    // survives a `memcpy` of the object: `nullptr` still means "use my own
+    // inline storage" (recomputed from `this`).
+    // Invariant: `isHeap()` implies `m_capacity > N`.
     TItem* m_heapData{nullptr};
     SizeT  m_size{0u};
     SizeT  m_capacity{N};
@@ -75,70 +78,39 @@ private:
 
 
     ////////////////////////////////////////////////////////////
-    [[gnu::cold, gnu::noinline, gnu::flatten]] void reserveImpl(const SizeT targetCapacity)
+    /// \brief Relocate the elements into `newData` around a gap, free the old storage, and adopt the new one
+    ///
+    /// `newData` is a heap buffer with room for `newCapacity > N` elements,
+    /// and its slots `[gapBegin, gapBegin + gapCount)` hold
+    /// already-constructed elements.
+    ///
+    ////////////////////////////////////////////////////////////
+    [[gnu::cold, gnu::noinline]] void adoptGrownStorage(TItem* const newData,
+                                                        const SizeT  newCapacity,
+                                                        const SizeT  gapBegin,
+                                                        const SizeT  gapCount)
     {
-        const auto currentCapacity = capacity();
-        const auto geometricGrowthTarget = currentCapacity + (currentCapacity / 2u); // Equivalent to `currentCapacity * 1.5`
-        const auto finalNewCapacity = ZA_MAX(targetCapacity, geometricGrowthTarget);
-
-        ZA_ASSERT(finalNewCapacity > capacity()); // Should only be called to grow
-
-        auto*      newData = priv::VectorUtils::allocate<TItem>(finalNewCapacity);
-        const auto oldSize = m_size;
-
+        const SizeT  oldSize = m_size;
         TItem* const oldData = data();
 
-        if (oldSize > 0u)
-            priv::VectorUtils::relocateRange(newData, oldData, oldData + oldSize);
+        ZA_ASSERT(newCapacity > N);
+        ZA_ASSERT(gapBegin <= oldSize);
+        ZA_ASSERT(oldSize + gapCount <= newCapacity);
+
+        priv::VectorUtils::relocateRange(newData, oldData, oldData + gapBegin);
+        priv::VectorUtils::relocateRange(newData + gapBegin + gapCount, oldData + gapBegin, oldData + oldSize);
 
         if (isHeap())
-            priv::VectorUtils::deallocate(m_heapData, currentCapacity);
+            priv::VectorUtils::deallocate(m_heapData, m_capacity);
 
         m_heapData = newData;
-        m_capacity = finalNewCapacity;
+        m_capacity = newCapacity;
+        m_size     = oldSize + gapCount;
     }
 
 
     ////////////////////////////////////////////////////////////
-    /// \brief Grow the buffer and construct a new element at `insertIndex`
-    ///
-    /// Allocates a new buffer, constructs the element at its target
-    /// position while the old buffer is still alive (so references
-    /// into the old buffer remain valid), then relocates existing
-    /// elements around it.
-    ///
-    ////////////////////////////////////////////////////////////
-    template <typename... Ts>
-    [[gnu::cold, gnu::noinline, gnu::returns_nonnull]] TItem* growAndEmplace(const SizeT insertIndex, Ts&&... xs)
-    {
-        const auto oldSize               = m_size;
-        const auto currentCapacity       = m_capacity;
-        const auto geometricGrowthTarget = currentCapacity + (currentCapacity / 2u);
-        const auto finalNewCapacity      = ZA_MAX(oldSize + 1, geometricGrowthTarget);
-
-        auto* newData = priv::VectorUtils::allocate<TItem>(finalNewCapacity);
-        ZA_ASSERT_AND_ASSUME(newData != nullptr);
-
-        // Construct new element first (old buffer still alive, references valid).
-        ZA_PLACEMENT_NEW(newData + insertIndex) TItem(static_cast<Ts&&>(xs)...);
-
-        // Relocate old elements around the newly constructed element.
-        TItem* const oldData = data();
-        if (oldSize > 0u)
-        {
-            priv::VectorUtils::relocateRange(newData, oldData, oldData + insertIndex);
-            priv::VectorUtils::relocateRange(newData + insertIndex + 1, oldData + insertIndex, oldData + oldSize);
-        }
-
-        if (isHeap())
-            priv::VectorUtils::deallocate(m_heapData, currentCapacity);
-
-        m_heapData = newData;
-        m_capacity = finalNewCapacity;
-        m_size     = oldSize + 1;
-
-        return newData + insertIndex;
-    }
+    ZA_PRIV_DEFINE_GROWABLE_VECTOR_OPERATIONS;
 
 
 public:
@@ -185,7 +157,7 @@ public:
         if (initialSize == 0u)
             return;
 
-        reserve(initialSize);
+        reserveExact(initialSize);
 
         priv::VectorUtils::copyConstructRange(data(), data() + initialSize, value);
         m_size = initialSize;
@@ -198,7 +170,7 @@ public:
         if (initialSize == 0u)
             return;
 
-        reserve(initialSize);
+        reserveExact(initialSize);
 
         priv::VectorUtils::defaultConstructRange(data(), data() + initialSize);
         m_size = initialSize;
@@ -214,7 +186,7 @@ public:
         if (srcCount == 0u)
             return;
 
-        reserve(srcCount);
+        reserveExact(srcCount);
         priv::VectorUtils::copyRange(data(), srcBegin, srcEnd);
         m_size = srcCount;
     }
@@ -228,11 +200,9 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline]] SmallVector(const SmallVector& rhs) : SmallVector{}
+    [[nodiscard, gnu::always_inline]] SmallVector(const SmallVector& rhs) :
+        SmallVector(rhs.data(), rhs.data() + rhs.m_size)
     {
-        reserve(rhs.m_size);
-        priv::VectorUtils::copyRange(data(), rhs.data(), rhs.data() + rhs.m_size);
-        m_size = rhs.m_size;
     }
 
 
@@ -244,17 +214,17 @@ public:
 
 
     ////////////////////////////////////////////////////////////
+    // `rhs` may be (part of) an element of `*this`
     SmallVector& operator=(const SmallVector& rhs)
     {
         if (this == &rhs)
             return *this;
 
-        clear();
-        reserve(rhs.m_size);
-        priv::VectorUtils::copyRange(data(), rhs.data(), rhs.data() + rhs.m_size);
+        // `rhs` lives inside one of our elements: copy it before destroying it
+        if (!priv::VectorUtils::isOutsideStorage(data(), data() + m_size, &rhs)) [[unlikely]]
+            return *this = SmallVector(rhs);
 
-        m_size = rhs.m_size;
-
+        assignRange(rhs.data(), rhs.data() + rhs.m_size);
         return *this;
     }
 
@@ -286,26 +256,28 @@ public:
 
 
     ////////////////////////////////////////////////////////////
+    // `rhs` may be (part of) an element of `*this`
     SmallVector& operator=(SmallVector&& rhs) noexcept
     {
         if (this == &rhs)
             return *this;
 
-        // Destroy current elements
+        // `rhs` lives inside one of our elements: take its contents before destroying it
+        if (!priv::VectorUtils::isOutsideStorage(data(), data() + m_size, &rhs)) [[unlikely]]
+            return *this = SmallVector(static_cast<SmallVector&&>(rhs));
+
         clear();
 
         if (rhs.isHeap())
         {
-            // If we have a heap buffer, deallocate it before stealing
             if (isHeap())
                 priv::VectorUtils::deallocate(m_heapData, m_capacity);
 
-            // Steal pointers
+            // Steal the heap buffer, and reset `rhs` to inline mode
             m_heapData = rhs.m_heapData;
             m_size     = rhs.m_size;
             m_capacity = rhs.m_capacity;
 
-            // Reset RHS
             rhs.m_heapData = nullptr;
             rhs.m_size     = 0u;
             rhs.m_capacity = N;
@@ -313,30 +285,12 @@ public:
             return *this;
         }
 
-        // Optimization: Reuse existing heap buffer
-        if (isHeap() && m_capacity >= rhs.m_size)
-        {
-            priv::VectorUtils::relocateRange(m_heapData, rhs.data(), rhs.data() + rhs.m_size);
-            m_size = rhs.m_size;
+        // `rhs` is inline, so its elements fit in our storage, whether inline or heap (`isHeap()` implies `m_capacity > N`)
+        ZA_ASSERT(m_capacity >= rhs.m_size);
 
-            rhs.m_size = 0u;
-
-            return *this;
-        }
-
-        if (isHeap())
-        {
-            priv::VectorUtils::deallocate(m_heapData, m_capacity);
-            m_heapData = nullptr;
-            m_capacity = N;
-        }
-
-        m_size = 0u; // Reset size
-
-        // Move elements
         priv::VectorUtils::relocateRange(data(), rhs.data(), rhs.data() + rhs.m_size);
-        m_size = rhs.m_size;
 
+        m_size     = rhs.m_size;
         rhs.m_size = 0u;
 
         return *this;
@@ -377,45 +331,34 @@ public:
 
     ////////////////////////////////////////////////////////////
     template <typename... Ts>
-    [[gnu::always_inline]] TItem* emplace(TItem* const pos, Ts&&... xs)
+    [[gnu::always_inline]] TItem* emplace(const TItem* const pos, Ts&&... xs)
     {
         ZA_ASSERT(pos >= begin() && pos <= end());
 
         const auto index = static_cast<SizeT>(pos - data());
 
-        if (m_size >= m_capacity) [[unlikely]]
+        if (m_size == m_capacity) [[unlikely]]
             return growAndEmplace(index, static_cast<Ts&&>(xs)...);
 
-        TItem* const d = data();
+        if (index == m_size) // Append at end: no shift, no aliasing risk.
+            return &unsafeEmplaceBack(static_cast<Ts&&>(xs)...);
 
-        if (pos == d + m_size) // Append at end: no shift, no aliasing risk.
-        {
-            ZA_PLACEMENT_NEW(d + m_size) TItem(static_cast<Ts&&>(xs)...);
-            ++m_size;
-            return d + index;
-        }
-
-        // Construct a copy first to handle self-aliasing (`makeHole` shifts elements in-place,
-        // which invalidates any reference into the shifted region).
-        TItem        copy(static_cast<Ts&&>(xs)...);
-        TItem* const currentPos = d + index;
-        priv::VectorUtils::makeHole(currentPos, d + m_size);
-        ZA_PLACEMENT_NEW(currentPos) TItem(static_cast<TItem&&>(copy));
-
-        ++m_size;
-        return d + index;
+        // Construct a copy first to handle self-aliasing (shifting the elements
+        // invalidates any reference into the shifted region).
+        TItem copy(static_cast<Ts&&>(xs)...);
+        return insertByShifting(index, static_cast<TItem&&>(copy));
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline]] TItem* insert(TItem* const pos, const TItem& value)
+    [[gnu::always_inline]] TItem* insert(const TItem* const pos, const TItem& value)
     {
         return emplace(pos, value);
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline]] TItem* insert(TItem* const pos, TItem&& value)
+    [[gnu::always_inline]] TItem* insert(const TItem* const pos, TItem&& value)
     {
         return emplace(pos, static_cast<TItem&&>(value));
     }
@@ -423,7 +366,7 @@ public:
 
     ////////////////////////////////////////////////////////////
     template <typename T = TItem>
-    [[gnu::always_inline, gnu::flatten]] TItem& pushBack(T&& x)
+    [[gnu::always_inline]] TItem& pushBack(T&& x)
     {
         if (m_size < m_capacity) [[likely]]
             return unsafeEmplaceBack(static_cast<T&&>(x));
@@ -434,7 +377,7 @@ public:
 
     ////////////////////////////////////////////////////////////
     template <typename... Ts>
-    [[gnu::always_inline, gnu::flatten]] TItem& emplaceBack(Ts&&... xs)
+    [[gnu::always_inline]] TItem& emplaceBack(Ts&&... xs)
     {
         if (m_size < m_capacity) [[likely]]
             return unsafeEmplaceBack(static_cast<Ts&&>(xs)...);
@@ -497,12 +440,14 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline, gnu::flatten]] void unsafeEmplaceBackRange(const TItem* const ptr, const SizeT count) noexcept
+    [[gnu::always_inline, gnu::flatten]] void unsafeEmplaceBackRange(const TItem* const ptr, const SizeT count)
     {
         ZA_ASSERT(m_size + count <= m_capacity);
+        ZA_ASSERT(count == 0u || ptr != nullptr);
 
-        TItem* const d = data();
-        priv::VectorUtils::copyRange(d + m_size, ptr, ptr + count);
+        if (count != 0u) // avoid `memcpy(dst, null, 0)` (UB) when appending nothing
+            priv::VectorUtils::copyRange(data() + m_size, ptr, ptr + count);
+
         m_size += count;
     }
 
@@ -536,39 +481,42 @@ public:
     {
         ZA_ASSERT(m_size < m_capacity);
 
-        TItem* const slot = data() + m_size;
+        // Size is only increased after a successful construction (no destruction of an unconstructed slot on throw)
+        TItem& result = *(ZA_PLACEMENT_NEW(data() + m_size) TItem(static_cast<Ts&&>(xs)...));
         ++m_size;
 
-        return *(ZA_PLACEMENT_NEW(slot) TItem(static_cast<Ts&&>(xs)...));
+        return result;
     }
 
 
     ////////////////////////////////////////////////////////////
-    TItem* erase(TItem* const it)
+    TItem* erase(const TItem* const it)
     {
         ZA_ASSERT(it >= begin() && it < end());
 
-        TItem* const newEnd = priv::VectorUtils::eraseImpl(end(), it);
-        m_size              = static_cast<SizeT>(newEnd - data());
-        return it;
+        TItem* const d   = data();
+        TItem* const pos = d + (it - d);
+
+        m_size = static_cast<SizeT>(priv::VectorUtils::eraseImpl(d + m_size, pos) - d);
+        return pos;
     }
 
 
     ////////////////////////////////////////////////////////////
-    TItem* erase(TItem* const first, TItem* const last)
+    TItem* erase(const TItem* const first, const TItem* const last)
     {
-        ZA_ASSERT(first <= last);
+        ZA_ASSERT(first >= begin() && first <= last && last <= end());
+
+        TItem* const d   = data();
+        TItem* const pos = d + (first - d);
 
         if (first == last)
-            return first; // No elements to erase
+            return pos; // No elements to erase
 
-        TItem* const newEnd = priv::VectorUtils::eraseRangeImpl(end(), first, last);
-        m_size              = static_cast<SizeT>(newEnd - data());
+        m_size = static_cast<SizeT>(priv::VectorUtils::eraseRangeImpl(d + m_size, pos, d + (last - d)) - d);
 
-        // Return an iterator to the element that now occupies the position
-        // where the first erased element (`first`) was. This is `first` itself,
-        // as elements were shifted into this position, or it's the new `end()`.
-        return first;
+        // Elements were shifted into `pos`, or it is the new `end()`.
+        return pos;
     }
 
 

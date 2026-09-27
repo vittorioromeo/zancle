@@ -560,7 +560,7 @@ TEST_CASE("[Base] Base/InPlaceVector.hpp")
         CHECK(tv[4].value == 5);
     }
 
-    SECTION("emplaceRange and unsafeEmplaceBackRange")
+    SECTION("emplaceBackRange and unsafeEmplaceBackRange")
     {
         resetCounters();
         za::InPlaceVector<Obj, 10> tv;
@@ -568,9 +568,9 @@ TEST_CASE("[Base] Base/InPlaceVector.hpp")
         CHECK(intCtorCount == 3); // For source array
         resetCounters();
 
-        tv.emplaceRange(source, 3);
+        tv.emplaceBackRange(source, 3);
         CHECK(tv.size() == 3);
-        CHECK(copyCtorCount == 3); // emplaceRange uses copyRange
+        CHECK(copyCtorCount == 3); // emplaceBackRange uses copyRange
         CHECK(tv[0].value == 10);
         CHECK(tv[1].value == 20);
         CHECK(tv[2].value == 30);

@@ -77,7 +77,7 @@ void bufferFromCallback(void* const context, void* const data, int size)
     const auto* const source = static_cast<za::U8*>(data);
     auto* const       dest   = static_cast<za::Vector<za::U8>*>(context);
 
-    dest->emplaceRange(source, static_cast<za::SizeT>(size));
+    dest->emplaceBackRange(source, static_cast<za::SizeT>(size));
 }
 
 ////////////////////////////////////////////////////////////

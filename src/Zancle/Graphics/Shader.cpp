@@ -192,8 +192,8 @@ static_assert(sizeof(za::Glsl::Mat4) == 16 * sizeof(float));
     static thread_local za::Vector<char> buffer; // Cannot reuse the other buffer here
     buffer.clear();
 
-    buffer.emplaceRange(preamble.data(), preamble.size());
-    buffer.emplaceRange(src.data(), src.size());
+    buffer.emplaceBackRange(preamble.data(), preamble.size());
+    buffer.emplaceBackRange(src.data(), src.size());
 
     return {buffer.data(), buffer.size()};
 }

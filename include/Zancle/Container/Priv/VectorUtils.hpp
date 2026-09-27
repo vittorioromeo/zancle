@@ -6,14 +6,16 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/Math/MinMaxMacros.hpp"
+
 #include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/AssertAndAssume.hpp"
 #include "Zancle/Base/FwdStdAlignedNewDelete.hpp"
 #include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/Memcpy.hpp"
 #include "Zancle/Base/Memmove.hpp"
 #include "Zancle/Base/PlacementNew.hpp"
 #include "Zancle/Base/SizeT.hpp"
-#include "Zancle/Base/Swap.hpp"
 
 #include "Zancle/Trait/IsTriviallyCopyable.hpp"
 #include "Zancle/Trait/IsTriviallyDestructible.hpp"
@@ -22,22 +24,6 @@
 
 namespace za::priv::VectorUtils
 {
-////////////////////////////////////////////////////////////
-template <typename T>
-[[gnu::always_inline]] inline constexpr void moveRange(T* target, T* const srcBegin, T* const srcEnd)
-{
-    if constexpr (ZA_IS_TRIVIALLY_COPYABLE(T))
-    {
-        ZA_MEMCPY(target, srcBegin, sizeof(T) * static_cast<SizeT>(srcEnd - srcBegin));
-    }
-    else
-    {
-        for (T* p = srcBegin; p != srcEnd; ++p, ++target)
-            ZA_PLACEMENT_NEW(target) T(static_cast<T&&>(*p)); // not exception-safe
-    }
-}
-
-
 ////////////////////////////////////////////////////////////
 template <typename T>
 [[gnu::always_inline]] inline constexpr void copyRange(T* target, const T* const srcBegin, const T* const srcEnd)
@@ -67,6 +53,13 @@ template <typename T>
 
 
 ////////////////////////////////////////////////////////////
+/// \brief Move `[srcBegin, srcEnd)` to `target` and end the lifetime of the source objects
+///
+/// Uses a single `memcpy` for trivially relocatable types, otherwise
+/// move-constructs each element and destroys its source (moves are
+/// expected not to throw).
+///
+////////////////////////////////////////////////////////////
 template <typename T>
 [[gnu::always_inline, gnu::flatten]] inline constexpr void relocateRange(T* target, T* const srcBegin, T* const srcEnd)
 {
@@ -76,8 +69,11 @@ template <typename T>
     }
     else
     {
-        moveRange(target, srcBegin, srcEnd);
-        destroyRange(srcBegin, srcEnd);
+        for (T* p = srcBegin; p != srcEnd; ++p, ++target)
+        {
+            ZA_PLACEMENT_NEW(target) T(static_cast<T&&>(*p));
+            p->~T();
+        }
     }
 }
 
@@ -101,18 +97,55 @@ template <typename T>
 
 
 ////////////////////////////////////////////////////////////
-template <typename T>
-[[nodiscard, gnu::always_inline]] inline T* allocate(const SizeT capacity)
+/// \brief Capacity to grow to when adding elements requires at least `minCapacity` slots
+///
+/// Geometric (x1.5) growth, floored at 4 so that growing from a tiny
+/// capacity (e.g. after `reserve(1)`) does not reallocate on every push
+/// (1, 2, 3, 4...).
+///
+////////////////////////////////////////////////////////////
+[[nodiscard, gnu::always_inline, gnu::const]] inline constexpr SizeT grownCapacity(const SizeT currentCapacity,
+                                                                                   const SizeT minCapacity) noexcept
 {
-    return capacity == 0u ? nullptr : static_cast<T*>(::operator new(capacity * sizeof(T), std::align_val_t{alignof(T)}));
+    const SizeT geometric = currentCapacity + (currentCapacity / 2u);
+    return ZA_MAX(minCapacity, ZA_MAX(SizeT{4u}, geometric));
 }
 
 
 ////////////////////////////////////////////////////////////
+/// \brief Allocate uninitialized storage for `capacity` objects of type `T` (`nullptr` if `capacity == 0`)
+///
+/// Uses the plain `operator new` unless `T` is over-aligned, so that the
+/// common case avoids the aligned allocation path (and allocation hooks
+/// that only replace the plain `operator new` see the allocation).
+///
+////////////////////////////////////////////////////////////
 template <typename T>
-[[gnu::always_inline]] inline constexpr void deallocate(T* const p, const SizeT /* capacity */) noexcept
+[[nodiscard, gnu::always_inline]] inline T* allocate(const SizeT capacity)
 {
-    ::operator delete(p, std::align_val_t{alignof(T)});
+    ZA_ASSERT(capacity <= SizeT(-1) / sizeof(T) && "allocation size overflow");
+
+    if (capacity == 0u)
+        return nullptr;
+
+    if constexpr (alignof(T) > __STDCPP_DEFAULT_NEW_ALIGNMENT__)
+        return static_cast<T*>(::operator new(capacity * sizeof(T), std::align_val_t{alignof(T)}));
+    else
+        return static_cast<T*>(::operator new(capacity * sizeof(T)));
+}
+
+
+////////////////////////////////////////////////////////////
+/// \brief Free storage obtained from `allocate<T>(capacity)` (sized deallocation)
+///
+////////////////////////////////////////////////////////////
+template <typename T>
+[[gnu::always_inline]] inline void deallocate(T* const p, const SizeT capacity) noexcept
+{
+    if constexpr (alignof(T) > __STDCPP_DEFAULT_NEW_ALIGNMENT__)
+        ::operator delete(p, capacity * sizeof(T), std::align_val_t{alignof(T)});
+    else
+        ::operator delete(p, capacity * sizeof(T));
 }
 
 
@@ -223,7 +256,7 @@ template <typename T>
     if (pos == end)
         return; // Inserting at the end, no move needed.
 
-    if constexpr (ZA_IS_TRIVIALLY_COPYABLE(T) || ZA_IS_TRIVIALLY_RELOCATABLE(T))
+    if constexpr (ZA_IS_TRIVIALLY_RELOCATABLE(T))
     {
         ZA_MEMMOVE(static_cast<void*>(pos + 1),                // Destination
                    pos,                                        // Source
@@ -248,32 +281,11 @@ template <typename T>
 
 
 ////////////////////////////////////////////////////////////
-template <typename T>
-[[gnu::always_inline]] inline constexpr void swapUnequalRanges(T* lhsData, SizeT& lhsSize, T* rhsData, SizeT& rhsSize)
-{
-    const SizeT s1 = lhsSize;
-    const SizeT s2 = rhsSize;
-
-    const SizeT commonSize = s2 < s1 ? s2 : s1;
-
-    for (SizeT i = 0u; i < commonSize; ++i)
-        za::genericSwap(lhsData[i], rhsData[i]); // Swap elements in the common part
-
-    if (s1 > s2) // `lhs` is larger; its tail elements move to `rhs`
-        relocateRange(rhsData + commonSize, lhsData + commonSize, lhsData + s1);
-    else if (s2 > s1) // `rhs` is larger; its tail elements move to `lhs`
-        relocateRange(lhsData + commonSize, rhsData + commonSize, rhsData + s2);
-
-    za::genericSwap(lhsSize, rhsSize);
-}
-
-
-////////////////////////////////////////////////////////////
 /// \brief `true` iff `p` lies outside the storage range `[begin, end)`
 ///
-/// Debug-only helper used by `resize` to assert that fill arguments do
-/// not alias an element of the container being resized (which would
-/// dangle once a reallocation frees the old buffer).
+/// Used to detect arguments that alias an element of the container
+/// being modified (e.g. debug assertions in `resize`, or to pick a
+/// safe path in `assignRange` and the copy/move assignments).
 ///
 ////////////////////////////////////////////////////////////
 template <typename T, typename U>
@@ -284,6 +296,16 @@ template <typename T, typename U>
 }
 
 
+////////////////////////////////////////////////////////////
+/// \brief Operations shared by `Vector`, `SmallVector`, and `InPlaceVector`
+///
+/// Requires the vector type to provide `data()`, `size()`, `capacity()`,
+/// `reserve(n)`, `reserveExact(n)`, `clear()`, `unsafeSetSize(n)`,
+/// `erase(first, last)`, `unsafePushBackMultiple(xs...)`,
+/// `unsafeEmplaceBackRange(ptr, count)`, `growAndPushBackMultiple(xs...)`,
+/// and `growAndEmplaceBackRange(ptr, count)`. Must be the last thing in
+/// the class, as it ends with a `private:` section.
+///
 ////////////////////////////////////////////////////////////
 #define ZA_PRIV_DEFINE_COMMON_VECTOR_OPERATIONS(vectorType)                                                                         \
                                                                                                                                     \
@@ -335,18 +357,18 @@ template <typename T, typename U>
         return size() == 0u;                                                                                                        \
     }                                                                                                                               \
                                                                                                                                     \
+    /* No `this == &rhs` shortcut: element-wise semantics (e.g. NaN != NaN) apply to self-comparison too */                         \
     [[nodiscard]] constexpr bool operator==(const vectorType& rhs) const                                                            \
     {                                                                                                                               \
-        if (this == &rhs)                                                                                                           \
-            return true;                                                                                                            \
-                                                                                                                                    \
         const SizeT lhsSize = size();                                                                                               \
                                                                                                                                     \
         if (lhsSize != rhs.size())                                                                                                  \
             return false;                                                                                                           \
                                                                                                                                     \
-        for (SizeT i = 0u; i < lhsSize; ++i)                                                                                        \
-            if (operator[](i) != rhs.operator[](i))                                                                                 \
+        const TItem* rhsIt = rhs.data();                                                                                            \
+                                                                                                                                    \
+        for (const TItem *lhsIt = data(), *const lhsEnd = lhsIt + lhsSize; lhsIt != lhsEnd; ++lhsIt, ++rhsIt)                       \
+            if (*lhsIt != *rhsIt)                                                                                                   \
                 return false;                                                                                                       \
                                                                                                                                     \
         return true;                                                                                                                \
@@ -358,10 +380,12 @@ template <typename T, typename U>
         lhs.swap(rhs);                                                                                                              \
     }                                                                                                                               \
                                                                                                                                     \
+    /* \pre `xs...` must not reference `*it`, and the constructor must not throw (the old element is destroyed first) */                                                                                                                                 \
     template <typename... Ts>                                                                                                       \
     [[gnu::always_inline]] constexpr TItem& reEmplaceByIterator(TItem* const it, Ts&&... xs)                                        \
     {                                                                                                                               \
         ZA_ASSERT(it >= begin() && it < end());                                                                                     \
+        ZA_ASSERT((priv::VectorUtils::isOutsideStorage(it, it + 1, &xs) && ...));                                                   \
                                                                                                                                     \
         if constexpr (!ZA_IS_TRIVIALLY_DESTRUCTIBLE(TItem))                                                                         \
             it->~TItem();                                                                                                           \
@@ -369,39 +393,59 @@ template <typename T, typename U>
         return *(ZA_PLACEMENT_NEW(it) TItem(static_cast<Ts&&>(xs)...));                                                             \
     }                                                                                                                               \
                                                                                                                                     \
+    /* \pre See `reEmplaceByIterator` */                                                                                            \
     template <typename... Ts>                                                                                                       \
     [[gnu::always_inline]] constexpr TItem& reEmplaceByIndex(const SizeT index, Ts&&... xs)                                         \
     {                                                                                                                               \
         return reEmplaceByIterator(data() + index, static_cast<Ts&&>(xs)...);                                                       \
     }                                                                                                                               \
                                                                                                                                     \
+    /* `items...` may reference elements of `*this` (handled on growth) */                                                          \
     template <typename... TItems>                                                                                                   \
     [[gnu::always_inline]] constexpr void pushBackMultiple(TItems&&... items)                                                       \
     {                                                                                                                               \
-        reserve(size() + sizeof...(items));                                                                                         \
-        unsafePushBackMultiple(static_cast<TItems&&>(items)...);                                                                    \
+        if constexpr (sizeof...(items) > 0u)                                                                                        \
+        {                                                                                                                           \
+            if (size() + sizeof...(items) > capacity()) [[unlikely]]                                                                \
+                return growAndPushBackMultiple(static_cast<TItems&&>(items)...);                                                    \
+                                                                                                                                    \
+            unsafePushBackMultiple(static_cast<TItems&&>(items)...);                                                                \
+        }                                                                                                                           \
     }                                                                                                                               \
                                                                                                                                     \
-    [[gnu::always_inline]] constexpr void emplaceRange(const TItem* const ptr, const SizeT count)                                   \
+    /* Append copies of the `count` elements starting at `ptr`, which may point into `*this` (handled on growth) */                 \
+    [[gnu::always_inline]] constexpr void emplaceBackRange(const TItem* const ptr, const SizeT count)                               \
     {                                                                                                                               \
-        reserve(size() + count);                                                                                                    \
+        if (size() + count > capacity()) [[unlikely]]                                                                               \
+            return growAndEmplaceBackRange(ptr, count);                                                                             \
+                                                                                                                                    \
         unsafeEmplaceBackRange(ptr, count);                                                                                         \
     }                                                                                                                               \
                                                                                                                                     \
-    [[gnu::always_inline, gnu::flatten]] constexpr void unsafeEmplaceOther(const vectorType& rhs) noexcept                          \
+    [[gnu::always_inline, gnu::flatten]] constexpr void unsafeEmplaceOther(const vectorType& rhs)                                   \
     {                                                                                                                               \
         unsafeEmplaceBackRange(rhs.data(), rhs.size());                                                                             \
     }                                                                                                                               \
                                                                                                                                     \
-    [[gnu::always_inline]] constexpr void assignRange(const TItem* const b, const TItem* const e)                                   \
+    /* Replace the contents with copies of `[b, e)`, which may be a subrange of `*this` */                                          \
+    constexpr void assignRange(const TItem* const b, const TItem* const e)                                                          \
     {                                                                                                                               \
         ZA_ASSERT(b <= e);                                                                                                          \
         ZA_ASSERT(b == e || (b != nullptr && e != nullptr)); /* only a non-empty range must be non-null */                          \
                                                                                                                                     \
+        if (b != e && !priv::VectorUtils::isOutsideStorage(data(), data() + size(), b)) [[unlikely]]                                \
+        {                                                                                                                           \
+            /* `[b, e)` is a non-empty subrange of `*this`: keep it by erasing what surrounds it */                                 \
+            TItem* const first = data() + (b - data());                                                                             \
+            erase(first + (e - b), end());                                                                                          \
+            erase(data(), first);                                                                                                   \
+            return;                                                                                                                 \
+        }                                                                                                                           \
+                                                                                                                                    \
         const auto count = static_cast<SizeT>(e - b);                                                                               \
                                                                                                                                     \
         clear();                                                                                                                    \
-        reserve(count);                                                                                                             \
+        reserveExact(count);                                                                                                        \
                                                                                                                                     \
         if (count != 0u) /* avoid `memcpy(null, null, 0)` (UB) on the empty-range path */                                           \
             priv::VectorUtils::copyRange(data(), b, e);                                                                             \
@@ -415,8 +459,96 @@ template <typename T, typename U>
         erase(data() + index);                                                                                                      \
     }                                                                                                                               \
                                                                                                                                     \
+private:                                                                                                                            \
+    /* Middle insertion (kept out of line, so that `emplace` call sites only inline the append fast path) */                        \
+    [[gnu::noinline]] constexpr TItem* insertByShifting(const SizeT index, TItem&& value)                                           \
+    {                                                                                                                               \
+        ZA_ASSERT(size() < capacity());                                                                                             \
+                                                                                                                                    \
+        TItem* const pos = data() + index;                                                                                          \
+        priv::VectorUtils::makeHole(pos, end());                                                                                    \
+        ZA_PLACEMENT_NEW(pos) TItem(static_cast<TItem&&>(value));                                                                   \
+                                                                                                                                    \
+        unsafeSetSize(size() + 1u);                                                                                                 \
+        return pos;                                                                                                                 \
+    }                                                                                                                               \
+                                                                                                                                    \
     static_assert(true)
 
+
+////////////////////////////////////////////////////////////
+/// \brief Growth operations shared by `Vector` and `SmallVector`
+///
+/// Requires the vector type to provide
+/// `adoptGrownStorage(newData, newCapacity, gapBegin, gapCount)`, which
+/// relocates the current elements into `newData` around a gap of
+/// `gapCount` already-constructed elements at `gapBegin`, frees the old
+/// storage, and adopts the new one. New elements are always constructed
+/// before the old storage is freed, so arguments referencing elements
+/// of the vector itself remain valid.
+///
+////////////////////////////////////////////////////////////
+#define ZA_PRIV_DEFINE_GROWABLE_VECTOR_OPERATIONS                                                                 \
+                                                                                                                  \
+    /* Explicit reservations are not floored (e.g. `reserve(1)` on an empty vector allocates exactly 1 slot) */   \
+    [[gnu::cold, gnu::noinline]] void reserveImpl(const SizeT minCapacity)                                        \
+    {                                                                                                             \
+        const SizeT currentCapacity = capacity();                                                                 \
+        const SizeT newCapacity     = ZA_MAX(minCapacity, currentCapacity + (currentCapacity / 2u));              \
+        adoptGrownStorage(priv::VectorUtils::allocate<TItem>(newCapacity), newCapacity, size(), 0u);              \
+    }                                                                                                             \
+                                                                                                                  \
+    [[gnu::cold, gnu::noinline]] void reserveExactImpl(const SizeT newCapacity)                                   \
+    {                                                                                                             \
+        adoptGrownStorage(priv::VectorUtils::allocate<TItem>(newCapacity), newCapacity, size(), 0u);              \
+    }                                                                                                             \
+                                                                                                                  \
+    /* Allocate exactly `targetCapacity` slots if the current capacity is smaller (no geometric growth) */        \
+    [[gnu::always_inline]] void reserveExact(const SizeT targetCapacity)                                          \
+    {                                                                                                             \
+        if (capacity() < targetCapacity)                                                                          \
+            reserveExactImpl(targetCapacity);                                                                     \
+    }                                                                                                             \
+                                                                                                                  \
+    template <typename... Ts>                                                                                     \
+    [[gnu::cold, gnu::noinline, gnu::returns_nonnull]] TItem* growAndEmplace(const SizeT insertIndex, Ts&&... xs) \
+    {                                                                                                             \
+        const SizeT  newCapacity = priv::VectorUtils::grownCapacity(capacity(), size() + 1u);                     \
+        TItem* const newData     = priv::VectorUtils::allocate<TItem>(newCapacity);                               \
+        ZA_ASSERT_AND_ASSUME(newData != nullptr);                                                                 \
+                                                                                                                  \
+        ZA_PLACEMENT_NEW(newData + insertIndex) TItem(static_cast<Ts&&>(xs)...);                                  \
+        adoptGrownStorage(newData, newCapacity, insertIndex, 1u);                                                 \
+                                                                                                                  \
+        return newData + insertIndex;                                                                             \
+    }                                                                                                             \
+                                                                                                                  \
+    template <typename... TItems>                                                                                 \
+    [[gnu::cold, gnu::noinline]] void growAndPushBackMultiple(TItems&&... items)                                  \
+    {                                                                                                             \
+        const SizeT  oldSize     = size();                                                                        \
+        const SizeT  newCapacity = priv::VectorUtils::grownCapacity(capacity(), oldSize + sizeof...(items));      \
+        TItem* const newData     = priv::VectorUtils::allocate<TItem>(newCapacity);                               \
+        ZA_ASSERT_AND_ASSUME(newData != nullptr);                                                                 \
+                                                                                                                  \
+        TItem* slot = newData + oldSize;                                                                          \
+        (..., ZA_PLACEMENT_NEW(slot++) TItem(static_cast<TItems&&>(items)));                                      \
+        adoptGrownStorage(newData, newCapacity, oldSize, sizeof...(items));                                       \
+    }                                                                                                             \
+                                                                                                                  \
+    [[gnu::cold, gnu::noinline]] void growAndEmplaceBackRange(const TItem* const ptr, const SizeT count)          \
+    {                                                                                                             \
+        ZA_ASSERT(count > 0u && ptr != nullptr); /* only called when growing, i.e. when appending something */    \
+                                                                                                                  \
+        const SizeT  oldSize     = size();                                                                        \
+        const SizeT  newCapacity = priv::VectorUtils::grownCapacity(capacity(), oldSize + count);                 \
+        TItem* const newData     = priv::VectorUtils::allocate<TItem>(newCapacity);                               \
+                                                                                                                  \
+        priv::VectorUtils::copyRange(newData + oldSize, ptr, ptr + count);                                        \
+        adoptGrownStorage(newData, newCapacity, oldSize, count);                                                  \
+    }                                                                                                             \
+                                                                                                                  \
+    static_assert(true)
 
 } // namespace za::priv::VectorUtils
 
@@ -427,11 +559,14 @@ template <typename T, typename U>
 /// \brief Shared low-level helpers for `Vector`, `SmallVector`, `InPlaceVector`
 ///
 /// All non-trivial element-management primitives (allocate / deallocate,
-/// construct / destroy / relocate ranges, erase, swap unequal ranges,
-/// `ZA_PRIV_DEFINE_COMMON_VECTOR_OPERATIONS` macro) live here so
-/// that the three vector flavors can share their implementation
-/// without inheritance or virtual dispatch. The helpers branch on
-/// trivial relocatability and trivial destructibility to fall back to
-/// `memcpy`/`memmove` whenever the element type permits it.
+/// construct / destroy / relocate ranges, erase, the shared-operation
+/// macros) live here so that the three vector flavors can share their
+/// implementation without inheritance or virtual dispatch. The helpers
+/// branch on trivial relocatability and trivial destructibility to fall
+/// back to `memcpy`/`memmove` whenever the element type permits it.
+///
+/// Exceptions are not officially supported: the containers only avoid
+/// double destruction when an element constructor throws, and moves are
+/// expected not to throw.
 ///
 ////////////////////////////////////////////////////////////

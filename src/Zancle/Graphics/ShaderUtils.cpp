@@ -156,9 +156,9 @@ constexpr unsigned int maxIncludeFilenameLength = 256;
                 constexpr za::StringView prefix{"// >>> begin included from \""};
                 constexpr za::StringView suffix{"\" >>>\n"};
 
-                output.emplaceRange(prefix.data(), prefix.size());
-                output.emplaceRange(filenameBuf, includedFilename.size());
-                output.emplaceRange(suffix.data(), suffix.size());
+                output.emplaceBackRange(prefix.data(), prefix.size());
+                output.emplaceBackRange(filenameBuf, includedFilename.size());
+                output.emplaceBackRange(suffix.data(), suffix.size());
             }
 
             // Push to include stack and recursively process
@@ -174,9 +174,9 @@ constexpr unsigned int maxIncludeFilenameLength = 256;
                 constexpr za::StringView prefix{"// <<< end included from \""};
                 constexpr za::StringView suffix{"\" <<<\n"};
 
-                output.emplaceRange(prefix.data(), prefix.size());
-                output.emplaceRange(filenameBuf, includedFilename.size());
-                output.emplaceRange(suffix.data(), suffix.size());
+                output.emplaceBackRange(prefix.data(), prefix.size());
+                output.emplaceBackRange(filenameBuf, includedFilename.size());
+                output.emplaceBackRange(suffix.data(), suffix.size());
             }
 
             // Restore line numbering for parent file
@@ -186,7 +186,7 @@ constexpr unsigned int maxIncludeFilenameLength = 256;
         {
             // Copy line as-is
             if (!line.empty())
-                output.emplaceRange(line.data(), line.size());
+                output.emplaceBackRange(line.data(), line.size());
 
             output.pushBack('\n');
         }
@@ -214,8 +214,8 @@ void ShaderUtils::emitLineDirective(za::Vector<char>& buffer, unsigned int lineN
     char* const end = za::toChars(tmp, tmp + sizeof(tmp), lineNumber);
     ZA_ASSERT(end != nullptr);
 
-    buffer.emplaceRange(prefix.data(), prefix.size());
-    buffer.emplaceRange(tmp, static_cast<za::SizeT>(end - tmp));
+    buffer.emplaceBackRange(prefix.data(), prefix.size());
+    buffer.emplaceBackRange(tmp, static_cast<za::SizeT>(end - tmp));
     buffer.pushBack('\n');
 }
 

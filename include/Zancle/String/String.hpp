@@ -12,8 +12,9 @@
 
 #include "Zancle/String/StringView.hpp"
 
+#include "Zancle/Container/Priv/VectorUtils.hpp"
+
 #include "Zancle/Base/Assert.hpp"
-#include "Zancle/Base/FwdStdAlignedNewDelete.hpp"
 #include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/Memcmp.hpp"
 #include "Zancle/Base/SizeT.hpp"
@@ -184,7 +185,11 @@ public:
 
     ////////////////////////////////////////////////////////////
     template <typename AnsiStringLike>
-        requires isSame<typename AnsiStringLike::value_type, char>
+        requires(isSame<typename AnsiStringLike::value_type, char> &&
+                 requires(const AnsiStringLike& s) {
+                     s.data();
+                     s.size();
+                 })
     explicit String(const AnsiStringLike& ansiString) : String{ansiString.data(), ansiString.size()}
     {
     }
@@ -201,8 +206,8 @@ public:
     ////////////////////////////////////////////////////////////
     constexpr ~String()
     {
-        if (!isSso())
-            ::operator delete(m_rep.heap.data, std::align_val_t{alignof(char)});
+        if (!isSso()) // must match the `priv::VectorUtils::allocate<char>` in `String.cpp`
+            priv::VectorUtils::deallocate(m_rep.heap.data, getHeapCapacity() + 1u);
     }
 
 

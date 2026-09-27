@@ -26,7 +26,7 @@ Packet& Packet::append(const void* data, za::SizeT sizeInBytes)
     ZA_ASSERT_AND_ASSUME(data != nullptr);
     ZA_ASSERT_AND_ASSUME(sizeInBytes > 0);
 
-    m_data.emplaceRange(reinterpret_cast<const unsigned char*>(data), sizeInBytes);
+    m_data.emplaceBackRange(reinterpret_cast<const unsigned char*>(data), sizeInBytes);
     return *this;
 }
 

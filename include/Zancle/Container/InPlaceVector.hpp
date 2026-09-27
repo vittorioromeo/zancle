@@ -6,6 +6,7 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/Container/Priv/SwapUnequalRanges.hpp"
 #include "Zancle/Container/Priv/VectorUtils.hpp"
 
 #include "Zancle/Base/Assert.hpp"
@@ -28,8 +29,15 @@ namespace za
 /// `InPlaceVector<T, N>` provides the usual `Vector` interface but
 /// stores all elements in a fixed-size aligned buffer of capacity `N`.
 /// It never allocates and `capacity()` always returns `N`. Attempting
-/// to grow past `N` is a programming error and is caught by debug
-/// assertions on the relevant `unsafe*` and `emplace*` operations.
+/// to grow past `N` is a programming error, caught by debug assertions
+/// on every operation that adds elements.
+///
+/// \note Although its members are declared `constexpr`, `InPlaceVector`
+///       is not yet usable in constant evaluation: `data()` requires a
+///       `reinterpret_cast` of the raw storage and elements are created
+///       with placement new, neither of which is allowed in constant
+///       expressions in C++23. Revisit in C++26 (constexpr placement new,
+///       trivial unions).
 ///
 /// Useful when the maximum element count is known statically and you
 /// want to avoid both heap traffic and the size overhead of
@@ -69,6 +77,13 @@ public:
 
 
     ////////////////////////////////////////////////////////////
+    // Trivial for trivially destructible elements, so that e.g. `InPlaceVector<int, N>` is trivially destructible
+    constexpr ~InPlaceVector()
+        requires za::isTriviallyDestructible<TItem>
+    = default;
+
+
+    ////////////////////////////////////////////////////////////
     constexpr ~InPlaceVector()
     {
         priv::VectorUtils::destroyRange(data(), data() + m_size);
@@ -101,7 +116,9 @@ public:
         const auto srcCount = static_cast<SizeT>(srcEnd - srcBegin);
         ZA_ASSERT(srcCount <= N);
 
-        priv::VectorUtils::copyRange(data(), srcBegin, srcEnd);
+        if (srcCount != 0u) // avoid `memcpy(dst, null, 0)` (UB) for an empty range
+            priv::VectorUtils::copyRange(data(), srcBegin, srcEnd);
+
         m_size = srcCount;
     }
 
@@ -122,10 +139,15 @@ public:
 
 
     ////////////////////////////////////////////////////////////
+    // `rhs` may be (part of) an element of `*this`
     constexpr InPlaceVector& operator=(const InPlaceVector& rhs)
     {
         if (this == &rhs)
             return *this;
+
+        // `rhs` lives inside one of our elements: copy it before destroying it
+        if (!priv::VectorUtils::isOutsideStorage(data(), data() + m_size, &rhs)) [[unlikely]]
+            return *this = InPlaceVector(rhs);
 
         clear();
         priv::VectorUtils::copyRange(data(), rhs.data(), rhs.data() + rhs.m_size);
@@ -145,10 +167,15 @@ public:
 
 
     ////////////////////////////////////////////////////////////
+    // `rhs` may be (part of) an element of `*this`
     constexpr InPlaceVector& operator=(InPlaceVector&& rhs) noexcept
     {
         if (this == &rhs)
             return *this;
+
+        // `rhs` lives inside one of our elements: take its contents before destroying it
+        if (!priv::VectorUtils::isOutsideStorage(data(), data() + m_size, &rhs)) [[unlikely]]
+            return *this = InPlaceVector(static_cast<InPlaceVector&&>(rhs));
 
         clear();
 
@@ -185,40 +212,31 @@ public:
 
     ////////////////////////////////////////////////////////////
     template <typename... Ts>
-    [[gnu::always_inline]] constexpr TItem* emplace(TItem* const pos, Ts&&... xs)
+    [[gnu::always_inline]] constexpr TItem* emplace(const TItem* const pos, Ts&&... xs)
     {
-        ZA_ASSERT(m_size < N);
         ZA_ASSERT(pos >= begin() && pos <= end());
 
         const auto index = static_cast<SizeT>(pos - data());
 
-        if (pos == end()) // Append at end: no shift, no aliasing risk.
-        {
-            ZA_PLACEMENT_NEW(pos) TItem(static_cast<Ts&&>(xs)...);
-            ++m_size;
-            return data() + index;
-        }
+        if (index == m_size) // Append at end: no shift, no aliasing risk.
+            return &unsafeEmplaceBack(static_cast<Ts&&>(xs)...);
 
-        // Construct a copy first to handle self-aliasing (`makeHole` shifts elements in-place,
-        // which invalidates any reference into the shifted region).
+        // Construct a copy first to handle self-aliasing (shifting the elements
+        // invalidates any reference into the shifted region).
         TItem copy(static_cast<Ts&&>(xs)...);
-        priv::VectorUtils::makeHole(pos, end());
-        ZA_PLACEMENT_NEW(pos) TItem(static_cast<TItem&&>(copy));
-
-        ++m_size;
-        return data() + index;
+        return insertByShifting(index, static_cast<TItem&&>(copy));
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline]] constexpr TItem* insert(TItem* const pos, const TItem& value)
+    [[gnu::always_inline]] constexpr TItem* insert(const TItem* const pos, const TItem& value)
     {
         return emplace(pos, value);
     }
 
 
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline]] constexpr TItem* insert(TItem* const pos, TItem&& value)
+    [[gnu::always_inline]] constexpr TItem* insert(const TItem* const pos, TItem&& value)
     {
         return emplace(pos, static_cast<TItem&&>(value));
     }
@@ -226,18 +244,16 @@ public:
 
     ////////////////////////////////////////////////////////////
     template <typename T = TItem>
-    [[gnu::always_inline, gnu::flatten]] constexpr TItem& pushBack(T&& x)
+    [[gnu::always_inline]] constexpr TItem& pushBack(T&& x)
     {
-        ZA_ASSERT(m_size < N);
         return unsafeEmplaceBack(static_cast<T&&>(x));
     }
 
 
     ////////////////////////////////////////////////////////////
     template <typename... Ts>
-    [[gnu::always_inline, gnu::flatten]] constexpr TItem& emplaceBack(Ts&&... xs)
+    [[gnu::always_inline]] constexpr TItem& emplaceBack(Ts&&... xs)
     {
-        ZA_ASSERT(m_size < N);
         return unsafeEmplaceBack(static_cast<Ts&&>(xs)...);
     }
 
@@ -265,12 +281,14 @@ public:
     }
 
     ////////////////////////////////////////////////////////////
-    [[gnu::always_inline, gnu::flatten]] constexpr void unsafeEmplaceBackRange(const TItem* const ptr, const SizeT count) noexcept
+    [[gnu::always_inline, gnu::flatten]] constexpr void unsafeEmplaceBackRange(const TItem* const ptr, const SizeT count)
     {
         ZA_ASSERT(m_size + count <= N);
-        ZA_ASSERT(ptr != nullptr);
+        ZA_ASSERT(count == 0u || ptr != nullptr);
 
-        priv::VectorUtils::copyRange(data() + m_size, ptr, ptr + count);
+        if (count != 0u) // avoid `memcpy(dst, null, 0)` (UB) when appending nothing
+            priv::VectorUtils::copyRange(data() + m_size, ptr, ptr + count);
+
         m_size += count;
     }
 
@@ -290,7 +308,7 @@ public:
 
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard, gnu::always_inline, gnu::const]] constexpr SizeT capacity() const noexcept
+    [[nodiscard, gnu::always_inline, gnu::const]] static constexpr SizeT capacity() noexcept
     {
         return N;
     }
@@ -301,36 +319,43 @@ public:
     [[gnu::always_inline]] constexpr TItem& unsafeEmplaceBack(Ts&&... xs)
     {
         ZA_ASSERT(m_size < N);
-        return *(ZA_PLACEMENT_NEW(data() + m_size++) TItem(static_cast<Ts&&>(xs)...));
+
+        // Size is only increased after a successful construction (no destruction of an unconstructed slot on throw)
+        TItem& result = *(ZA_PLACEMENT_NEW(data() + m_size) TItem(static_cast<Ts&&>(xs)...));
+        ++m_size;
+
+        return result;
     }
 
 
     ////////////////////////////////////////////////////////////
-    constexpr TItem* erase(TItem* const it)
+    constexpr TItem* erase(const TItem* const it)
     {
         ZA_ASSERT(it >= begin() && it < end());
 
-        TItem* const newEnd = priv::VectorUtils::eraseImpl(end(), it);
-        m_size              = static_cast<SizeT>(newEnd - data());
-        return it;
+        TItem* const d   = data();
+        TItem* const pos = d + (it - d);
+
+        m_size = static_cast<SizeT>(priv::VectorUtils::eraseImpl(d + m_size, pos) - d);
+        return pos;
     }
 
 
     ////////////////////////////////////////////////////////////
-    constexpr TItem* erase(TItem* const first, TItem* const last)
+    constexpr TItem* erase(const TItem* const first, const TItem* const last)
     {
-        ZA_ASSERT(first <= last);
+        ZA_ASSERT(first >= begin() && first <= last && last <= end());
+
+        TItem* const d   = data();
+        TItem* const pos = d + (first - d);
 
         if (first == last)
-            return first; // No elements to erase
+            return pos; // No elements to erase
 
-        TItem* const newEnd = priv::VectorUtils::eraseRangeImpl(end(), first, last);
-        m_size              = static_cast<SizeT>(newEnd - data());
+        m_size = static_cast<SizeT>(priv::VectorUtils::eraseRangeImpl(d + m_size, pos, d + (last - d)) - d);
 
-        // Return an iterator to the element that now occupies the position
-        // where the first erased element (`first`) was. This is `first` itself,
-        // as elements were shifted into this position, or it's the new `end()`.
-        return first;
+        // Elements were shifted into `pos`, or it is the new `end()`.
+        return pos;
     }
 
 
@@ -339,7 +364,7 @@ public:
     [[gnu::always_inline]] constexpr void unsafePushBackMultiple(TItems&&... items)
     {
         ZA_ASSERT(m_size + sizeof...(items) <= N);
-        (..., ZA_PLACEMENT_NEW(data() + m_size++) TItem(static_cast<TItems&&>(items)));
+        (..., (ZA_PLACEMENT_NEW(data() + m_size) TItem(static_cast<TItems&&>(items)), ++m_size));
     }
 
 
@@ -406,7 +431,7 @@ public:
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr TItem& back() noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(!empty());
-        return this->operator[](size() - 1u);
+        return *(data() + m_size - 1u);
     }
 
 
@@ -414,10 +439,36 @@ public:
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] constexpr const TItem& back() const noexcept ZA_LIFETIMEBOUND
     {
         ZA_ASSERT(!empty());
-        return this->operator[](size() - 1u);
+        return *(data() + m_size - 1u);
     }
 
 
+    ////////////////////////////////////////////////////////////
+
+private:
+    ////////////////////////////////////////////////////////////
+    [[gnu::always_inline]] constexpr void reserveExact([[maybe_unused]] const SizeT targetCapacity)
+    {
+        ZA_ASSERT(targetCapacity <= N);
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    template <typename... TItems>
+    [[gnu::always_inline]] constexpr void growAndPushBackMultiple(TItems&&... items)
+    {
+        unsafePushBackMultiple(static_cast<TItems&&>(items)...); // asserts on capacity
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    [[gnu::always_inline]] constexpr void growAndEmplaceBackRange(const TItem* const ptr, const SizeT count)
+    {
+        unsafeEmplaceBackRange(ptr, count); // asserts on capacity
+    }
+
+
+public:
     ////////////////////////////////////////////////////////////
     ZA_PRIV_DEFINE_COMMON_VECTOR_OPERATIONS(InPlaceVector);
 };
