@@ -105,7 +105,7 @@ endif()
 
 # Android options
 if(ZA_OS_ANDROID)
-    zancle_set_option(ZA_ANDROID_USE_SUSPEND_AWARE_CLOCK OFF BOOL "ON to use an za::Clock implementation which takes system sleep time into account (keeps advancing during suspension), OFF to default to another available monotonic clock")
+    zancle_set_option(ZA_ANDROID_USE_SUSPEND_AWARE_CLOCK OFF BOOL "ON to base za::Clock on CLOCK_BOOTTIME, which keeps advancing while the device is suspended, OFF to use CLOCK_MONOTONIC")
 
     # avoid missing libraries when building Zancle for Android with NDK r19c and later
     list(PREPEND CMAKE_FIND_ROOT_PATH "${PROJECT_SOURCE_DIR}")
