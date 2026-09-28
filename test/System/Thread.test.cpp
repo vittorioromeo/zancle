@@ -8,6 +8,7 @@
 #include "Zancle/Chrono/Clock.hpp"
 #include "Zancle/Chrono/Time.hpp"
 
+#include "Zancle/Base/InitializerList.hpp" // IWYU pragma: keep
 #include "Zancle/Base/IntTypes.hpp"
 
 #include "Zancle/Trait/IsCopyAssignable.hpp"
@@ -193,6 +194,85 @@ TEST_CASE("[System] Zancle/Concurrency/Thread.hpp - sleep sleeps for at least th
     checkSleeps(za::milliseconds(1));
     checkSleeps(za::milliseconds(5));
     checkSleeps(za::milliseconds(25));
+}
+
+namespace
+{
+////////////////////////////////////////////////////////////
+// Sleep `repetitions` times, returning the shortest and longest measured sleeps
+struct SleepExtremes
+{
+    za::Time shortest;
+    za::Time longest;
+};
+
+[[nodiscard]] SleepExtremes measureSleeps(const za::Time duration, const int repetitions)
+{
+    SleepExtremes result{za::seconds(1000.f), za::Time{}};
+
+    for (int i = 0; i < repetitions; ++i)
+    {
+        const za::Clock clock;
+        za::ThisThread::sleepFor(duration);
+        const za::Time elapsed = clock.getElapsedTime();
+
+        result.shortest = elapsed < result.shortest ? elapsed : result.shortest;
+        result.longest  = elapsed > result.longest ? elapsed : result.longest;
+    }
+
+    return result;
+}
+
+} // namespace
+
+TEST_CASE("[System] Zancle/Concurrency/Thread.hpp - sleep is never shorter than requested, even below a millisecond")
+{
+    // Truncating to whole milliseconds used to return immediately for sub-millisecond
+    // durations on Windows, and early for non-integral ones (e.g. 1.5ms -> 1ms)
+    for (const za::I64 us : {50, 100, 500, 999, 1000, 1001, 1500, 1900, 2500, 5500})
+    {
+        const za::Time      duration = za::microseconds(us);
+        const SleepExtremes extremes = measureSleeps(duration, 10);
+
+        INFO("requested: " << us << "us, shortest: " << extremes.shortest.asMicroseconds()
+                           << "us, longest: " << extremes.longest.asMicroseconds() << "us");
+
+        CHECK(extremes.shortest >= duration);
+
+        // Generous: only catches gross errors (e.g. a unit mix-up), not scheduler noise
+        CHECK(extremes.longest < duration + za::milliseconds(250));
+    }
+}
+
+TEST_CASE("[System] Zancle/Concurrency/Thread.hpp - non-positive sleeps return immediately")
+{
+    const za::Clock clock;
+
+    za::ThisThread::sleepFor(za::Time{});
+    za::ThisThread::sleepFor(za::microseconds(-1));
+    za::ThisThread::sleepFor(za::seconds(-10.f));
+
+    CHECK(clock.getElapsedTime() < za::milliseconds(100));
+}
+
+TEST_CASE("[System] Zancle/Concurrency/Thread.hpp - concurrent sleeps on many threads")
+{
+    // Each thread uses its own timer on Windows
+    za::Atomic<int> tooShort{0};
+
+    {
+        za::Thread threads[8];
+
+        for (za::Thread& t : threads)
+            t = za::Thread{[&tooShort]
+            {
+                for (const za::I64 us : {300, 1500, 2200})
+                    if (measureSleeps(za::microseconds(us), 5).shortest < za::microseconds(us))
+                        tooShort.fetchAddRelaxed(1);
+            }};
+    } // joins
+
+    CHECK(tooShort.loadRelaxed() == 0);
 }
 
 TEST_CASE("[System] Zancle/Concurrency/Thread.hpp - many threads each see distinct ids")

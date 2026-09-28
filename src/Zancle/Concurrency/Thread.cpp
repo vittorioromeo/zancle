@@ -72,16 +72,14 @@
 
 namespace za
 {
+namespace
+{
 ////////////////////////////////////////////////////////////
-// Per-thread id slot. Declared at namespace scope (not in the
-// anonymous namespace) so the trampoline can refer to a single
-// shared TLS symbol across this TU.
+// Id of the calling thread (`0` until first assigned)
 ////////////////////////////////////////////////////////////
 thread_local za::U64 tlCurrentThreadId{0u};
 
 
-namespace
-{
 ////////////////////////////////////////////////////////////
 // Reinterpret the opaque `m_native[16]` byte buffer as the
 // platform handle. The `static_assert`s below catch any ABI
@@ -96,10 +94,38 @@ static_assert(alignof(NativeHandle) <= alignof(za::U64));
 
 #elif ZA_THREAD_WIN32
 
+    #ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
+        #define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00'00'00'02 // missing from older SDKs/MinGW headers
+    #endif
+
+////////////////////////////////////////////////////////////
+// Per-thread high-resolution waitable timer used by `sleepFor`
+// (`handle` is null on Windows versions older than 10 1803)
+////////////////////////////////////////////////////////////
+struct HighResolutionTimer
+{
+    HANDLE handle = CreateWaitableTimerExW(/* attributes */ nullptr,
+                                           /* name       */ nullptr,
+                                           CREATE_WAITABLE_TIMER_HIGH_RESOLUTION,
+                                           TIMER_ALL_ACCESS);
+
+    HighResolutionTimer() = default;
+
+    HighResolutionTimer(const HighResolutionTimer&)            = delete;
+    HighResolutionTimer& operator=(const HighResolutionTimer&) = delete;
+
+    ~HighResolutionTimer()
+    {
+        if (handle != nullptr)
+            CloseHandle(handle);
+    }
+};
+
+
+////////////////////////////////////////////////////////////
 struct NativeHandle
 {
     HANDLE handle;
-    DWORD  id;
 };
 
 static_assert(sizeof(NativeHandle) <= 16u);
@@ -200,7 +226,7 @@ Thread::Thread(int, priv::ThreadEntry* entry)
                        &threadStartRoutine,
                        entry,
                        /* initflag    */ 0u,
-                       reinterpret_cast<unsigned int*>(&native.id)));
+                       /* thrdaddr    */ nullptr));
 
     if (native.handle == nullptr)
     {
@@ -263,6 +289,7 @@ Thread::~Thread()
 void Thread::join()
 {
     ZA_ASSERT(m_joinable);
+    ZA_ASSERT(ThisThread::getId() != getId() && "a thread cannot join itself (deadlock)");
 
 #if ZA_THREAD_POSIX
 
@@ -326,9 +353,8 @@ unsigned int Thread::hardwareConcurrency() noexcept
 
 #elif ZA_THREAD_WIN32
 
-    SYSTEM_INFO info;
-    GetSystemInfo(&info);
-    return static_cast<unsigned int>(info.dwNumberOfProcessors);
+    // Unlike `GetSystemInfo`, counts the processors of every group (not just the first 64)
+    return static_cast<unsigned int>(GetActiveProcessorCount(ALL_PROCESSOR_GROUPS));
 
 #endif
 }
@@ -376,10 +402,27 @@ void ThisThread::sleepFor(Time duration)
 
 #elif ZA_THREAD_WIN32
 
-    // Bump the system timer resolution so `Sleep` honors short
-    // durations more accurately. `std::this_thread::sleep_for` is
-    // intentionally not used: it produces inconsistent results
-    // under MinGW-w64.
+    // `std::this_thread::sleep_for` is intentionally not used: it
+    // produces inconsistent results under MinGW-w64.
+    const za::I64 usecs = duration.asMicroseconds();
+
+    // Preferred: a high-resolution waitable timer (Windows 10 1803+),
+    // which never wakes up early and needs no global timer resolution change
+    thread_local const HighResolutionTimer timer;
+
+    if (timer.handle != nullptr)
+    {
+        LARGE_INTEGER dueTime;
+        dueTime.QuadPart = -usecs * 10; // negative: relative, in 100ns units
+
+        if (SetWaitableTimer(timer.handle, &dueTime, /* period */ 0, nullptr, nullptr, /* resume */ FALSE) &&
+            WaitForSingleObject(timer.handle, INFINITE) == WAIT_OBJECT_0)
+            return;
+    }
+
+    // Fallback: `Sleep` with the system timer resolution bumped so that
+    // it honors short durations more accurately. The duration is rounded
+    // up to whole milliseconds, so that the sleep is never shorter.
     static const UINT periodMin = []
     {
         TIMECAPS tc;
@@ -387,8 +430,11 @@ void ThisThread::sleepFor(Time duration)
         return tc.wPeriodMin;
     }();
 
+    constexpr za::I64 maxSleepMs = 0xFF'FF'FF'FE; // `INFINITE` (0xFFFFFFFF) must be avoided
+    const za::I64     ms         = (usecs + 999) / 1000;
+
     timeBeginPeriod(periodMin);
-    ::Sleep(static_cast<DWORD>(duration.asMilliseconds()));
+    ::Sleep(static_cast<DWORD>(ms < maxSleepMs ? ms : maxSleepMs));
     timeEndPeriod(periodMin);
 
 #endif

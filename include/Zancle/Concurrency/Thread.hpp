@@ -270,7 +270,7 @@ private:
     // Opaque storage for the platform native handle.
     //
     // - POSIX:    `pthread_t`     (8 bytes on every supported libc).
-    // - Win32:    `HANDLE` (8B) + `DWORD` (4B) + alignment slack.
+    // - Win32:    `HANDLE` (8 bytes).
     // - 16 bytes / 8-byte alignment covers both with room to spare.
     //
     // The .cpp `static_assert`s sizeof / alignof against the real
