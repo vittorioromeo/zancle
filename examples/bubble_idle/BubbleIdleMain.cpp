@@ -262,8 +262,7 @@ za::Vector<za::Vector<za::StringView>> Main::makeShuffledCatNames(RNGFast& rng)
 ////////////////////////////////////////////////////////////
 unsigned int Main::getTPWorkerCount()
 {
-    const auto numThreads = static_cast<unsigned int>(za::ThreadPool::getHardwareWorkerCount());
-    return (numThreads == 0u) ? 3u : numThreads - 1u;
+    return static_cast<unsigned int>(za::ThreadPool::getHardwareWorkerCountExcludingCallingThread());
 }
 
 

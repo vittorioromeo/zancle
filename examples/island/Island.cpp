@@ -351,16 +351,21 @@ void generateTerrain(za::ThreadPool& threadPool, za::Vertex* buffer)
     while (pendingTasks.loadAcquire() > 0u)
         za::ThisThread::sleepFor(za::milliseconds(10));
 
-    // Queue all the new work items
+    // Count the work items before queuing them, so that the counter never underflows
+    pendingTasks.fetchAddRelease(blockCount);
+
+    // Queue all the new work items at once
+    za::ThreadPool::Task tasks[blockCount];
+
     for (unsigned int i = 0u; i < blockCount; ++i)
-        threadPool.post([buffer, i]
+        tasks[i] = [buffer, i]
         {
             const unsigned int rowStart = rowBlockSize * i;
             processWorkItem(buffer + (resolution.x * rowStart * 6), i);
             pendingTasks.fetchSubRelease(1u);
-        });
+        };
 
-    pendingTasks.fetchAddRelease(blockCount);
+    threadPool.postBulk(tasks, blockCount);
 }
 
 } // namespace

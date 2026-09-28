@@ -49,10 +49,7 @@
 #include "Zancle/Base/GetArraySize.hpp"
 #include "Zancle/Base/IntTypes.hpp"
 #include "Zancle/Base/InterferenceSize.hpp"
-#include "Zancle/Base/PtrDiffT.hpp"
 #include "Zancle/Base/SizeT.hpp"
-
-#include <latch>
 
 
 namespace
@@ -334,28 +331,26 @@ int main()
     //
     //
     // Set up thread pool
-    za::ThreadPool pool(nMaxWorkers);
+    // The calling thread takes part in `parallelFor`, so `nMaxWorkers` batches can run at once
+    za::ThreadPool pool(za::ThreadPool::getHardwareWorkerCountExcludingCallingThread());
 
     const auto doInBatches = [&](const za::SizeT nParticlesTotal, auto&& f)
     {
-        const za::SizeT particlesPerBatch = nParticlesTotal / nWorkers;
+        const auto      nBatches          = static_cast<za::SizeT>(nWorkers);
+        const za::SizeT particlesPerBatch = nParticlesTotal / nBatches;
 
-        std::latch latch{static_cast<za::PtrDiffT>(nWorkers)};
-
-        for (za::SizeT i = 0u; i < nWorkers; ++i)
+        pool.parallelFor(nBatches,
+                         [&](za::SizeT i, const za::SizeT end)
         {
-            pool.post([&, i]
+            for (; i < end; ++i)
             {
                 const za::SizeT batchStartIdx = i * particlesPerBatch;
-                const za::SizeT batchEndIdx   = (i == nWorkers - 1u) ? nParticlesTotal : (i + 1u) * particlesPerBatch;
+                const za::SizeT batchEndIdx   = (i == nBatches - 1u) ? nParticlesTotal : (i + 1u) * particlesPerBatch;
 
                 f(i, batchStartIdx, batchEndIdx);
-
-                latch.count_down();
-            });
-        }
-
-        latch.wait();
+            }
+        },
+                         /* chunkSize */ 1u);
     };
 
     //

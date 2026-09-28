@@ -192,8 +192,7 @@ void Main::gameLoopUpdateCollisionsBubbleBubble(const float deltaTimeMs)
         handleBubbleCollision(deltaTimeMs, pt->bubbles[bubbleIdxI], pt->bubbles[bubbleIdxJ]);
     };
 
-    const za::SizeT nWorkers = threadPool.getWorkerCount();
-    sweepAndPrune->forEachUniqueIndexPair(nWorkers, threadPool, func);
+    sweepAndPrune->forEachUniqueIndexPair(threadPool, func);
 }
 
 

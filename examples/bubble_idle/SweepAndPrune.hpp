@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Zancle/Concurrency/Atomic.hpp"
+#include "Zancle/Concurrency/ThreadPool.hpp"
 
 #include "Zancle/Algorithm/Sort.hpp"
 
@@ -9,7 +9,6 @@
 #include "Zancle/Math/MinMax.hpp"
 
 #include "Zancle/Base/IntTypes.hpp"
-#include "Zancle/Base/InterferenceSize.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
 
@@ -27,7 +26,7 @@ private:
 
 public:
     ////////////////////////////////////////////////////////////
-    void forEachUniqueIndexPair(const za::SizeT nWorkers, auto& pool, auto& func)
+    void forEachUniqueIndexPair(za::ThreadPool& pool, auto& func)
     {
         const za::SizeT numObjects = m_aabbs.size();
 
@@ -55,47 +54,15 @@ public:
             }
         };
 
-        // If there's only one worker, process synchronously.
-        if (nWorkers <= 1u)
+        // Dynamic scheduling, one row at a time: early rows (low `i`) have much more work than late
+        // rows (high `i`) due to longer inner loops and less effective early exits.
+        pool.parallelFor(numObjects,
+                         [&](za::SizeT i, const za::SizeT end)
         {
-            for (za::SizeT i = 0; i < numObjects; ++i)
+            for (; i < end; ++i)
                 processOne(i);
-
-            return;
-        }
-
-        // Dynamic scheduling: each thread grabs the next row via atomic counter.
-        // This naturally balances load since early rows (low i) have much more work
-        // than late rows (high i) due to longer inner loops and less effective early-exit.
-        alignas(za::hardwareDestructiveInterferenceSize) za::Atomic<za::SizeT> nextI{0};
-        alignas(za::hardwareDestructiveInterferenceSize) za::Atomic<za::SizeT> nRemaining{nWorkers};
-
-        auto worker = [&]
-        {
-            while (true)
-            {
-                const auto i = nextI.fetchAddRelaxed(1);
-
-                if (i >= numObjects)
-                    break;
-
-                processOne(i);
-            }
-
-            // Only notify when the last worker finishes (like std::latch).
-            if (nRemaining.fetchSubRelease(1) == 1)
-                nRemaining.notifyOne();
-        };
-
-        // Launch asynchronous workers.
-        for (za::SizeT iWorker = 1u; iWorker < nWorkers; ++iWorker)
-            pool.post(worker);
-
-        // Main thread also participates as a worker.
-        worker();
-
-        // Wait until all workers finish.
-        nRemaining.waitUntilAcquire([](za::SizeT val) { return val == 0; });
+        },
+                         /* chunkSize */ 1u);
     }
 
     ////////////////////////////////////////////////////////////
