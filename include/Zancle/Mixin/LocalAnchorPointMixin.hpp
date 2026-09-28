@@ -12,15 +12,9 @@
 namespace za
 {
 ////////////////////////////////////////////////////////////
-/// \brief Utility mixin providing anchor point functions for positioning
+/// \brief Mixin to get anchor points of an object's local bounds
 ///
-/// This class can be inherited by classes that have position
-/// and bounds (like `za::Transformable` based classes)
-/// to add convenient functions for getting and setting the object's position
-/// based on common anchor points (corners, centers, edges).
-///
-/// It relies on the inheriting class providing `getLocalBounds()`.
-/// The derived type is deduced at call time via C++23 explicit object parameters.
+/// See the class documentation at the end of this file.
 ///
 ////////////////////////////////////////////////////////////
 struct LocalAnchorPointMixin
@@ -39,66 +33,65 @@ struct LocalAnchorPointMixin
 
 
 ////////////////////////////////////////////////////////////
-#define ZA_PRIV_DEFINE_MIXIN_GETTER(name, ...)                                                                   \
-    /** \brief Get the position of the name anchor point */                                                      \
+#define ZA_PRIV_DEFINE_MIXIN_GETTER(name, rectGetter)                                                            \
     [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]] inline constexpr auto name(this auto const& self) \
     {                                                                                                            \
-        return self.getLocalAnchorPoint(__VA_ARGS__);                                                            \
+        return self.getLocalBounds().rectGetter();                                                               \
     }
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the local position of the top-left anchor point
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_MIXIN_GETTER(getLocalTopLeft, {0.f, 0.f});
+    ZA_PRIV_DEFINE_MIXIN_GETTER(getLocalTopLeft, getTopLeft);
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the local position of the top-center anchor point
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_MIXIN_GETTER(getLocalTopCenter, {0.5f, 0.f});
+    ZA_PRIV_DEFINE_MIXIN_GETTER(getLocalTopCenter, getTopCenter);
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the local position of the top-right anchor point
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_MIXIN_GETTER(getLocalTopRight, {1.f, 0.f});
+    ZA_PRIV_DEFINE_MIXIN_GETTER(getLocalTopRight, getTopRight);
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the local position of the center-left anchor point
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_MIXIN_GETTER(getLocalCenterLeft, {0.f, 0.5f});
+    ZA_PRIV_DEFINE_MIXIN_GETTER(getLocalCenterLeft, getCenterLeft);
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the local position of the center anchor point
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_MIXIN_GETTER(getLocalCenter, {0.5f, 0.5f});
+    ZA_PRIV_DEFINE_MIXIN_GETTER(getLocalCenter, getCenter);
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the local position of the center-right anchor point
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_MIXIN_GETTER(getLocalCenterRight, {1.f, 0.5f});
+    ZA_PRIV_DEFINE_MIXIN_GETTER(getLocalCenterRight, getCenterRight);
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the local position of the bottom-left anchor point
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_MIXIN_GETTER(getLocalBottomLeft, {0.f, 1.f});
+    ZA_PRIV_DEFINE_MIXIN_GETTER(getLocalBottomLeft, getBottomLeft);
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the local position of the bottom-center anchor point
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_MIXIN_GETTER(getLocalBottomCenter, {0.5f, 1.f});
+    ZA_PRIV_DEFINE_MIXIN_GETTER(getLocalBottomCenter, getBottomCenter);
 
     ////////////////////////////////////////////////////////////
     /// \brief Get the local position of the bottom-right anchor point
     ///
     ////////////////////////////////////////////////////////////
-    ZA_PRIV_DEFINE_MIXIN_GETTER(getLocalBottomRight, {1.f, 1.f});
+    ZA_PRIV_DEFINE_MIXIN_GETTER(getLocalBottomRight, getBottomRight);
 
 #undef ZA_PRIV_DEFINE_MIXIN_GETTER
 
@@ -148,6 +141,28 @@ struct LocalAnchorPointMixin
 
 
     ////////////////////////////////////////////////////////////
+    /// \brief Local X coordinate of the center
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]]
+    inline constexpr float getLocalCenterX(this const auto& self)
+    {
+        return self.getLocalBounds().getCenter().x;
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Local Y coordinate of the center
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline, gnu::flatten, gnu::pure]]
+    inline constexpr float getLocalCenterY(this const auto& self)
+    {
+        return self.getLocalBounds().getCenter().y;
+    }
+
+
+    ////////////////////////////////////////////////////////////
     /// \brief Local width of the object
     ///
     ////////////////////////////////////////////////////////////
@@ -176,20 +191,29 @@ struct LocalAnchorPointMixin
 /// \class za::LocalAnchorPointMixin
 /// \ingroup system
 ///
-/// Utility mixin providing convenient functions to get and set
-/// the position of an object based on anchor points relative
-/// to its bounding box (or size, for windows). These anchor points
-/// include corners (e.g., `getTopLeft()`, `setBottomRight()`),
-/// edge centers (e.g., `getCenterLeft()`, `setTopCenter()`), and the
-/// overall center (`getCenter()`, `setCenter()`).
+/// Utility mixin providing convenient functions to get anchor points
+/// of an object's local bounds, i.e. in the object's own coordinate
+/// system, before its transform is applied:
 ///
-/// It also provides functions to get or set the position based
-/// on individual edge coordinates (`getLeft()`, `setRight()`, etc.).
+/// - Corners, edge centers, and the center, e.g. `getLocalTopLeft()`,
+///   `getLocalBottomRight()`, `getLocalCenterLeft()`, `getLocalCenter()`.
+///
+/// - Arbitrary anchor points, via normalized factors in `[0, 1]`:
+///   `getLocalAnchorPoint(factors)`.
+///
+/// - Individual coordinates and size: `getLocalLeft()`, `getLocalRight()`,
+///   `getLocalCenterX()`, `getLocalWidth()`, etc.
+///
+/// A typical use is choosing a transform origin, e.g.
+/// `sprite.origin = sprite.getLocalCenter();`. There are no setters:
+/// local bounds are defined by the object's contents, not its position.
+/// Use `za::GlobalAnchorPointMixin` to position objects.
 ///
 /// To use this mixin, inherit from it publicly, e.g.:
-/// `struct MyObject : public za::Transformable, public za::LocalAnchorPointMixin`
+/// `struct MyObject : za::TransformableMixin, za::LocalAnchorPointMixin`
+///
 /// The inheriting class must provide `getLocalBounds()`.
 ///
-/// \see `za::Transformable`
+/// \see `za::GlobalAnchorPointMixin`, `za::TransformableMixin`
 ///
 ////////////////////////////////////////////////////////////

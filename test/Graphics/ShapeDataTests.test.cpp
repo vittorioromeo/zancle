@@ -1072,3 +1072,69 @@ TEST_CASE("[Graphics] hasVisibleGeometry")
         CHECK(rectsApproxEqual(invalidCog.getGlobalBounds(), {}));
     }
 }
+
+
+TEST_CASE("[Graphics] Anchor point mixins on transformed shapes")
+{
+    // Rotated, non-uniformly scaled, with an off-center origin: global bounds are the axis-aligned bounding box
+    const auto makeShape = []
+    {
+        return za::RectangleShapeData{.position = {100.f, 50.f},
+                                      .scale    = {2.f, 0.5f},
+                                      .origin   = {10.f, 5.f},
+                                      .rotation = za::degrees(30.f),
+                                      .size     = {40.f, 20.f}};
+    };
+
+    SECTION("Local anchors ignore the transform")
+    {
+        const auto shape = makeShape();
+
+        CHECK(shape.getLocalTopLeft() == Approx(za::Vec2f{0.f, 0.f}));
+        CHECK(shape.getLocalCenter() == Approx(za::Vec2f{20.f, 10.f}));
+        CHECK(shape.getLocalBottomRight() == Approx(za::Vec2f{40.f, 20.f}));
+    }
+
+    SECTION("Global anchors follow the global bounds")
+    {
+        const auto shape  = makeShape();
+        const auto bounds = shape.getGlobalBounds();
+
+        CHECK(shape.getGlobalTopLeft() == Approx(bounds.position));
+        CHECK(shape.getGlobalCenter() == Approx(bounds.position + bounds.size / 2.f));
+        CHECK(shape.getGlobalBottomRight() == Approx(bounds.position + bounds.size));
+        CHECK(shape.getGlobalWidth() == Approx(bounds.size.x));
+        CHECK(shape.getGlobalHeight() == Approx(bounds.size.y));
+    }
+
+    SECTION("Global setters move the bounds without changing them otherwise")
+    {
+        const za::Vec2f target{-300.f, 700.f};
+
+        auto       shape      = makeShape();
+        const auto sizeBefore = shape.getGlobalBounds().size;
+
+        shape.setGlobalCenter(target);
+        CHECK(shape.getGlobalCenter() == Approx(target));
+        CHECK(shape.getGlobalBounds().size == Approx(sizeBefore));
+
+        shape.setGlobalTopLeft(target);
+        CHECK(shape.getGlobalTopLeft() == Approx(target));
+
+        shape.setGlobalBottomRight(target);
+        CHECK(shape.getGlobalBottomRight() == Approx(target));
+
+        shape.setGlobalRight(12.f);
+        CHECK(shape.getGlobalRight() == Approx(12.f));
+        CHECK(shape.getGlobalBottom() == Approx(target.y)); // the other axis is untouched
+
+        shape.setGlobalCenterY(-5.f);
+        CHECK(shape.getGlobalCenterY() == Approx(-5.f));
+        CHECK(shape.getGlobalRight() == Approx(12.f));
+
+        // Only the position changed
+        CHECK(shape.rotation == za::degrees(30.f));
+        CHECK(shape.scale == za::Vec2f{2.f, 0.5f});
+        CHECK(shape.origin == za::Vec2f{10.f, 5.f});
+    }
+}
