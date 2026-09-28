@@ -57,7 +57,7 @@ namespace
 // use with C stdio's narrow-char `fopen`. Used by the fallback path.
 [[maybe_unused, gnu::always_inline]] inline std::string toUtf8FilenameForStdio(za::StringView v)
 {
-    return v.toString<std::string>();
+    return v.to<std::string>();
 }
 
 
@@ -302,7 +302,7 @@ inline void nativeClose(::HANDLE handle)
 [[nodiscard]] bool nativeOpenAndStat(za::StringView filename, int& outFd, za::SizeT& outSize)
 {
     // `open` requires a NUL-terminated path; `StringView` is not guaranteed to be one.
-    const auto path = filename.toString<std::string>();
+    const auto path = filename.to<std::string>();
 
     const int fd = nativeOpenCStr(path.c_str());
     if (fd < 0)
@@ -476,7 +476,7 @@ bool writeToFile(za::StringView filename, za::StringView contents)
 {
     // `Path{StringView}` is unavailable; route via `std::string` (matches the
     // pre-migration behavior, which constructed `std::ofstream` the same way).
-    auto optFile = OutFile::open(Path{filename.toString<std::string>()}, FileOpenMode::bin);
+    auto optFile = OutFile::open(Path{filename.to<std::string>()}, FileOpenMode::bin);
     if (!optFile.hasValue())
     {
         priv::errMsg("Failed to write to file '{}'\n", filename);

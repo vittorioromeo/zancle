@@ -13,6 +13,7 @@
 #include "Zancle/Base/Strlen.hpp"
 
 #include "Zancle/Trait/IsAggregate.hpp"
+#include "Zancle/Trait/IsConstructible.hpp"
 #include "Zancle/Trait/IsStandardLayout.hpp"
 #include "Zancle/Trait/IsTrivial.hpp"
 #include "Zancle/Trait/IsTriviallyAssignable.hpp"
@@ -1410,5 +1411,93 @@ TEST_CASE("[Base] Base/StringView.hpp")
             CHECK(a.data() == p);
             CHECK(a.size() == s);
         }
+    }
+}
+
+
+TEST_CASE("[Base] za::StringView find (runtime and constant evaluation)")
+{
+    SECTION("find(char)")
+    {
+        constexpr za::StringView sv{"abcabc"};
+
+        STATIC_CHECK(sv.find('a') == 0u);
+        STATIC_CHECK(sv.find('c') == 2u);
+        STATIC_CHECK(sv.find('a', 1u) == 3u);
+        STATIC_CHECK(sv.find('z') == za::StringView::nPos);
+        STATIC_CHECK(sv.find('a', 6u) == za::StringView::nPos);
+
+        const za::StringView rt = sv; // runtime path (`memchr`)
+        CHECK(rt.find('a') == 0u);
+        CHECK(rt.find('c') == 2u);
+        CHECK(rt.find('a', 1u) == 3u);
+        CHECK(rt.find('c', 5u) == 5u);
+        CHECK(rt.find('z') == za::StringView::nPos);
+        CHECK(rt.find('a', 6u) == za::StringView::nPos);
+        CHECK(rt.find('a', 100u) == za::StringView::nPos);
+        CHECK(za::StringView{}.find('a') == za::StringView::nPos);
+
+        // Bytes above 0x7F
+        const za::StringView high{"a\xE9z"};
+        CHECK(high.find('\xE9') == 1u);
+    }
+
+    SECTION("find(StringView)")
+    {
+        constexpr za::StringView sv{"aaabaab"};
+
+        STATIC_CHECK(sv.find("aab") == 1u);
+        STATIC_CHECK(sv.find("aab", 2u) == 4u);
+        STATIC_CHECK(sv.find("b") == 3u);
+        STATIC_CHECK(sv.find("aaabaab") == 0u);
+        STATIC_CHECK(sv.find("aaabaabx") == za::StringView::nPos);
+        STATIC_CHECK(sv.find("x") == za::StringView::nPos);
+        STATIC_CHECK(sv.find("") == 0u);
+
+        const za::StringView rt = sv; // runtime path (`memchr` + `memcmp`)
+        CHECK(rt.find("aab") == 1u);  // candidates starting with 'a' that fail first
+        CHECK(rt.find("aab", 2u) == 4u);
+        CHECK(rt.find("ab", 5u) == 5u); // match ending exactly at the end
+        CHECK(rt.find("b") == 3u);
+        CHECK(rt.find("aaabaab") == 0u);
+        CHECK(rt.find("aaabaabx") == za::StringView::nPos);
+        CHECK(rt.find("x") == za::StringView::nPos);
+        CHECK(rt.find("ba", 5u) == za::StringView::nPos);
+        CHECK(rt.find("") == 0u);
+        CHECK(rt.find("", 7u) == 7u);
+        CHECK(rt.find("", 8u) == za::StringView::nPos);
+        CHECK(rt.contains("baa"));
+    }
+}
+
+
+TEST_CASE("[Base] za::StringView construction from containers")
+{
+    SECTION("Empty containers may have no storage")
+    {
+        const za::Vector<char> empty;
+        const za::StringView   sv{empty};
+
+        CHECK(sv.empty());
+        CHECK(sv.startsWith(za::StringView{}));
+        CHECK(sv.endsWith(za::StringView{}));
+        CHECK(sv == za::StringView{});
+    }
+
+    SECTION("Non-empty containers")
+    {
+        za::Vector<char> v;
+        v.pushBack('h');
+        v.pushBack('i');
+
+        const za::StringView sv{v};
+        CHECK(sv == "hi");
+    }
+
+    SECTION("Only containers of `char` convert")
+    {
+        STATIC_CHECK(ZA_IS_CONSTRUCTIBLE(za::StringView, const za::Vector<char>&));
+        STATIC_CHECK(!ZA_IS_CONSTRUCTIBLE(za::StringView, const za::Vector<int>&));
+        STATIC_CHECK(!ZA_IS_CONSTRUCTIBLE(za::StringView, const za::Vector<float>&));
     }
 }

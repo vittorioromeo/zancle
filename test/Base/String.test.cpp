@@ -1520,3 +1520,219 @@ TEST_CASE("[Base] Base/String.hpp")
         CHECK(s == "3.141590");
     }
 }
+
+
+TEST_CASE("[Base] za::String moved-from strings are empty and null-terminated")
+{
+    SECTION("Move construction from a heap string")
+    {
+        za::String source{"this string is definitely longer than the SSO buffer"};
+        za::String destination{ZA_MOVE(source)};
+
+        CHECK(destination == "this string is definitely longer than the SSO buffer");
+        CHECK(source.empty());
+        CHECK(source.cStr()[0] == '\0'); // used to contain stale pointer bytes
+        CHECK(source == "");
+
+        source += "reusable";
+        CHECK(source == "reusable");
+    }
+
+    SECTION("Move construction from an SSO string")
+    {
+        za::String source{"hello"};
+        za::String destination{ZA_MOVE(source)};
+
+        CHECK(destination == "hello");
+        CHECK(source.empty());
+        CHECK(source.cStr()[0] == '\0'); // used to still read "hello"
+    }
+
+    SECTION("Move assignment")
+    {
+        za::String heap{"this string is definitely longer than the SSO buffer"};
+        za::String sso{"world"};
+        za::String destination{"old"};
+
+        destination = ZA_MOVE(heap);
+        CHECK(heap.empty());
+        CHECK(heap.cStr()[0] == '\0');
+
+        destination = ZA_MOVE(sso);
+        CHECK(destination == "world");
+        CHECK(sso.empty());
+        CHECK(sso.cStr()[0] == '\0');
+    }
+}
+
+
+TEST_CASE("[Base] za::String erase/replace clamp huge counts without overflowing")
+{
+    constexpr auto huge = static_cast<za::SizeT>(-2); // `index + huge` wraps around
+
+    za::String s{"abcdef"};
+    s.erase(3, huge);
+    CHECK(s == "abc");
+
+    za::String r{"abcdef"};
+    r.replace(3, huge, "X");
+    CHECK(r == "abcX");
+
+    za::String t{"abcdef"};
+    t.erase(0, za::String::nPos);
+    CHECK(t.empty());
+}
+
+
+TEST_CASE("[Base] za::String accepts empty ranges without storage")
+{
+    const za::StringView nullView{};
+
+    const za::String fromView{nullView};
+    CHECK(fromView.empty());
+    CHECK(fromView.cStr()[0] == '\0');
+
+    za::String assigned{"previous contents that are longer than the SSO buffer"};
+    assigned = nullView;
+    CHECK(assigned.empty());
+
+    za::String s{"x"};
+    s.assign(nullptr, 0u);
+    CHECK(s.empty());
+
+    s.append(nullptr, 0u);
+    s.append(nullView);
+    s.insert(0u, nullView);
+    CHECK(s.empty());
+
+    CHECK(s == nullView);
+    CHECK(nullView == s);
+}
+
+
+TEST_CASE("[Base] za::String ordering against C strings")
+{
+    const za::String s{"this string is definitely longer than the SSO buffer (b)"};
+
+    CHECK(s < "this string is definitely longer than the SSO buffer (c)");
+    CHECK(s <= "this string is definitely longer than the SSO buffer (b)");
+    CHECK(s > "this string is definitely longer than the SSO buffer (a)");
+    CHECK(s >= "this string is definitely longer than the SSO buffer (b)");
+    CHECK(!(s < "this string is definitely longer than the SSO buffer (a)"));
+
+    CHECK("this string is definitely longer than the SSO buffer (a)" < s);
+    CHECK("this string is definitely longer than the SSO buffer (b)" <= s);
+    CHECK("this string is definitely longer than the SSO buffer (c)" > s);
+    CHECK("this string is definitely longer than the SSO buffer (b)" >= s);
+
+    // Against `StringView`, and prefixes
+    CHECK(s > za::StringView{"this"});
+    CHECK(za::String{"abc"} < "abcd");
+    CHECK(za::String{"abcd"} > "abc");
+}
+
+
+TEST_CASE("[Base] za::String replaceAllOccurrences")
+{
+    SECTION("Growing, shrinking, and same-size replacements")
+    {
+        za::String s{"a-b-c-d"};
+        CHECK(s.replaceAllOccurrences("-", "--") == 3u);
+        CHECK(s == "a--b--c--d");
+
+        CHECK(s.replaceAllOccurrences("--", "") == 3u);
+        CHECK(s == "abcd");
+
+        CHECK(s.replaceAllOccurrences("bc", "XY") == 1u);
+        CHECK(s == "aXYd");
+    }
+
+    SECTION("Occurrences at the edges, adjacent, and none")
+    {
+        za::String s{"xxaxx"};
+        CHECK(s.replaceAllOccurrences("xx", "y") == 2u);
+        CHECK(s == "yay");
+
+        za::String n{"abc"};
+        CHECK(n.replaceAllOccurrences("z", "y") == 0u);
+        CHECK(n == "abc");
+
+        CHECK(n.replaceAllOccurrences("", "y") == 0u);
+        CHECK(n == "abc");
+    }
+
+    SECTION("Non-overlapping, and not re-matching the replacement")
+    {
+        za::String s{"aaaa"};
+        CHECK(s.replaceAllOccurrences("aa", "a") == 2u);
+        CHECK(s == "aa");
+
+        za::String r{"ab"};
+        CHECK(r.replaceAllOccurrences("a", "aa") == 1u);
+        CHECK(r == "aab");
+    }
+
+    SECTION("Arguments viewing into the string itself")
+    {
+        za::String           s{"one two one"};
+        const za::StringView one = s.toStringView().substrByPosLen(0u, 3u);
+        const za::StringView two = s.toStringView().substrByPosLen(4u, 3u);
+
+        CHECK(s.replaceAllOccurrences(one, two) == 2u);
+        CHECK(s == "two two two");
+    }
+
+    SECTION("Many occurrences, growing into the heap")
+    {
+        za::String s;
+        for (int i = 0; i < 10'000; ++i)
+            s += "ab ";
+
+        CHECK(s.replaceAllOccurrences(" ", "__") == 10'000u);
+        CHECK(s.size() == 40'000u);
+        CHECK(s.toStringView().substrByPosLen(0u, 8u) == "ab__ab__");
+        CHECK(!s.contains(' '));
+    }
+}
+
+
+TEST_CASE("[Base] za::String assignment from a view of itself, resize, and insert")
+{
+    SECTION("Assigning a view of its own contents")
+    {
+        za::String s{"0123456789 and more text beyond the SSO buffer"};
+        s = s.toStringView().substrByPosLen(2u, 3u);
+        CHECK(s == "234");
+    }
+
+    SECTION("resize fills with the given character")
+    {
+        za::String s{"ab"};
+        s.resize(40u, 'z');
+        CHECK(s.size() == 40u);
+        CHECK(s.toStringView().substrByPosLen(0u, 3u) == "abz");
+        CHECK(s[39] == 'z');
+        CHECK(s.cStr()[40] == '\0');
+
+        s.resize(1u);
+        CHECK(s == "a");
+    }
+
+    SECTION("insert a StringView")
+    {
+        za::String s{"ace"};
+        s.insert(1u, za::StringView{"b"});
+        s.insert(3u, za::StringView{"d"});
+        s.insert(5u, za::StringView{"f"});
+        s.insert(0u, za::StringView{">"});
+        CHECK(s == ">abcdef");
+
+        // A view of its own contents
+        s.insert(0u, s.toStringView().substrByPosLen(1u, 3u));
+        CHECK(s == "abc>abcdef");
+
+        // Growing into the heap
+        s.insert(3u, za::StringView{" -- a long insertion that does not fit in the SSO buffer -- "});
+        CHECK(s == "abc -- a long insertion that does not fit in the SSO buffer -- >abcdef");
+    }
+}

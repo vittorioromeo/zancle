@@ -90,7 +90,7 @@ struct Ftp::Response::Impl
 
 
 ////////////////////////////////////////////////////////////
-Ftp::Response::Response(Status code, za::StringView message) : m_impl{code, message.toString<za::String>()}
+Ftp::Response::Response(Status code, za::StringView message) : m_impl{code, message.to<za::String>()}
 {
 }
 
@@ -133,7 +133,7 @@ Ftp::DirectoryResponse::DirectoryResponse(const Ftp::Response& response) : Ftp::
         const za::SizeT begin = getMessage().find('"', 0);
         const za::SizeT end   = getMessage().find('"', begin + 1);
 
-        m_directory = getMessage().substrByPosLen(begin + 1, end - begin - 1).toString<za::String>();
+        m_directory = getMessage().substrByPosLen(begin + 1, end - begin - 1).to<za::String>();
     }
 }
 
@@ -176,7 +176,7 @@ Ftp::ListingResponse::ListingResponse(const Ftp::Response& response, za::StringV
         za::SizeT lastPos = 0;
         for (za::SizeT pos = data.find("\r\n"); pos != za::String::nPos; pos = data.find("\r\n", lastPos))
         {
-            m_impl->listing.pushBack(data.substrByPosLen(lastPos, pos - lastPos).toString<za::String>());
+            m_impl->listing.pushBack(data.substrByPosLen(lastPos, pos - lastPos).to<za::String>());
             lastPos = pos + 2;
         }
     }
@@ -452,7 +452,7 @@ Ftp::Response Ftp::upload(const Path& localFile, const Path& remotePath, Transfe
 Ftp::Response Ftp::sendCommand(za::StringView command, za::StringView parameter)
 {
     // Build the command string
-    auto commandStr = command.toString<za::String>();
+    auto commandStr = command.to<za::String>();
 
     if (parameter.empty())
         commandStr += "\r\n";
@@ -460,7 +460,7 @@ Ftp::Response Ftp::sendCommand(za::StringView command, za::StringView parameter)
     {
         // TODO P2: concat utility from Open Hexagon?
         commandStr += ' ';
-        commandStr += parameter.toString<za::String>();
+        commandStr += parameter.to<za::String>();
         commandStr += "\r\n";
     }
 
@@ -639,7 +639,7 @@ Ftp::Response Ftp::DataChannel::open(Ftp::TransferMode mode)
     if (begin == za::String::nPos)
         return response;
 
-    const auto      str     = response.getMessage().substrByPosLen(begin).toString<za::String>();
+    const auto      str     = response.getMessage().substrByPosLen(begin).to<za::String>();
     const za::SizeT strSize = str.size();
 
     za::SizeT index   = 0;
