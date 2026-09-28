@@ -18,9 +18,10 @@ namespace za
 ////////////////////////////////////////////////////////////
 /// \brief Forward iterator over Unicode codepoints in a `Utf8String`
 ///
-/// Decodes one codepoint per `operator++`. Invalid or truncated
-/// sequences yield `Utf8String::replacementCodepoint` and consume
-/// the rest of the input buffer in a single step.
+/// Decodes one codepoint per `operator++`. Invalid sequences yield
+/// `Utf8String::replacementCodepoint` and consume only their invalid
+/// prefix (see `Utf<8>::decode`), so decoding resumes at the next byte
+/// that can start a character.
 ///
 ////////////////////////////////////////////////////////////
 class [[nodiscard]] Utf8String::CodepointIter
@@ -38,8 +39,8 @@ public:
 
 private:
     ////////////////////////////////////////////////////////////
-    const char* m_ptr;          //!< Start of current codepoint
-    const char* m_end;          //!< One past the last byte
+    const char* m_ptr{};        //!< Start of current codepoint
+    const char* m_end{};        //!< One past the last byte
     char32_t    m_current{};    //!< Cached decoded codepoint
     za::SizeT   m_currentLen{}; //!< Byte width of current codepoint
 
@@ -59,6 +60,11 @@ private:
 
 
 public:
+    ////////////////////////////////////////////////////////////
+    /// \brief Singular iterator (required by the standard iterator concepts, e.g. for `std::ranges`)
+    [[nodiscard]] CodepointIter() noexcept = default;
+
+
     ////////////////////////////////////////////////////////////
     CodepointIter(const char* ptr, const char* end) noexcept : m_ptr{ptr}, m_end{end}
     {
@@ -193,6 +199,15 @@ inline bool Utf8String::appendCodepoint(char32_t codepoint)
 inline Utf8String& Utf8String::operator+=(char32_t codepoint)
 {
     (void)appendCodepoint(codepoint);
+    return *this;
+}
+
+
+////////////////////////////////////////////////////////////
+inline Utf8String& Utf8String::operator+=(const char latin1Char)
+{
+    // Latin-1 characters are the codepoints U+0000..U+00FF
+    (void)appendCodepoint(static_cast<unsigned char>(latin1Char));
     return *this;
 }
 

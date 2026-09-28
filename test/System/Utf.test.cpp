@@ -4,30 +4,15 @@
 
 #include "Zancle/String/Utf.hpp"
 
-#include "Zancle/Base/Assert.hpp"
-
+#include <initializer_list>
 #include <iterator>
 #include <locale>
+#include <string>
 #include <string_view>
 
 
 namespace
 {
-////////////////////////////////////////////////////////////
-// Return either argument depending on whether wchar_t is 16 or 32 bits
-// Lets us write tests that work on both Windows where wchar_t is 16 bits
-// and elsewhere where it is 32. Otherwise the tests would only work on
-// one OS or the other.
-template <typename T>
-auto select(const std::basic_string_view<T>& string16, const std::basic_string_view<T>& string32)
-{
-    ZA_ASSERT(string16 != string32 && "Invalid to select between identical inputs");
-    if constexpr (sizeof(wchar_t) == 2)
-        return string16;
-    else
-        return string32;
-}
-
 ////////////////////////////////////////////////////////////
 const auto& getFacet()
 {
@@ -160,7 +145,7 @@ TEST_CASE("[System] za::Utf8")
         SECTION("Default replacement character")
         {
             za::Utf8::toAnsi(utf8.cbegin(), utf8.cend(), std::back_inserter(output), 0, getFacet());
-            CHECK(output == "Zancle \0"sv);
+            CHECK(output == "Zancle "sv); // skipped
         }
 
         SECTION("Custom replacement character")
@@ -177,13 +162,13 @@ TEST_CASE("[System] za::Utf8")
         SECTION("Default replacement character")
         {
             za::Utf8::toWide(utf8.cbegin(), utf8.cend(), std::back_inserter(output), 0);
-            CHECK(output == select(L"Zancle "sv, L"Zancle 🐌"sv));
+            CHECK(output == L"Zancle 🐌"sv);
         }
 
         SECTION("Custom replacement character")
         {
             za::Utf8::toWide(utf8.cbegin(), utf8.cend(), std::back_inserter(output), L'_');
-            CHECK(output == select(L"Zancle _"sv, L"Zancle 🐌"sv));
+            CHECK(output == L"Zancle 🐌"sv);
         }
     }
 
@@ -340,7 +325,7 @@ TEST_CASE("[System] za::Utf16")
         SECTION("Default replacement character")
         {
             za::Utf16::toAnsi(utf16.cbegin(), utf16.cend(), std::back_inserter(output), 0, getFacet());
-            CHECK(output == "Zancle \0"sv);
+            CHECK(output == "Zancle "sv); // skipped
         }
 
         SECTION("Custom replacement character")
@@ -357,13 +342,13 @@ TEST_CASE("[System] za::Utf16")
         SECTION("Default replacement character")
         {
             za::Utf16::toWide(utf16.cbegin(), utf16.cend(), std::back_inserter(output), 0);
-            CHECK(output == select(L"Zancle "sv, L"Zancle 🐌"sv));
+            CHECK(output == L"Zancle 🐌"sv);
         }
 
         SECTION("Custom replacement character")
         {
             za::Utf16::toWide(utf16.cbegin(), utf16.cend(), std::back_inserter(output), '_');
-            CHECK(output == select(L"Zancle _"sv, L"Zancle 🐌"sv));
+            CHECK(output == L"Zancle 🐌"sv);
         }
     }
 
@@ -374,13 +359,13 @@ TEST_CASE("[System] za::Utf16")
         SECTION("Default replacement character")
         {
             za::Utf16::toLatin1(utf16.cbegin(), utf16.cend(), std::back_inserter(output), 0);
-            CHECK(output == "Zancle \0\0"sv);
+            CHECK(output == "Zancle \0"sv);
         }
 
         SECTION("Custom replacement character")
         {
             za::Utf16::toLatin1(utf16.cbegin(), utf16.cend(), std::back_inserter(output), '_');
-            CHECK(output == "Zancle __"sv);
+            CHECK(output == "Zancle _"sv);
         }
     }
 
@@ -502,7 +487,7 @@ TEST_CASE("[System] za::Utf32")
         SECTION("Default replacement character")
         {
             za::Utf32::toAnsi(utf32.cbegin(), utf32.cend(), std::back_inserter(output), 0, getFacet());
-            CHECK(output == "Zancle \0"sv);
+            CHECK(output == "Zancle "sv); // skipped
         }
 
         SECTION("Custom replacement character")
@@ -519,13 +504,13 @@ TEST_CASE("[System] za::Utf32")
         SECTION("Default replacement character")
         {
             za::Utf32::toWide(utf32.cbegin(), utf32.cend(), std::back_inserter(output), 0);
-            CHECK(output == select(L"Zancle "sv, L"Zancle 🐌"sv));
+            CHECK(output == L"Zancle 🐌"sv);
         }
 
         SECTION("Custom replacement character")
         {
             za::Utf32::toWide(utf32.cbegin(), utf32.cend(), std::back_inserter(output), L'_');
-            CHECK(output == select(L"Zancle _"sv, L"Zancle 🐌"sv));
+            CHECK(output == L"Zancle 🐌"sv);
         }
     }
 
@@ -598,7 +583,7 @@ TEST_CASE("[System] za::Utf32")
             za::Utf32::encodeAnsi(U'a', std::back_inserter(output), 0, getFacet());
             CHECK(output == " _a"sv);
             za::Utf32::encodeAnsi(U'🐌', std::back_inserter(output), 0, getFacet());
-            CHECK(output == " _a\0"sv);
+            CHECK(output == " _a"sv); // skipped
         }
 
         SECTION("Custom replacement character")
@@ -627,7 +612,7 @@ TEST_CASE("[System] za::Utf32")
             za::Utf32::encodeWide(U'a', std::back_inserter(output), 0);
             CHECK(output == L" _a"sv);
             za::Utf32::encodeWide(U'🐌', std::back_inserter(output), 0);
-            CHECK(output == select(L" _a"sv, L" _a🐌"sv));
+            CHECK(output == L" _a🐌"sv);
         }
 
         SECTION("Custom replacement character")
@@ -639,9 +624,284 @@ TEST_CASE("[System] za::Utf32")
             za::Utf32::encodeWide(U'a', std::back_inserter(output), L'?');
             CHECK(output == L" _a"sv);
             za::Utf32::encodeWide(U'🐌', std::back_inserter(output), L'?');
-            CHECK(output == select(L" _a?"sv, L" _a🐌"sv));
+            CHECK(output == L" _a🐌"sv);
         }
     }
+}
+
+
+namespace
+{
+namespace UtfValidationTest // for unity builds
+{
+////////////////////////////////////////////////////////////
+// Decode every codepoint of `bytes` (with U+FFFD as replacement)
+[[nodiscard]] std::u32string decodeAllUtf8(const std::initializer_list<unsigned char> bytes)
+{
+    const std::string input(bytes.begin(), bytes.end());
+
+    std::u32string result;
+    for (auto it = input.cbegin(); it != input.cend();)
+    {
+        char32_t codepoint = 0;
+        it                 = za::Utf8::decode(it, input.cend(), codepoint, U'�');
+        result += codepoint;
+    }
+
+    return result;
+}
+
+
+////////////////////////////////////////////////////////////
+[[nodiscard]] std::u32string decodeAllUtf16(const std::u16string& input)
+{
+    std::u32string result;
+    for (auto it = input.cbegin(); it != input.cend();)
+    {
+        char32_t codepoint = 0;
+        it                 = za::Utf16::decode(it, input.cend(), codepoint, U'�');
+        result += codepoint;
+    }
+
+    return result;
+}
+
+} // namespace UtfValidationTest
+} // namespace
+
+
+TEST_CASE("[System] za::Utf8 decoding rejects ill-formed input")
+{
+    using UtfValidationTest::decodeAllUtf8;
+
+    constexpr char32_t r = U'�';
+
+    SECTION("Valid boundaries")
+    {
+        CHECK(decodeAllUtf8({0x7F}) == U"\u007F");
+        CHECK(decodeAllUtf8({0xC2, 0x80}) == U"\u0080");
+        CHECK(decodeAllUtf8({0xDF, 0xBF}) == U"߿");
+        CHECK(decodeAllUtf8({0xE0, 0xA0, 0x80}) == U"ࠀ");
+        CHECK(decodeAllUtf8({0xED, 0x9F, 0xBF}) == U"퟿");
+        CHECK(decodeAllUtf8({0xEE, 0x80, 0x80}) == U"");
+        CHECK(decodeAllUtf8({0xEF, 0xBF, 0xBF}) == U"￿");
+        CHECK(decodeAllUtf8({0xF0, 0x90, 0x80, 0x80}) == U"\U00010000");
+        CHECK(decodeAllUtf8({0xF4, 0x8F, 0xBF, 0xBF}) == U"\U0010FFFF");
+    }
+
+    SECTION("A broken sequence does not swallow the next character")
+    {
+        CHECK(decodeAllUtf8({0xC3, 0x41}) == std::u32string{r, U'A'});
+        CHECK(decodeAllUtf8({0xE3, 0x81, 0x41, 0x42}) == std::u32string{r, U'A', U'B'});
+        CHECK(decodeAllUtf8({0xF0, 0x9F, 0x98, 0x41}) == std::u32string{r, U'A'});
+    }
+
+    SECTION("Stray continuation bytes and invalid lead bytes")
+    {
+        CHECK(decodeAllUtf8({0x80, 0x41}) == std::u32string{r, U'A'});
+        CHECK(decodeAllUtf8({0xBF}) == std::u32string{r});
+        CHECK(decodeAllUtf8({0xF5, 0x80}) == std::u32string{r, r});
+        CHECK(decodeAllUtf8({0xFF}) == std::u32string{r});
+        CHECK(decodeAllUtf8({0xF8, 0x88, 0x80, 0x80, 0x80}) == std::u32string(5, r)); // old 5-byte form
+    }
+
+    SECTION("Overlong encodings")
+    {
+        CHECK(decodeAllUtf8({0xC0, 0x80}) == std::u32string{r, r}); // U+0000
+        CHECK(decodeAllUtf8({0xC0, 0xAF}) == std::u32string{r, r}); // '/', classic path traversal trick
+        CHECK(decodeAllUtf8({0xC1, 0xBF}) == std::u32string{r, r});
+        CHECK(decodeAllUtf8({0xE0, 0x80, 0xAF}) == std::u32string{r, r, r}); // '/'
+        CHECK(decodeAllUtf8({0xE0, 0x9F, 0xBF}) == std::u32string{r, r, r});
+        CHECK(decodeAllUtf8({0xF0, 0x8F, 0xBF, 0xBF}) == std::u32string{r, r, r, r});
+    }
+
+    SECTION("Surrogates and codepoints above U+10FFFF")
+    {
+        CHECK(decodeAllUtf8({0xED, 0xA0, 0x80}) == std::u32string{r, r, r});          // U+D800
+        CHECK(decodeAllUtf8({0xED, 0xBF, 0xBF}) == std::u32string{r, r, r});          // U+DFFF
+        CHECK(decodeAllUtf8({0xF4, 0x90, 0x80, 0x80}) == std::u32string{r, r, r, r}); // U+110000
+    }
+
+    SECTION("Truncated sequences at the end of the input")
+    {
+        CHECK(decodeAllUtf8({0x41, 0xC3}) == std::u32string{U'A', r});
+        CHECK(decodeAllUtf8({0xE3, 0x81}) == std::u32string{r});
+        CHECK(decodeAllUtf8({0xF0, 0x9F, 0x98}) == std::u32string{r});
+    }
+
+    SECTION("Every valid codepoint round-trips, and every surrogate is rejected by the encoder")
+    {
+        bool allRoundTrip = true;
+        bool noSurrogates = true;
+
+        for (char32_t codepoint = 0; codepoint <= 0x10'FF'FF; ++codepoint)
+        {
+            std::string encoded;
+            za::Utf8::encode(codepoint, std::back_inserter(encoded), '?');
+
+            if (codepoint >= 0xD8'00 && codepoint <= 0xDF'FF)
+            {
+                noSurrogates &= encoded == "?";
+                continue;
+            }
+
+            char32_t   decoded = 0;
+            const auto end     = za::Utf8::decode(encoded.cbegin(), encoded.cend(), decoded, U'�');
+            allRoundTrip &= decoded == codepoint && end == encoded.cend();
+        }
+
+        CHECK(allRoundTrip);
+        CHECK(noSurrogates);
+    }
+
+    SECTION("count and next agree with decode")
+    {
+        const std::string input = "a\xC3\x41\xE2\x82\xAC\xF0";
+        CHECK(za::Utf8::count(input.cbegin(), input.cend()) == 5u); // a, U+FFFD, A, U+20AC, U+FFFD
+    }
+}
+
+
+TEST_CASE("[System] za::Utf conversions of ill-formed input do not produce U+0000")
+{
+    const std::string truncated = "ab\xE3";
+
+    SECTION("To UTF-32 and UTF-16: U+FFFD")
+    {
+        std::u32string utf32;
+        za::Utf8::toUtf32(truncated.cbegin(), truncated.cend(), std::back_inserter(utf32));
+        CHECK(utf32 == U"ab�");
+
+        std::u16string utf16;
+        za::Utf8::toUtf16(truncated.cbegin(), truncated.cend(), std::back_inserter(utf16));
+        CHECK(utf16 == u"ab�");
+
+        const std::u16string loneSurrogate = {u'a', char16_t{0xD8'00}, u'b'};
+        std::string          utf8;
+        za::Utf16::toUtf8(loneSurrogate.cbegin(), loneSurrogate.cend(), std::back_inserter(utf8));
+        CHECK(utf8 ==
+              "a\xEF\xBF\xBD"
+              "b");
+    }
+
+    SECTION("To encodings with a replacement parameter: the replacement, or nothing")
+    {
+        std::string latin1;
+        za::Utf8::toLatin1(truncated.cbegin(), truncated.cend(), std::back_inserter(latin1), '?');
+        CHECK(latin1 == "ab?");
+
+        std::string ansi;
+        za::Utf8::toAnsi(truncated.cbegin(), truncated.cend(), std::back_inserter(ansi), 0, getFacet());
+        CHECK(ansi == "ab");
+
+        std::wstring wide;
+        za::Utf8::toWide(truncated.cbegin(), truncated.cend(), std::back_inserter(wide), L'?');
+        CHECK(wide == L"ab?");
+    }
+
+    SECTION("UTF-32 input is validated too")
+    {
+        const std::u32string invalid = {U'a', char32_t{0xD8'00}, char32_t{0x11'00'00}};
+
+        std::string utf8;
+        za::Utf32::toUtf8(invalid.cbegin(), invalid.cend(), std::back_inserter(utf8));
+        CHECK(utf8 == "a\xEF\xBF\xBD\xEF\xBF\xBD");
+
+        std::u32string copy;
+        za::Utf32::encode(char32_t{0xDC'00}, std::back_inserter(copy), U'?');
+        za::Utf32::encode(char32_t{0x11'00'00}, std::back_inserter(copy), 0);
+        CHECK(copy == U"?");
+    }
+}
+
+
+TEST_CASE("[System] za::Utf16 decoding of unpaired surrogates")
+{
+    using UtfValidationTest::decodeAllUtf16;
+
+    constexpr char16_t high = 0xD8'3D;
+    constexpr char16_t low  = 0xDE'00;
+
+    CHECK(decodeAllUtf16({high, low}) == U"\U0001F600");
+    CHECK(decodeAllUtf16({high, u'A', u'B'}) == U"�AB"); // the 'A' is not swallowed
+    CHECK(decodeAllUtf16({low, u'A'}) == U"�A");
+    CHECK(decodeAllUtf16({u'A', high}) == U"A�");
+    CHECK(decodeAllUtf16({high, high, low}) == U"�\U0001F600");
+
+    const std::u16string input = {high, u'A', u'B'};
+    CHECK(za::Utf16::count(input.cbegin(), input.cend()) == 3u);
+
+    SECTION("toLatin1 works on codepoints, not code units")
+    {
+        const std::u16string withPair = {u'a', high, low, u'b'};
+
+        std::string latin1;
+        za::Utf16::toLatin1(withPair.cbegin(), withPair.cend(), std::back_inserter(latin1), '?');
+        CHECK(latin1 == "a?b");
+    }
+}
+
+
+TEST_CASE("[System] za::Utf wide strings are UTF-16 where wchar_t is 16-bit")
+{
+    const std::wstring wide = L"a\U0001F600b"; // a surrogate pair on Windows
+
+    std::string utf8;
+    za::Utf8::fromWide(wide.cbegin(), wide.cend(), std::back_inserter(utf8));
+    CHECK(utf8 ==
+          "a\xF0\x9F\x98\x80"
+          "b");
+
+    std::u16string utf16;
+    za::Utf16::fromWide(wide.cbegin(), wide.cend(), std::back_inserter(utf16));
+    CHECK(utf16 == u"a\U0001F600b");
+
+    std::u32string utf32;
+    za::Utf32::fromWide(wide.cbegin(), wide.cend(), std::back_inserter(utf32));
+    CHECK(utf32 == U"a\U0001F600b");
+
+    std::wstring roundTrip;
+    za::Utf8::toWide(utf8.cbegin(), utf8.cend(), std::back_inserter(roundTrip), L'?');
+    CHECK(roundTrip == wide);
+
+    if constexpr (sizeof(wchar_t) == 2)
+    {
+        const std::wstring loneSurrogate = {L'a', static_cast<wchar_t>(0xD8'00), L'b'};
+
+        std::u32string decoded;
+        za::Utf32::fromWide(loneSurrogate.cbegin(), loneSurrogate.cend(), std::back_inserter(decoded));
+        CHECK(decoded == U"a�b");
+    }
+}
+
+
+TEST_CASE("[System] za::Utf toAnsi does not truncate codepoints that wchar_t cannot hold")
+{
+    const std::u32string input = {U'x', char32_t{0x1'00'41}}; // would alias 'A' if truncated to 16 bits
+
+    std::string ansi;
+    za::Utf32::toAnsi(input.cbegin(), input.cend(), std::back_inserter(ansi), '?', getFacet());
+    CHECK(ansi == "x?");
+}
+
+
+TEST_CASE("[System] za::Utf raw pointers as output iterators")
+{
+    char        utf8[8]{};
+    char* const utf8End = za::Utf8::encode(U'é', utf8, '?');
+    CHECK(utf8End - utf8 == 2);
+    CHECK(static_cast<unsigned char>(utf8[0]) == 0xC3);
+    CHECK(static_cast<unsigned char>(utf8[1]) == 0xA9);
+
+    const char32_t input[] = {U'a', U'\U0001F600'};
+    char32_t       utf32[4]{};
+    CHECK(za::Utf32::toUtf32(input, input + 2, utf32) == utf32 + 2);
+    CHECK(utf32[1] == U'\U0001F600');
+
+    const char latin1[] = "\xE9";
+    char16_t   utf16[2]{};
+    CHECK(za::Utf16::fromLatin1(latin1, latin1 + 1, utf16) == utf16 + 1);
+    CHECK(utf16[0] == u'é');
 }
 
 // NOLINTEND(readability-qualified-auto)

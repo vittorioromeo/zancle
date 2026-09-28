@@ -877,3 +877,78 @@ TEST_CASE("[System] za::Utf8String - as a sink for Utf<X>::toUtf8")
 
     CHECK(result == za::Utf8String{u8"aé€\U0001F600"});
 }
+
+
+TEST_CASE("[System] za::Utf8String codepoints of ill-formed input")
+{
+    const za::Utf8String text{
+        "x\xC3"
+        "A\x80y"}; // broken 2-byte sequence, stray continuation byte
+
+    za::Vector<char32_t> codepoints;
+    for (const char32_t codepoint : text.codepoints())
+        codepoints.pushBack(codepoint);
+
+    const char32_t r = za::Utf8String::replacementCodepoint;
+    CHECK((codepoints == za::Vector<char32_t>{U'x', r, U'A', r, U'y'}));
+    CHECK(text.codepointCount() == 5u);
+}
+
+
+TEST_CASE("[System] za::Utf8String appending codepoints and characters")
+{
+    SECTION("Surrogates are rejected")
+    {
+        za::Utf8String s;
+        CHECK(!s.appendCodepoint(0xD8'00));
+        CHECK(!s.appendCodepoint(0xDC'00)); // low surrogates used to be encoded
+        CHECK(!s.appendCodepoint(0xDF'FF));
+        CHECK(!s.appendCodepoint(0x11'00'00));
+        CHECK(s.byteSize() == 0u);
+    }
+
+    SECTION("A char is a Latin-1 character")
+    {
+        za::Utf8String s;
+        s += 'a';
+        s += '\xE9'; // used to be silently dropped (sign-extended into an invalid codepoint)
+        CHECK(s == za::Utf8String{u8"aé"});
+        CHECK(s.byteSize() == 3u);
+    }
+}
+
+
+TEST_CASE("[System] za::Utf8String comparisons with other byte strings")
+{
+    const za::Utf8String text{"abc"};
+    const za::String     bytes{"abc"};
+
+    CHECK(text == bytes); // used to be ambiguous
+    CHECK(bytes == text);
+    CHECK(!(text != bytes));
+
+    CHECK(text < za::String{"abd"});
+    CHECK(za::String{"abb"} < text);
+    CHECK(text <= za::StringView{"abc"});
+    CHECK(za::StringView{"abd"} > text);
+    CHECK(text >= "abc");
+    CHECK("abd" >= text);
+    CHECK(text < "abcd");
+}
+
+
+TEST_CASE("[System] za::Utf8String codepoint iterator concepts")
+{
+    using Iter = za::Utf8String::CodepointIter;
+
+    const Iter singular{};
+    CHECK(singular == Iter{});
+
+    const za::Utf8String text{u8"aé"};
+    auto                 it = text.codepoints().begin();
+    CHECK(*it == U'a');
+    ++it;
+    CHECK(*it == U'é');
+    ++it;
+    CHECK(it == text.codepoints().end());
+}

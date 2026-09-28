@@ -363,6 +363,19 @@ public:
 
 
     ////////////////////////////////////////////////////////////
+    /// \brief Append a single Latin-1 character, encoded as UTF-8
+    ///
+    /// ASCII characters are appended as-is. Without this overload, a
+    /// `char` above `0x7F` (e.g. `'\xE9'`) would promote to an invalid
+    /// `char32_t` (sign extension) and be silently dropped.
+    ///
+    /// \note Defined in `Utf8StringCodepoints.hpp`.
+    ///
+    ////////////////////////////////////////////////////////////
+    Utf8String& operator+=(char latin1Char);
+
+
+    ////////////////////////////////////////////////////////////
     void clear() noexcept
     {
         m_bytes.clear();
@@ -551,6 +564,49 @@ public:
     }
 
 
+    ////////////////////////////////////////////////////////////
+    /// \brief Equality against a `za::String` holding UTF-8 bytes
+    ///
+    /// Without it, the comparison is ambiguous: `za::String` converts
+    /// both to `Utf8String` and to `za::StringView`.
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] friend bool operator==(const Utf8String& lhs, const za::String& rhs) noexcept
+    {
+        return lhs.m_bytes == rhs;
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    // Ordering against UTF-8 bytes in other forms. Without these, the
+    // comparisons would be ambiguous (`za::String`) or construct a
+    // temporary `Utf8String`, possibly allocating (C strings).
+    ////////////////////////////////////////////////////////////
+#define ZA_PRIV_DEFINE_UTF8STRING_BYTES_ORDERING(op, BytesType)                          \
+    [[nodiscard]] friend bool operator op(const Utf8String& lhs, BytesType rhs) noexcept \
+    {                                                                                    \
+        return lhs.m_bytes.toStringView() op za::StringView{rhs};                        \
+    }                                                                                    \
+                                                                                         \
+    [[nodiscard]] friend bool operator op(BytesType lhs, const Utf8String& rhs) noexcept \
+    {                                                                                    \
+        return za::StringView{lhs} op rhs.m_bytes.toStringView();                        \
+    }
+
+#define ZA_PRIV_DEFINE_UTF8STRING_BYTES_ORDERINGS(BytesType) \
+    ZA_PRIV_DEFINE_UTF8STRING_BYTES_ORDERING(<, BytesType)   \
+    ZA_PRIV_DEFINE_UTF8STRING_BYTES_ORDERING(<=, BytesType)  \
+    ZA_PRIV_DEFINE_UTF8STRING_BYTES_ORDERING(>, BytesType)   \
+    ZA_PRIV_DEFINE_UTF8STRING_BYTES_ORDERING(>=, BytesType)
+
+    ZA_PRIV_DEFINE_UTF8STRING_BYTES_ORDERINGS(za::StringView)
+    ZA_PRIV_DEFINE_UTF8STRING_BYTES_ORDERINGS(const char*)
+    ZA_PRIV_DEFINE_UTF8STRING_BYTES_ORDERINGS(const za::String&)
+
+#undef ZA_PRIV_DEFINE_UTF8STRING_BYTES_ORDERINGS
+#undef ZA_PRIV_DEFINE_UTF8STRING_BYTES_ORDERING
+
+
 private:
     ////////////////////////////////////////////////////////////
     za::String m_bytes; //!< UTF-8 encoded byte storage
@@ -560,7 +616,9 @@ private:
 ////////////////////////////////////////////////////////////
 [[nodiscard]] inline Utf8String operator+(const Utf8String& lhs, const Utf8String& rhs)
 {
-    Utf8String result = lhs;
+    Utf8String result;
+    result.reserve(lhs.byteSize() + rhs.byteSize()); // a single allocation
+    result += lhs;
     result += rhs;
     return result;
 }

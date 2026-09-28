@@ -29,13 +29,71 @@
 namespace za::priv
 {
 ////////////////////////////////////////////////////////////
+/// \brief Codepoint used internally to mark invalid input
+///
+/// Above U+10FFFF, so every encoder rejects it: conversions taking a
+/// `replacement` output that replacement instead (or nothing, if it is
+/// `0`), exactly as for valid but unrepresentable codepoints.
+///
+////////////////////////////////////////////////////////////
+inline constexpr char32_t invalidCodepoint = 0xFF'FF'FF'FFu;
+
+
+////////////////////////////////////////////////////////////
+/// \brief U+FFFD REPLACEMENT CHARACTER
+///
+/// Output for invalid input by conversions to UTF-8/16/32, which have
+/// no `replacement` parameter.
+///
+////////////////////////////////////////////////////////////
+inline constexpr char32_t replacementCharacter = 0xFF'FDu;
+
+
+////////////////////////////////////////////////////////////
+/// \brief Whether `codepoint` is a Unicode scalar value: at most U+10FFFF, and not a surrogate
+///
+////////////////////////////////////////////////////////////
+[[nodiscard, gnu::always_inline, gnu::const]] inline constexpr bool isValidCodepoint(const char32_t codepoint) noexcept
+{
+    return codepoint <= 0x10'FF'FFu && (codepoint & 0xFF'FF'F8'00u) != 0xD8'00u;
+}
+
+
+////////////////////////////////////////////////////////////
+/// \brief Element type written through the output iterator `Out`
+///
+/// Inserters (e.g. `std::back_insert_iterator`) expose it through
+/// `container_type`, raw pointers through their pointee type.
+///
+////////////////////////////////////////////////////////////
+template <typename Out>
+struct UtfOutputElement
+{
+    using type = typename Out::container_type::value_type;
+};
+
+
+////////////////////////////////////////////////////////////
+template <typename T>
+struct UtfOutputElement<T*>
+{
+    using type = T;
+};
+
+
+////////////////////////////////////////////////////////////
+template <typename Out>
+using UtfOutputElementType = typename UtfOutputElement<Out>::type;
+
+
+////////////////////////////////////////////////////////////
 template <typename In, typename Out>
 [[gnu::always_inline]] inline constexpr Out copyBits(In begin, const In end, Out output)
 {
     using InputType = ZA_REMOVE_CVREF(decltype(*begin));
     static_assert(ZA_IS_INTEGRAL(InputType));
 
-    using OutputType = typename Out::container_type::value_type;
+    using OutputType = UtfOutputElementType<Out>;
     static_assert(ZA_IS_INTEGRAL(OutputType));
 
     static_assert(sizeof(OutputType) >= sizeof(InputType));
@@ -61,36 +119,49 @@ template <typename In, typename Out>
 
 
 ////////////////////////////////////////////////////////////
-/// Number of trailing continuation bytes for each possible UTF-8
-/// lead byte. ASCII (`0x00`-`0x7F`) and stray continuation bytes
-/// (`0x80`-`0xBF`) map to `0`; lead bytes `0xC0`-`0xDF` map to
-/// `1`, `0xE0`-`0xEF` to `2`, etc.
+/// First-byte prefix for an n-byte UTF-8 sequence (indexed by the byte count, 1-4).
+///
 ////////////////////////////////////////////////////////////
-inline constexpr za::U8 utf8TrailingBytes[256] =
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-     1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5};
+inline constexpr za::U8 utf8FirstBytes[5] = {0x00, 0x00, 0xC0, 0xE0, 0xF0};
 
 
 ////////////////////////////////////////////////////////////
-/// Magic-constant offsets, indexed by `utf8TrailingBytes[leadByte]`,
-/// that recover the codepoint value once the input bytes have been
-/// folded into a single 32-bit accumulator. Derived from the standard
-/// CVTUTF algorithm.
+/// \brief Decode one UTF-16 character (possibly a surrogate pair) from a non-empty `[begin, end)`
+///
+/// Unpaired surrogates yield `replacement`. A high surrogate followed by
+/// anything but a low surrogate consumes only itself, so that the next
+/// unit is decoded on its own (instead of being swallowed).
+///
+/// Also used for `wchar_t` sequences on platforms where `wchar_t` is 16-bit (UTF-16).
+///
 ////////////////////////////////////////////////////////////
-inline constexpr za::U32 utf8DecodeOffsets[6] =
-    {0x00'00'00'00, 0x00'00'30'80, 0x00'0E'20'80, 0x03'C8'20'80, 0xFA'08'20'80, 0x82'08'20'80};
+template <typename In>
+[[nodiscard, gnu::always_inline]] inline In decodeUtf16Impl(In begin, const In end, char32_t& output, const char32_t replacement)
+{
+    const auto first = static_cast<za::U32>(static_cast<char16_t>(*begin++));
 
+    if ((first & 0xFC'00u) == 0xD8'00u) // High surrogate: must be followed by a low surrogate
+    {
+        if (begin != end)
+        {
+            const auto second = static_cast<za::U32>(static_cast<char16_t>(*begin));
 
-////////////////////////////////////////////////////////////
-/// First-byte prefix for an n-byte UTF-8 sequence (indexed by
-/// the byte count, 1-4 in practice).
-////////////////////////////////////////////////////////////
-inline constexpr za::U8 utf8FirstBytes[7] = {0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC};
+            if ((second & 0xFC'00u) == 0xDC'00u)
+            {
+                ++begin;
+                output = ((first - 0xD8'00u) << 10) + (second - 0xDC'00u) + 0x1'00'00u;
+                return begin;
+            }
+        }
+
+        output = replacement;
+        return begin;
+    }
+
+    // A low surrogate cannot come first
+    output = (first & 0xFC'00u) == 0xDC'00u ? replacement : static_cast<char32_t>(first);
+    return begin;
+}
 
 
 ////////////////////////////////////////////////////////////
@@ -102,42 +173,57 @@ template <typename In, typename Facet>
 
 
 ////////////////////////////////////////////////////////////
+/// \brief Decode a single `wchar_t` unit, without combining UTF-16 surrogate pairs
+///
+////////////////////////////////////////////////////////////
 template <typename In>
-[[nodiscard, gnu::always_inline]] inline char32_t decodeWideImpl(In input)
+[[nodiscard, gnu::always_inline]] inline char32_t decodeWideUnitImpl(In input)
 {
-    // wchar_t encoding is platform-defined: UCS-2 on Windows, UCS-4 on Unix.
-    // A direct cast works for both (UCS-2 is a subset of UCS-4, UCS-4 *is* UTF-32).
     return static_cast<char32_t>(input);
 }
 
 
 ////////////////////////////////////////////////////////////
-template <typename Out, typename Facet>
-[[gnu::always_inline]] inline Out encodeAnsiImpl(char32_t codepoint, Out output, char replacement, const Facet& facet)
+/// \brief Decode one character from a non-empty `wchar_t` sequence
+///
+/// `wchar_t` holds UTF-16 on platforms where it is 16-bit (Windows), and
+/// UTF-32 where it is 32-bit. Invalid input yields `replacement`.
+///
+////////////////////////////////////////////////////////////
+template <typename In>
+[[nodiscard, gnu::always_inline]] inline In decodeWideImpl(In begin, const In end, char32_t& output, const char32_t replacement)
 {
-    *output++ = facet.narrow(static_cast<wchar_t>(codepoint), replacement);
-    return output;
+    if constexpr (sizeof(wchar_t) == 2)
+    {
+        return decodeUtf16Impl(begin, end, output, replacement);
+    }
+    else
+    {
+        const auto codepoint = static_cast<char32_t>(*begin++);
+        output               = isValidCodepoint(codepoint) ? codepoint : replacement;
+        return begin;
+    }
 }
 
 
 ////////////////////////////////////////////////////////////
-template <typename Out>
-[[gnu::always_inline]] inline Out encodeWideImpl(char32_t codepoint, Out output, wchar_t replacement)
+/// \brief Narrow a codepoint to ANSI through `facet`
+///
+/// Codepoints that are invalid, or that `wchar_t` cannot hold (above
+/// U+FFFF where it is 16-bit), are substituted with `replacement` rather
+/// than truncated into another character. Unrepresentable codepoints are
+/// skipped if `replacement` is `0`.
+///
+////////////////////////////////////////////////////////////
+template <typename Out, typename Facet>
+[[gnu::always_inline]] inline Out encodeAnsiImpl(const char32_t codepoint, Out output, const char replacement, const Facet& facet)
 {
-    // For UCS-4 platforms (Unix), every valid codepoint fits in `wchar_t`.
-    // For UCS-2 platforms (Windows), only the BMP fits; non-BMP codepoints
-    // (and surrogates themselves) are replaced or dropped.
-    if constexpr (sizeof(wchar_t) == 4)
-    {
-        *output++ = static_cast<wchar_t>(codepoint);
-    }
-    else
-    {
-        if ((codepoint <= 0xFF'FF) && ((codepoint < 0xD8'00) || (codepoint > 0xDF'FF)))
-            *output++ = static_cast<wchar_t>(codepoint);
-        else if (replacement)
-            *output++ = replacement;
-    }
+    const bool fitsInWchar = isValidCodepoint(codepoint) && (sizeof(wchar_t) == 4 || codepoint <= 0xFF'FFu);
+    const char narrowed    = fitsInWchar ? facet.narrow(static_cast<wchar_t>(codepoint), replacement) : replacement;
+
+    // `narrow` returns `replacement` for unrepresentable characters (a genuine U+0000 is kept)
+    if (narrowed != '\0' || codepoint == 0u)
+        *output++ = narrowed;
 
     return output;
 }
@@ -147,10 +233,9 @@ template <typename Out>
 /// \brief Encode a single codepoint into a raw 4-byte buffer
 ///
 /// Returns the number of bytes actually written (1-4), or `0` if
-/// the codepoint is invalid (outside Unicode range or a high
-/// surrogate). The buffer must have room for at least 4 bytes;
-/// only the first `result` bytes are written, the remainder is
-/// untouched.
+/// the codepoint is invalid (outside Unicode range or a surrogate).
+/// The buffer must have room for at least 4 bytes; only the first
+/// `result` bytes are written, the remainder is untouched.
 ///
 /// Used directly by `Utf8String::appendCodepoint` to skip the
 /// `BackInserter` per-byte function-call chain when the caller
@@ -159,25 +244,14 @@ template <typename Out>
 ////////////////////////////////////////////////////////////
 [[nodiscard, gnu::always_inline]] inline za::SizeT encodeCodepointToBuffer(char32_t input, char out[4]) noexcept
 {
-    if ((input > 0x00'10'FF'FF) || ((input >= 0xD8'00) && (input <= 0xDB'FF))) [[unlikely]]
-        return 0u; // Invalid codepoint: outside Unicode range or a high surrogate.
+    if (!isValidCodepoint(input)) [[unlikely]]
+        return 0u;
 
-    // Compute byte count from codepoint magnitude.
-    za::SizeT bytestoWrite = 1;
-    if (input < 0x80)
-        bytestoWrite = 1;
-    else if (input < 0x8'00)
-        bytestoWrite = 2;
-    else if (input < 0x1'00'00)
-        bytestoWrite = 3;
-    else if (input <= 0x00'10'FF'FF)
-        bytestoWrite = 4;
+    const za::SizeT bytesToWrite = input < 0x80u ? 1u : input < 0x8'00u ? 2u : input < 0x1'00'00u ? 3u : 4u;
 
     // Lay down the bytes from least-significant onwards, then prefix the
     // lead byte. Each continuation byte takes 6 bits of payload.
-    // `utf8FirstBytes` lives in `za::priv` (one `.rodata` copy across
-    // all instantiations).
-    switch (bytestoWrite)
+    switch (bytesToWrite)
     {
         case 4:
             out[3] = static_cast<char>((input | 0x80) & 0xBF);
@@ -192,10 +266,10 @@ template <typename Out>
             input >>= 6;
             [[fallthrough]];
         case 1:
-            out[0] = static_cast<char>(input | utf8FirstBytes[bytestoWrite]);
+            out[0] = static_cast<char>(input | utf8FirstBytes[bytesToWrite]);
     }
 
-    return bytestoWrite;
+    return bytesToWrite;
 }
 
 
@@ -209,47 +283,39 @@ template <typename Out>
 [[gnu::always_inline]] inline Out encodeUtf8Impl(char32_t input, Out output, za::U8 replacement)
 {
     char       buf[4];
-    const auto bytestoWrite = encodeCodepointToBuffer(input, buf);
+    const auto bytesToWrite = encodeCodepointToBuffer(input, buf);
 
-    if (bytestoWrite == 0u) [[unlikely]]
+    if (bytesToWrite == 0u) [[unlikely]]
     {
         // Invalid codepoint: emit replacement byte if requested, otherwise drop.
         if (replacement)
-            *output++ = static_cast<typename Out::container_type::value_type>(replacement);
+            *output++ = static_cast<UtfOutputElementType<Out>>(replacement);
 
         return output;
     }
 
-    return copyBits(buf, buf + bytestoWrite, output);
+    return copyBits(buf, buf + bytesToWrite, output);
 }
 
 
 ////////////////////////////////////////////////////////////
-/// \brief Raw UTF-16 encoder (used by `za::Utf<16>::encode` and by
-///        UTF-8 → UTF-16 / UTF-32 → UTF-16 conversion bodies).
+/// \brief Raw UTF-16 encoder (used by `za::Utf<16>::encode`, by
+///        UTF-8 → UTF-16 / UTF-32 → UTF-16 conversion bodies, and for
+///        16-bit `wchar_t`).
 ///
 ////////////////////////////////////////////////////////////
 template <typename Out>
 [[gnu::always_inline]] inline Out encodeUtf16Impl(char32_t input, Out output, char16_t replacement)
 {
-    if (input <= 0xFF'FF)
+    if (!isValidCodepoint(input))
     {
-        if ((input >= 0xD8'00) && (input <= 0xDF'FF))
-        {
-            // Reserved surrogate range -- not a valid codepoint.
-            if (replacement)
-                *output++ = replacement;
-        }
-        else
-        {
-            *output++ = static_cast<char16_t>(input);
-        }
-    }
-    else if (input > 0x00'10'FF'FF)
-    {
-        // Above the Unicode maximum.
+        // Surrogate, or above the Unicode maximum.
         if (replacement)
             *output++ = replacement;
+    }
+    else if (input <= 0xFF'FF)
+    {
+        *output++ = static_cast<char16_t>(input);
     }
     else
     {
@@ -262,6 +328,30 @@ template <typename Out>
     return output;
 }
 
+
+////////////////////////////////////////////////////////////
+/// \brief Encode a codepoint as `wchar_t`: UTF-16 where it is 16-bit (Windows), UTF-32 where it is 32-bit
+///
+/// Invalid codepoints are replaced with `replacement`, or dropped if it is `0`.
+///
+////////////////////////////////////////////////////////////
+template <typename Out>
+[[gnu::always_inline]] inline Out encodeWideImpl(char32_t codepoint, Out output, wchar_t replacement)
+{
+    if constexpr (sizeof(wchar_t) == 2)
+    {
+        return encodeUtf16Impl(codepoint, output, static_cast<char16_t>(replacement));
+    }
+    else
+    {
+        if (isValidCodepoint(codepoint))
+            *output++ = static_cast<wchar_t>(codepoint);
+        else if (replacement)
+            *output++ = replacement;
+
+        return output;
+    }
+}
 
 } // namespace za::priv
 
@@ -282,7 +372,12 @@ public:
     ////////////////////////////////////////////////////////////
     /// \brief Decode a single UTF-8 character into its Unicode codepoint
     ///
-    /// On an invalid or incomplete sequence, `output` is set to `replacement`.
+    /// Only well-formed UTF-8 is accepted: overlong encodings, encoded
+    /// surrogates, codepoints above U+10FFFF, stray continuation bytes, and
+    /// truncated sequences all set `output` to `replacement`. Following the
+    /// Unicode "maximal subpart" practice, an invalid sequence consumes only
+    /// its valid prefix (at least one byte), so a valid character that
+    /// follows it (e.g. the `'A'` in `C3 41`) is decoded on its own.
     ///
     /// **Precondition:** `begin != end`. Callers loop on `begin != end`
     /// (or `begin < end`) before invoking `decode`, so this is always
@@ -292,9 +387,8 @@ public:
     /// **ASCII fast path:** when the lead byte has the high bit clear,
     /// the codepoint equals the byte value and the iterator advances
     /// by one. UI text is overwhelmingly ASCII (whitespace, digits,
-    /// punctuation, Latin letters) even in localized strings, so we
-    /// hint the branch and skip the `trailing[]`/`offsets[]` table
-    /// loads entirely.
+    /// punctuation, Latin letters) even in localized strings, so the
+    /// branch is hinted as likely.
     ///
     /// \return Iterator past the last consumed input element
     ///
@@ -306,54 +400,74 @@ public:
 
         // ASCII fast path: a leading byte with the high bit clear is a
         // single-byte codepoint that equals the byte value (U+0000..U+007F).
-        // No table touch, no truncation check (none possible for 1 byte).
-        const auto firstByte = static_cast<za::U8>(*begin);
+        const auto firstByte = static_cast<za::U8>(*begin++);
         if (firstByte < 0x80u) [[likely]]
         {
             output = firstByte;
-            return ++begin;
+            return begin;
         }
 
-        // Slow path: multi-byte sequence (or stray continuation byte).
-        // Tables live in `za::priv` so they're shared across all
-        // template instantiations of `decode` (one `.rodata` copy
-        // instead of one per `In` type).
-        const auto trailingBytes = priv::utf8TrailingBytes[firstByte];
+        // Well-formed multi-byte sequences (Unicode Table 3-7). The valid range of the
+        // second byte depends on the lead byte: this rules out overlong encodings,
+        // surrogates (U+D800..U+DFFF), and codepoints above U+10FFFF.
+        za::SizeT length;
+        za::U8    low  = 0x80u; // valid range of the next continuation byte
+        za::U8    high = 0xBFu;
 
-        // The `trailing[]` table only produces values in [0, 5]; assert the
-        // invariant so GCC's value-range analysis can prove that the later
-        // `offsets[trailingBytes]` access stays in bounds (otherwise
-        // `-Warray-bounds` fires after the inline fast path makes the
-        // dataflow harder to track across instantiations).
-        if (trailingBytes > 5u)
-            ZA_UNREACHABLE();
-
-        if (trailingBytes < (end - begin)) [[likely]]
+        if (firstByte >= 0xC2u && firstByte <= 0xDFu)
         {
-            // Already consumed `firstByte` mentally; fold it in and shift,
-            // then add the trailing bytes one at a time. The switch falls
-            // through to accumulate (trailingBytes + 1) bytes total.
-            output = 0;
+            length = 2u;
+            output = firstByte & 0x1Fu;
+        }
+        else if (firstByte >= 0xE0u && firstByte <= 0xEFu)
+        {
+            length = 3u;
+            output = firstByte & 0x0Fu;
 
-            // clang-format off
-            switch (trailingBytes)
-            {
-                case 5: output += static_cast<za::U8>(*begin++); output <<= 6; [[fallthrough]];
-                case 4: output += static_cast<za::U8>(*begin++); output <<= 6; [[fallthrough]];
-                case 3: output += static_cast<za::U8>(*begin++); output <<= 6; [[fallthrough]];
-                case 2: output += static_cast<za::U8>(*begin++); output <<= 6; [[fallthrough]];
-                case 1: output += static_cast<za::U8>(*begin++); output <<= 6; [[fallthrough]];
-                case 0: output += static_cast<za::U8>(*begin++);
-            }
-            // clang-format on
+            if (firstByte == 0xE0u)
+                low = 0xA0u; // overlong
+            else if (firstByte == 0xEDu)
+                high = 0x9Fu; // surrogates
+        }
+        else if (firstByte >= 0xF0u && firstByte <= 0xF4u)
+        {
+            length = 4u;
+            output = firstByte & 0x07u;
 
-            output -= priv::utf8DecodeOffsets[trailingBytes];
+            if (firstByte == 0xF0u)
+                low = 0x90u; // overlong
+            else if (firstByte == 0xF4u)
+                high = 0x8Fu; // above U+10FFFF
         }
         else
         {
-            // Incomplete character at end of input -- consume the rest.
-            begin  = end;
+            // Stray continuation byte (0x80..0xBF), overlong lead (0xC0, 0xC1), or no longer valid lead (0xF5..0xFF)
             output = replacement;
+            return begin;
+        }
+
+        for (za::SizeT i = 1u; i < length; ++i)
+        {
+            // Truncated or broken sequence: replace the maximal invalid subpart consumed so far,
+            // without consuming the offending byte (which may start the next valid character)
+            if (begin == end)
+            {
+                output = replacement;
+                return begin;
+            }
+
+            const auto byte = static_cast<za::U8>(*begin);
+            if (byte < low || byte > high)
+            {
+                output = replacement;
+                return begin;
+            }
+
+            output = (output << 6) | (byte & 0x3Fu);
+            ++begin;
+
+            low  = 0x80u;
+            high = 0xBFu;
         }
 
         return begin;
@@ -443,8 +557,9 @@ public:
 
         while (begin != end)
         {
-            const char32_t codepoint = priv::decodeWideImpl(*begin++);
-            output                   = encode(codepoint, output, 0);
+            char32_t codepoint = 0;
+            begin              = priv::decodeWideImpl(begin, end, codepoint, priv::replacementCharacter);
+            output             = encode(codepoint, output, 0);
         }
 
         return output;
@@ -484,7 +599,7 @@ public:
         while (begin != end)
         {
             char32_t codepoint = 0;
-            begin              = decode(begin, end, codepoint, 0);
+            begin              = decode(begin, end, codepoint, priv::invalidCodepoint);
             output             = priv::encodeAnsiImpl(codepoint, output, replacement, facet);
         }
 
@@ -506,7 +621,7 @@ public:
         while (begin != end)
         {
             char32_t codepoint = 0;
-            begin              = decode(begin, end, codepoint, 0);
+            begin              = decode(begin, end, codepoint, priv::invalidCodepoint);
             output             = priv::encodeWideImpl(codepoint, output, replacement);
         }
 
@@ -529,7 +644,7 @@ public:
         while (begin != end)
         {
             char32_t codepoint = 0;
-            begin              = decode(begin, end, codepoint, 0);
+            begin              = decode(begin, end, codepoint, priv::invalidCodepoint);
             *output++          = codepoint < 256 ? static_cast<char>(codepoint) : replacement;
         }
 
@@ -563,7 +678,7 @@ public:
         while (begin != end)
         {
             char32_t codepoint = 0;
-            begin              = decode(begin, end, codepoint, 0);
+            begin              = decode(begin, end, codepoint, priv::replacementCharacter);
             output             = priv::encodeUtf16Impl(codepoint, output, char16_t{0});
         }
 
@@ -582,7 +697,7 @@ public:
         while (begin != end)
         {
             char32_t codepoint = 0;
-            begin              = decode(begin, end, codepoint, 0);
+            begin              = decode(begin, end, codepoint, priv::replacementCharacter);
             *output++          = codepoint;
         }
 
@@ -601,8 +716,9 @@ public:
     ////////////////////////////////////////////////////////////
     /// \brief Decode a single UTF-16 character into its Unicode codepoint
     ///
-    /// Handles surrogate pairs. On an invalid or incomplete sequence,
-    /// `output` is set to `replacement`.
+    /// Handles surrogate pairs. Unpaired surrogates set `output` to
+    /// `replacement`; a high surrogate that is not followed by a low
+    /// surrogate consumes only itself.
     ///
     /// \return Iterator past the last consumed input element
     ///
@@ -612,39 +728,7 @@ public:
     {
         static_assert(sizeof(decltype(*begin)) == sizeof(char16_t));
 
-        const char16_t first = *begin++;
-
-        // If it's a surrogate pair, first convert to a single UTF-32 character
-        if ((first >= 0xD8'00) && (first <= 0xDB'FF))
-        {
-            if (begin != end)
-            {
-                const za::U32 second = *begin++;
-                if ((second >= 0xDC'00) && (second <= 0xDF'FF))
-                {
-                    // The second element is valid: convert the two elements to a UTF-32 character
-                    output = ((first - 0xD8'00u) << 10) + (second - 0xDC'00) + 0x0'01'00'00;
-                }
-                else
-                {
-                    // Invalid character
-                    output = replacement;
-                }
-            }
-            else
-            {
-                // Invalid character
-                begin  = end;
-                output = replacement;
-            }
-        }
-        else
-        {
-            // We can make a direct copy
-            output = static_cast<char32_t>(first);
-        }
-
-        return begin;
+        return priv::decodeUtf16Impl(begin, end, output, replacement);
     }
 
 
@@ -733,8 +817,9 @@ public:
 
         while (begin != end)
         {
-            const char32_t codepoint = priv::decodeWideImpl(*begin++);
-            output                   = encode(codepoint, output, 0);
+            char32_t codepoint = 0;
+            begin              = priv::decodeWideImpl(begin, end, codepoint, priv::replacementCharacter);
+            output             = encode(codepoint, output, 0);
         }
 
         return output;
@@ -770,7 +855,7 @@ public:
         while (begin != end)
         {
             char32_t codepoint = 0;
-            begin              = decode(begin, end, codepoint, 0);
+            begin              = decode(begin, end, codepoint, priv::invalidCodepoint);
             output             = priv::encodeAnsiImpl(codepoint, output, replacement, facet);
         }
 
@@ -792,7 +877,7 @@ public:
         while (begin != end)
         {
             char32_t codepoint = 0;
-            begin              = decode(begin, end, codepoint, 0);
+            begin              = decode(begin, end, codepoint, priv::invalidCodepoint);
             output             = priv::encodeWideImpl(codepoint, output, replacement);
         }
 
@@ -810,12 +895,14 @@ public:
     {
         static_assert(sizeof(decltype(*begin)) == sizeof(char16_t));
 
-        // Latin-1 is directly compatible with Unicode encodings,
-        // and can thus be treated as (a sub-range of) UTF-32
+        // Latin-1 is directly compatible with Unicode encodings, and can thus be treated
+        // as (a sub-range of) UTF-32. Decode whole codepoints, so that a surrogate pair
+        // yields a single replacement.
         while (begin != end)
         {
-            *output++ = *begin < 256 ? static_cast<char>(*begin) : replacement;
-            ++begin;
+            char32_t codepoint = 0;
+            begin              = decode(begin, end, codepoint, priv::invalidCodepoint);
+            *output++          = codepoint < 256 ? static_cast<char>(codepoint) : replacement;
         }
 
         return output;
@@ -833,7 +920,7 @@ public:
         while (begin != end)
         {
             char32_t codepoint = 0;
-            begin              = decode(begin, end, codepoint, 0);
+            begin              = decode(begin, end, codepoint, priv::replacementCharacter);
             output             = Utf<8>::encode(codepoint, output, 0);
         }
 
@@ -868,7 +955,7 @@ public:
         while (begin != end)
         {
             char32_t codepoint = 0;
-            begin              = decode(begin, end, codepoint, 0);
+            begin              = decode(begin, end, codepoint, priv::replacementCharacter);
             *output++          = codepoint;
         }
 
@@ -892,14 +979,12 @@ public:
     ///
     ////////////////////////////////////////////////////////////
     template <typename In>
-    [[nodiscard, gnu::always_inline]] static In decode(In                        begin,
-                                                       [[maybe_unused]] In       end,
-                                                       char32_t&                 output,
-                                                       [[maybe_unused]] char32_t replacement)
+    [[nodiscard, gnu::always_inline]] static In decode(In begin, [[maybe_unused]] In end, char32_t& output, char32_t replacement)
     {
         static_assert(sizeof(decltype(*begin)) == sizeof(char32_t));
 
-        output = *begin++;
+        const auto codepoint = static_cast<char32_t>(*begin++);
+        output               = priv::isValidCodepoint(codepoint) ? codepoint : replacement;
         return begin;
     }
 
@@ -911,9 +996,13 @@ public:
     ///
     ////////////////////////////////////////////////////////////
     template <typename Out>
-    [[gnu::always_inline]] static Out encode(char32_t input, Out output, [[maybe_unused]] char32_t replacement)
+    [[gnu::always_inline]] static Out encode(char32_t input, Out output, char32_t replacement)
     {
-        *output++ = input;
+        if (priv::isValidCodepoint(input))
+            *output++ = input;
+        else if (replacement)
+            *output++ = replacement;
+
         return output;
     }
 
@@ -974,7 +1063,11 @@ public:
         static_assert(sizeof(decltype(*begin)) == sizeof(wchar_t));
 
         while (begin != end)
-            *output++ = decodeWide(*begin++);
+        {
+            char32_t codepoint = 0;
+            begin              = priv::decodeWideImpl(begin, end, codepoint, priv::replacementCharacter);
+            *output++          = codepoint;
+        }
 
         return output;
     }
@@ -1062,7 +1155,11 @@ public:
         static_assert(sizeof(decltype(*begin)) == sizeof(char32_t));
 
         while (begin != end)
-            output = Utf<8>::encode(*begin++, output, 0);
+        {
+            char32_t codepoint = 0;
+            begin              = decode(begin, end, codepoint, priv::replacementCharacter);
+            output             = Utf<8>::encode(codepoint, output, 0);
+        }
 
         return output;
     }
@@ -1077,7 +1174,11 @@ public:
         static_assert(sizeof(decltype(*begin)) == sizeof(char32_t));
 
         while (begin != end)
-            output = Utf<16>::encode(*begin++, output, 0);
+        {
+            char32_t codepoint = 0;
+            begin              = decode(begin, end, codepoint, priv::replacementCharacter);
+            output             = Utf<16>::encode(codepoint, output, 0);
+        }
 
         return output;
     }
@@ -1120,7 +1221,7 @@ public:
     template <typename In>
     [[nodiscard, gnu::always_inline]] static char32_t decodeWide(In input)
     {
-        return priv::decodeWideImpl(input);
+        return priv::decodeWideUnitImpl(input);
     }
 
     ////////////////////////////////////////////////////////////
