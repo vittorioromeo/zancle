@@ -7,8 +7,6 @@
 #include "Zancle/Concurrency/Atomic.hpp"
 #include "Zancle/Concurrency/Thread.hpp"
 
-#include "Zancle/Chrono/Time.hpp"
-
 #include "Zancle/Container/Vector.hpp"
 
 #include "Zancle/Base/Assert.hpp"
@@ -29,103 +27,64 @@ namespace za
 namespace
 {
 ////////////////////////////////////////////////////////////
-using TaskQueue              = moodycamel::BlockingConcurrentQueue<ThreadPool::Task>;
-using TaskQueueConsumerToken = moodycamel::ConsumerToken;
+using TaskQueue = moodycamel::BlockingConcurrentQueue<ThreadPool::Task>;
 
 
 ////////////////////////////////////////////////////////////
-class [[nodiscard]] Worker
+/// \brief Enqueue `count` copies of `task`, waking consumers with a single signal
+///
+////////////////////////////////////////////////////////////
+void enqueueCopies(TaskQueue& queue, const ThreadPool::Task& task, const SizeT count)
 {
-public:
-    ////////////////////////////////////////////////////////////
-    explicit Worker(TaskQueue& queue) noexcept :
-        m_queue{&queue},
-        m_ctok{queue},
-        m_state{State::Running},
-        m_doneBlockingProcessing{false}
+    // Minimal iterator for `enqueue_bulk` that yields `task` over and over
+    struct RepeatIterator
     {
-    }
+        const ThreadPool::Task* ptr;
 
-    ////////////////////////////////////////////////////////////
-    void start(za::Atomic<SizeT>& remainingInits)
-    {
-        m_thread = za::Thread{[this, &remainingInits]
+        [[nodiscard]] const ThreadPool::Task& operator*() const noexcept
         {
-            // Set the running flag and signal to the pool that we are initialized.
-            m_state.storeRelease(State::Running);
-            remainingInits.fetchSubRelease(1u);
+            return *ptr;
+        }
 
-            ThreadPool::Task taskBuffer;
+        RepeatIterator& operator++() noexcept
+        {
+            return *this;
+        }
 
-            while (m_state.loadAcquire() == State::Running)
-            {
-                m_queue->wait_dequeue(m_ctok, taskBuffer); // Blocking
-                taskBuffer();
-            }
-
-            // Signal the thread pool to send dummy final tasks.
-            ZA_ASSERT(m_state.loadAcquire() == State::Stopped);
-            m_doneBlockingProcessing.storeRelease(true);
-
-            while (m_state.loadAcquire() == State::Stopped)
-            {
-                if (!m_queue->try_dequeue(m_ctok, taskBuffer)) // Non-blocking
-                    break;                                     // No more tasks available
-
-                taskBuffer();
-            }
-        }};
-    }
-
-    ////////////////////////////////////////////////////////////
-    void stop() noexcept
-    {
-        ZA_ASSERT(m_state.loadAcquire() == State::Running);
-        m_state.storeRelease(State::Stopped);
-    }
-
-    ////////////////////////////////////////////////////////////
-    void join() noexcept
-    {
-        ZA_ASSERT(m_thread.joinable());
-        ZA_ASSERT(m_state.loadAcquire() == State::Stopped);
-
-        m_thread.join();
-    }
-
-    ////////////////////////////////////////////////////////////
-    [[nodiscard]] bool isDoneBlockingProcessing() const noexcept
-    {
-        return m_doneBlockingProcessing.loadAcquire();
-    }
-
-private:
-    ////////////////////////////////////////////////////////////
-    enum class [[nodiscard]] State : bool
-    {
-        Running, //!< The worker is dequeuing and accepting tasks in blocking mode
-        Stopped, //!< The worker is dequeuing and accepting tasks in non-blocking mode
+        RepeatIterator operator++(int) noexcept
+        {
+            return *this;
+        }
     };
 
-    ////////////////////////////////////////////////////////////
-    // Member data
-    ////////////////////////////////////////////////////////////
-    za::Thread             m_thread;                 //!< Worker thread
-    TaskQueue*             m_queue;                  //!< Pointer to queue
-    TaskQueueConsumerToken m_ctok;                   //!< Consumer token
-    za::Atomic<State>      m_state;                  //!< State (controlled both by the pool and internally)
-    za::Atomic<bool>       m_doneBlockingProcessing; //!< Worker is done processing tasks in blocking mode
-};
+    if (count == 0u)
+        return;
+
+    [[maybe_unused]] const bool enqueued = queue.enqueue_bulk(RepeatIterator{&task}, count);
+    ZA_ASSERT(enqueued);
+}
 
 } // namespace
 
 
 ////////////////////////////////////////////////////////////
+/// Shutdown protocol:
+///
+/// - An empty task is a "stop task". Users cannot post one (asserted).
+/// - The destructor posts one stop task per worker. A worker exits as soon
+///   as its main loop dequeues one, so each worker consumes exactly one,
+///   no matter how the tasks are distributed.
+/// - Stop tasks dequeued elsewhere (by `tryRunPendingTask`, e.g. from a
+///   `parallelFor` inside a task that runs during destruction) are put back.
+/// - After joining the workers, the destructor runs any remaining task
+///   (queued by other threads behind the stop tasks, or posted by tasks
+///   during shutdown) on the destroying thread.
+///
+////////////////////////////////////////////////////////////
 struct ThreadPool::Impl
 {
-    TaskQueue          queue;
-    za::Vector<Worker> workers;
-    za::Atomic<SizeT>  remainingInits;
+    TaskQueue              queue;
+    za::Vector<za::Thread> workers;
 };
 
 
@@ -134,54 +93,115 @@ ThreadPool::ThreadPool(const SizeT workerCount)
 {
     ZA_ASSERT(workerCount > 0u);
 
-    m_impl->workers.unsafeAllocateCapacity(workerCount);
+    m_impl->workers.reserve(workerCount);
 
     for (SizeT i = 0u; i < workerCount; ++i)
-        m_impl->workers.unsafeEmplaceBack(m_impl->queue);
+        m_impl->workers.emplaceBack([&queue = m_impl->queue]
+        {
+            moodycamel::ConsumerToken token{queue};
 
-    m_impl->remainingInits.storeRelaxed(workerCount);
+            while (true)
+            {
+                Task task; // destroyed right after running, releasing whatever it captured
+                queue.wait_dequeue(token, task);
 
-    for (Worker& w : m_impl->workers)
-        w.start(m_impl->remainingInits);
+                if (!task) [[unlikely]] // stop task
+                    return;
+
+                task();
+            }
+        });
 }
 
 
 ////////////////////////////////////////////////////////////
 ThreadPool::~ThreadPool()
 {
-    // Returns `true` if all workers have finished processing packets in a blocking manner.
-    const auto areAllWorkersDoneBlockingProcessing = [&]
-    {
-        for (const Worker& w : m_impl->workers)
-            if (!w.isDoneBlockingProcessing())
-                return false;
+    enqueueCopies(m_impl->queue, Task{}, m_impl->workers.size());
 
-        return true;
-    };
+    for (za::Thread& worker : m_impl->workers)
+        worker.join();
 
-    // Busy wait until all workers are initialized.
-    while (m_impl->remainingInits.loadAcquire() > 0u)
-        za::ThisThread::sleepFor(za::milliseconds(1));
-
-    // Signal all workers to exit their processing loops.
-    for (Worker& w : m_impl->workers)
-        w.stop();
-
-    // Post dummy tasks until all workers have exited their loops.
-    while (!areAllWorkersDoneBlockingProcessing())
-        post([] {});
-
-    // Join the workers' threads.
-    for (Worker& w : m_impl->workers)
-        w.join();
+    while (tryRunPendingTask())
+        ;
 }
 
 
 ////////////////////////////////////////////////////////////
 void ThreadPool::post(Task&& f)
 {
+    ZA_ASSERT(static_cast<bool>(f) && "cannot post an empty task");
+
     [[maybe_unused]] const bool enqueued = m_impl->queue.enqueue(ZA_MOVE(f));
     ZA_ASSERT(enqueued);
+}
+
+
+////////////////////////////////////////////////////////////
+void ThreadPool::postBulk(Task* const tasks, const SizeT count)
+{
+    ZA_ASSERT(count == 0u || tasks != nullptr);
+
+    // Minimal iterator for `enqueue_bulk` that moves from `tasks`
+    struct MoveIterator
+    {
+        Task* ptr;
+
+        [[nodiscard]] Task&& operator*() const noexcept
+        {
+            return static_cast<Task&&>(*ptr);
+        }
+
+        MoveIterator& operator++() noexcept
+        {
+            ++ptr;
+            return *this;
+        }
+
+        MoveIterator operator++(int) noexcept
+        {
+            return MoveIterator{ptr++};
+        }
+    };
+
+    if (count == 0u)
+        return;
+
+#ifdef ZA_DEBUG
+    for (SizeT i = 0u; i < count; ++i)
+        ZA_ASSERT(static_cast<bool>(tasks[i]) && "cannot post an empty task");
+#endif
+
+    [[maybe_unused]] const bool enqueued = m_impl->queue.enqueue_bulk(MoveIterator{tasks}, count);
+    ZA_ASSERT(enqueued);
+}
+
+
+////////////////////////////////////////////////////////////
+void ThreadPool::postCopies(const Task& task, const SizeT count)
+{
+    ZA_ASSERT((count == 0u || static_cast<bool>(task)) && "cannot post an empty task");
+    enqueueCopies(m_impl->queue, task, count);
+}
+
+
+////////////////////////////////////////////////////////////
+bool ThreadPool::tryRunPendingTask()
+{
+    Task task;
+
+    if (!m_impl->queue.try_dequeue(task))
+        return false;
+
+    if (!task) [[unlikely]]
+    {
+        // Stop task: it belongs to a worker's main loop (the pool is being destroyed)
+        m_impl->queue.enqueue(ZA_MOVE(task));
+        return false;
+    }
+
+    task();
+    return true;
 }
 
 
@@ -196,6 +216,14 @@ SizeT ThreadPool::getWorkerCount() const noexcept
 SizeT ThreadPool::getHardwareWorkerCount() noexcept
 {
     return static_cast<SizeT>(za::Thread::hardwareConcurrency());
+}
+
+
+////////////////////////////////////////////////////////////
+SizeT ThreadPool::getHardwareWorkerCountExcludingCallingThread() noexcept
+{
+    const SizeT hardwareThreads = getHardwareWorkerCount(); // `0` if unknown
+    return hardwareThreads > 1u ? hardwareThreads - 1u : 1u;
 }
 
 } // namespace za
