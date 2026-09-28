@@ -91,8 +91,8 @@ struct [[nodiscard]] Transform
     /// \param position World-space position
     /// \param scale    Per-axis scale factors
     /// \param origin   Origin of translation/rotation/scaling, in local space
-    /// \param sine     Sine of the rotation angle (must be in `[-1, 1]`)
-    /// \param cosine   Cosine of the rotation angle (must be in `[-1, 1]`)
+    /// \param sine     Sine of the rotation angle (in `[-1, 1]`, up to `za::sinCosLookupMaxMagnitude`)
+    /// \param cosine   Cosine of the rotation angle (in `[-1, 1]`, up to `za::sinCosLookupMaxMagnitude`)
     ///
     /// \return Transform that applies the requested translation, rotation, and scaling
     ///
@@ -104,8 +104,8 @@ struct [[nodiscard]] Transform
         const float sine,
         const float cosine)
     {
-        ZA_ASSERT_AND_ASSUME(sine >= -1.f && sine <= 1.f);
-        ZA_ASSERT_AND_ASSUME(cosine >= -1.f && cosine <= 1.f);
+        ZA_ASSERT_AND_ASSUME(sine >= -za::sinCosLookupMaxMagnitude && sine <= za::sinCosLookupMaxMagnitude);
+        ZA_ASSERT_AND_ASSUME(cosine >= -za::sinCosLookupMaxMagnitude && cosine <= za::sinCosLookupMaxMagnitude);
 
         const float sxc = scale.x * cosine;
         const float syc = scale.y * cosine;

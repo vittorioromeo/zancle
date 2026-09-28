@@ -101,8 +101,8 @@ private:
     {
         const auto [sine, cosine] = za::sinCosLookup(radians);
 
-        ZA_ASSERT_AND_ASSUME(sine >= -1.f && sine <= 1.f);
-        ZA_ASSERT_AND_ASSUME(cosine >= -1.f && cosine <= 1.f);
+        ZA_ASSERT_AND_ASSUME(sine >= -za::sinCosLookupMaxMagnitude && sine <= za::sinCosLookupMaxMagnitude);
+        ZA_ASSERT_AND_ASSUME(cosine >= -za::sinCosLookupMaxMagnitude && cosine <= za::sinCosLookupMaxMagnitude);
 
         return Transform::fromPositionScaleOriginSinCos(position, scale, origin, sine, cosine);
     }

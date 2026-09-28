@@ -48,8 +48,8 @@ namespace za::ShapeUtils
 {
     const auto [sine, cosine] = za::sinCosLookup(startRadians + static_cast<float>(index) * angleStep);
 
-    ZA_ASSERT_AND_ASSUME(sine >= -1.f && sine <= 1.f);
-    ZA_ASSERT_AND_ASSUME(cosine >= -1.f && cosine <= 1.f);
+    ZA_ASSERT_AND_ASSUME(sine >= -za::sinCosLookupMaxMagnitude && sine <= za::sinCosLookupMaxMagnitude);
+    ZA_ASSERT_AND_ASSUME(cosine >= -za::sinCosLookupMaxMagnitude && cosine <= za::sinCosLookupMaxMagnitude);
 
     // Winding is CW-visual in screen space (y-down) so that outline normals point inward:
     // `outlineThickness > 0` overlays the outline on top of the fill without growing the bounds.
@@ -326,8 +326,8 @@ namespace za::ShapeUtils
     const auto arcPointStep   = static_cast<float>(index - 1u);
     const auto [sine, cosine] = za::sinCosLookup(startAngle + arcPointStep * arcAngleStep);
 
-    ZA_ASSERT_AND_ASSUME(sine >= -1.f && sine <= 1.f);
-    ZA_ASSERT_AND_ASSUME(cosine >= -1.f && cosine <= 1.f);
+    ZA_ASSERT_AND_ASSUME(sine >= -za::sinCosLookupMaxMagnitude && sine <= za::sinCosLookupMaxMagnitude);
+    ZA_ASSERT_AND_ASSUME(cosine >= -za::sinCosLookupMaxMagnitude && cosine <= za::sinCosLookupMaxMagnitude);
 
     // Winding is CW-visual in screen space (y-down) so that outline normals point inward:
     // `outlineThickness > 0` overlays the outline on top of the fill without growing the bounds.
@@ -404,8 +404,8 @@ namespace za::ShapeUtils
 
     const auto [sine, cosine] = za::sinCosLookup(angle);
 
-    ZA_ASSERT_AND_ASSUME(sine >= -1.f && sine <= 1.f);
-    ZA_ASSERT_AND_ASSUME(cosine >= -1.f && cosine <= 1.f);
+    ZA_ASSERT_AND_ASSUME(sine >= -za::sinCosLookupMaxMagnitude && sine <= za::sinCosLookupMaxMagnitude);
+    ZA_ASSERT_AND_ASSUME(cosine >= -za::sinCosLookupMaxMagnitude && cosine <= za::sinCosLookupMaxMagnitude);
 
     // Use outerRadius for centering consistently, like circle/ellipse
     return {outerRadius + radius * cosine, outerRadius + radius * sine};
@@ -460,8 +460,8 @@ namespace za::ShapeUtils
 
     const auto [sine, cosine] = za::sinCosLookup(startRadians + static_cast<float>(index) * angleStep);
 
-    ZA_ASSERT_AND_ASSUME(sine >= -1.f && sine <= 1.f);
-    ZA_ASSERT_AND_ASSUME(cosine >= -1.f && cosine <= 1.f);
+    ZA_ASSERT_AND_ASSUME(sine >= -za::sinCosLookupMaxMagnitude && sine <= za::sinCosLookupMaxMagnitude);
+    ZA_ASSERT_AND_ASSUME(cosine >= -za::sinCosLookupMaxMagnitude && cosine <= za::sinCosLookupMaxMagnitude);
 
     // Local center of the ring
     const Vec2f localCenter{outerRadius, outerRadius};

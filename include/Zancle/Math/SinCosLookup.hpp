@@ -140,6 +140,27 @@ extern const SinTable sinTable;
 } // namespace za::priv
 
 
+namespace za
+{
+////////////////////////////////////////////////////////////
+/// \brief Upper bound of the magnitude of `sinLookup`, `cosLookup`, and `sinCosLookup` results
+///
+/// The first-order correction slightly overshoots near the peaks of the
+/// sine and cosine: results can exceed `1` in magnitude by about `1.2e-6`
+/// (e.g. `1.0000012f`), for any angle. With table entries `s` and `c` at
+/// the same angle and a correction `|d| < sinTableStep`, `|s + d * c|` is
+/// at most `sqrt(1 + d^2) < 1 + d^2 / 2`; this bound leaves room for rounding.
+///
+/// Clamping the results would cost ~30-75% of the lookup time, so code
+/// that requires `[-1, 1]` should validate against this bound instead,
+/// or clamp by itself.
+///
+////////////////////////////////////////////////////////////
+inline constexpr float sinCosLookupMaxMagnitude = 1.f + priv::sinTableStep * priv::sinTableStep;
+
+} // namespace za
+
+
 ////////////////////////////////////////////////////////////
 // Macros rather than functions, to minimize stack traffic in unoptimized builds.
 //
@@ -168,7 +189,8 @@ namespace za
 /// correction, using the same table for the derivative. The maximum
 /// absolute error is about `1.3e-6` in `[-2*Pi, 2*Pi]` and `1.5e-6` in
 /// `[-4*Pi, 4*Pi]`; like any `float` function, precision degrades as
-/// `|radians|` grows. Multiples of `Pi/2` (e.g. `za::halfPi * 3.f`) yield
+/// `|radians|` grows. Near the peaks, results can slightly exceed `1` in
+/// magnitude (see `sinCosLookupMaxMagnitude`). Multiples of `Pi/2` (e.g. `za::halfPi * 3.f`) yield
 /// exact results. Constant-evaluated calls return the same values as
 /// runtime calls, up to last-bit differences when the compiler contracts
 /// the correction into FMA instructions (e.g. on ARM64).

@@ -160,6 +160,17 @@ TEST_CASE("[Graphics] za::Transformable")
         CHECK(transformable.rotation == Approx(za::degrees(340)));
     }
 
+    SECTION("Rotation near a quarter turn (lookup overshoot)")
+    {
+        // `sinCosLookup(1.57007849f)` returns a sine of `1.00000012f`: `getTransform` used to fail an
+        // assertion requiring `[-1, 1]` (e.g. crashing the batching example at startup)
+        TestTransformable transformable;
+        transformable.rotation = za::radians(1.57007849f);
+
+        const za::Transform transform = transformable.getTransform();
+        CHECK(transform.transformPoint({1.f, 0.f}) == Approx(za::Vec2f{0.f, 1.f}));
+    }
+
     SECTION("scaleBy()")
     {
         TestTransformable transformable;

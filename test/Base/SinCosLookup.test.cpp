@@ -6,6 +6,7 @@
 #include "Zancle/Math/Cos.hpp"
 #include "Zancle/Math/Fabs.hpp"
 #include "Zancle/Math/Fmax.hpp"
+#include "Zancle/Math/Nextafter.hpp"
 #include "Zancle/Math/Sin.hpp"
 
 #include "Zancle/Base/Signbit.hpp"
@@ -184,5 +185,33 @@ TEST_CASE("[Base] Base/SinCosLookup.hpp")
         CHECK(maxError(za::tau, 200'000) < 1.5e-6);
         CHECK(maxError(2.f * za::tau, 200'000) < 2e-6);
         CHECK(maxError(100.f, 200'000) < 1.5e-5);
+    }
+
+    SECTION("Results never exceed `sinCosLookupMaxMagnitude`")
+    {
+        // Every `float` angle in `[-2*Pi, 2*Pi]`, plus a coarser sweep up to large angles
+        const auto maxMagnitude = [](const float from, const float to, const int stride)
+        {
+            float result = 0.f;
+
+            for (float x = from; x < to;)
+            {
+                const auto [sine, cosine] = za::sinCosLookup(x);
+
+                result = za::fmax(result, za::fmax(za::fabs(sine), za::fabs(cosine)));
+                result = za::fmax(result, za::fmax(za::fabs(za::sinLookup(x)), za::fabs(za::cosLookup(x))));
+
+                for (int i = 0; i < stride; ++i)
+                    x = za::nextafter(x, to);
+            }
+
+            return result;
+        };
+
+        const float nearPeaks = maxMagnitude(-za::tau, za::tau, 1);
+        CHECK(nearPeaks > 1.f); // documented overshoot
+        CHECK(nearPeaks <= za::sinCosLookupMaxMagnitude);
+
+        CHECK(maxMagnitude(-100'000.f, 100'000.f, 64) <= za::sinCosLookupMaxMagnitude);
     }
 }
