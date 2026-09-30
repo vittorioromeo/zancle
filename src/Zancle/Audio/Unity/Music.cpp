@@ -168,7 +168,7 @@ struct Music::Impl
     ////////////////////////////////////////////////////////////
     // Lifetime tracking
     ////////////////////////////////////////////////////////////
-    ZA_DEFINE_LIFETIME_DEPENDANT(MusicReader);
+    ZA_LIFETIME_DEPENDS_ON(MusicReader); // `Music` depends on `MusicReader`
 };
 
 
@@ -176,7 +176,7 @@ struct Music::Impl
 Music::Music(PlaybackDevice& playbackDevice, MusicReader& musicReader, const AudioSettings& audioSettings) :
     m_impl(playbackDevice, musicReader, *this)
 {
-    ZA_UPDATE_LIFETIME_DEPENDANT(MusicReader, Music, (&*m_impl), (&m_impl->stream.state().musicReader));
+    ZA_LIFETIME_UPDATE_DEPENDENCY(&*m_impl, MusicReader, &m_impl->stream.state().musicReader);
     applyAudioSettings(audioSettings);
 }
 

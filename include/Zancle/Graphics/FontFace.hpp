@@ -285,7 +285,7 @@ private:
     ////////////////////////////////////////////////////////////
     // Lifetime tracking
     ////////////////////////////////////////////////////////////
-    ZA_DEFINE_LIFETIME_DEPENDEE(FontFace, GlyphMappedText);
+    ZA_LIFETIME_DEPENDED_ON_BY(FontFace, GlyphMappedText); // `FontFace` is depended on by `GlyphMappedText`
 };
 
 } // namespace za

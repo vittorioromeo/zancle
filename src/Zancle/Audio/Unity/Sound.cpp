@@ -164,7 +164,7 @@ struct Sound::Impl
 Sound::Sound(PlaybackDevice& playbackDevice, const SoundBuffer& buffer, const AudioSettings& audioSettings) :
     m_impl(playbackDevice, *this, buffer)
 {
-    ZA_UPDATE_LIFETIME_DEPENDANT(SoundBuffer, Sound, this, (&m_impl->buffer));
+    ZA_LIFETIME_UPDATE_DEPENDENCY(this, SoundBuffer, &m_impl->buffer);
     applyAudioSettings(audioSettings);
 }
 
@@ -178,7 +178,7 @@ Sound::Sound(PlaybackDevice& playbackDevice, const SoundBuffer& buffer) : Sound{
 ////////////////////////////////////////////////////////////
 Sound::~Sound()
 {
-    ZA_LIFETIME_DEPENDANT_RETURN_IF_TESTING_ERROR(SoundBuffer);
+    ZA_LIFETIME_RETURN_IF_TESTING_ERROR(SoundBuffer);
 
     // TODO P1: revisit?
     // Stop the sound before `Impl` begins tearing down, otherwise the audio

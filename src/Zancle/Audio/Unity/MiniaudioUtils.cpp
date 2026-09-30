@@ -110,7 +110,7 @@ MiniaudioUtils::SoundBase::SoundBase(PlaybackDevice&   thePlaybackDevice,
     dataSourceBase{}, // must be first member!
     playbackDevice(&thePlaybackDevice)
 {
-    ZA_UPDATE_LIFETIME_DEPENDANT(PlaybackDevice, SoundBase, this, playbackDevice);
+    ZA_LIFETIME_UPDATE_DEPENDENCY(this, PlaybackDevice, playbackDevice);
 
     setChannelMap(channelMap);
 

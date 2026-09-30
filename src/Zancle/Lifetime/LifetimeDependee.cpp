@@ -18,10 +18,9 @@
     #include "Zancle/Base/Assert.hpp"
     #include "Zancle/Base/Launder.hpp"
     #include "Zancle/Base/PlacementNew.hpp"
+    #include "Zancle/Base/SizeT.hpp"
     #include "Zancle/Base/StackTrace.hpp"
     #include "Zancle/Base/Strcmp.hpp"
-
-    #include <cctype>
 
 
 using AtomicUInt = za::Atomic<unsigned int>;
@@ -136,21 +135,25 @@ LifetimeDependee::~LifetimeDependee()
     if (finalCount == 0u)
         return;
 
+    // Names are C++ identifiers: ASCII lowercasing is enough
     const auto toLowerStr = [](za::String s)
     {
         for (char& c : s)
-            c = static_cast<char>(std::tolower(c));
+            if (c >= 'A' && c <= 'Z')
+                c = static_cast<char>(c - 'A' + 'a');
 
         return s;
     };
 
-    const auto toTildes = [](za::String s)
+    // Underline for `s`, following a `^` marking its first character
+    const auto toTildes = [](const za::String& s)
     {
-        for (char& c : s)
-            c = '~';
+        za::String result;
 
-        s[s.size() - 1] = '\0';
-        return s;
+        for (za::SizeT i = 1u; i < s.size(); ++i)
+            result += '~';
+
+        return result;
     };
 
     const auto dependeeNameLower  = toLowerStr(m_dependeeName);

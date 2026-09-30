@@ -40,31 +40,59 @@ private:
 
 } // namespace za::priv
 
+    ////////////////////////////////////////////////////////////
+    /// \brief Declare that the enclosing class depends on a `dependeeType` object
+    ///
+    /// Reads as a sentence: `ZA_LIFETIME_DEPENDS_ON(Font)` in `Text` means
+    /// "`Text` depends on `Font`". Once per dependee type.
+    ///
+    ////////////////////////////////////////////////////////////
     // NOLINTBEGIN(bugprone-macro-parentheses)
-    #define ZA_DEFINE_LIFETIME_DEPENDANT(dependantType)                                \
-        mutable ::za::priv::LifetimeDependant m_sfPrivLifetimeDependant##dependantType \
-        {                                                                              \
-            #dependantType                                                             \
+    #define ZA_LIFETIME_DEPENDS_ON(dependeeType)                                         \
+        mutable ::za::priv::LifetimeDependant m_zaPrivLifetimeDependencyOn##dependeeType \
+        {                                                                                \
+            #dependeeType                                                                \
         }
 
-    #define ZA_UPDATE_LIFETIME_DEPENDANT(dependantType, dependeeType, thisPtr, dependantMemberPtr) \
-        thisPtr->m_sfPrivLifetimeDependant##dependantType.update(                                  \
-            dependantMemberPtr == nullptr ? nullptr : &dependantMemberPtr->m_sfPrivLifetimeDependee##dependeeType)
+    ////////////////////////////////////////////////////////////
+    /// \brief Make `*objectPtr` depend on `*dependeePtr` (a `dependeeType`), or on nothing if null
+    ///
+    /// Must be used after every change of the pointer to the dependee,
+    /// e.g. `ZA_LIFETIME_UPDATE_DEPENDENCY(this, Font, m_font)`.
+    ///
+    ////////////////////////////////////////////////////////////
+    #define ZA_LIFETIME_UPDATE_DEPENDENCY(objectPtr, dependeeType, dependeePtr) \
+        (objectPtr)->m_zaPrivLifetimeDependencyOn##dependeeType.update(         \
+            (dependeePtr) == nullptr ? nullptr : &(dependeePtr)->m_zaPrivLifetimeDependee)
 
-    #define ZA_LIFETIME_DEPENDANT_RETURN_IF_TESTING_ERROR(dependeeType)                \
-        do                                                                             \
-        {                                                                              \
-            if (m_sfPrivLifetimeDependant##dependeeType.isTestingModeErrorTriggered()) \
-                return;                                                                \
+    ////////////////////////////////////////////////////////////
+    /// \brief In testing mode, return if the `dependeeType` object was destroyed too early
+    ///
+    /// Use at the start of dependant destructors that access their dependee.
+    ///
+    ////////////////////////////////////////////////////////////
+    #define ZA_LIFETIME_RETURN_IF_TESTING_ERROR(dependeeType)                             \
+        do                                                                                \
+        {                                                                                 \
+            if (m_zaPrivLifetimeDependencyOn##dependeeType.isTestingModeErrorTriggered()) \
+                return;                                                                   \
         } while (false)
 // NOLINTEND(bugprone-macro-parentheses)
 
 #else // ZA_ENABLE_LIFETIME_TRACKING
 
-    #define ZA_DEFINE_LIFETIME_DEPENDANT(dependantType) static_assert(true)
+    #define ZA_LIFETIME_DEPENDS_ON(dependeeType) static_assert(true)
 
-    #define ZA_UPDATE_LIFETIME_DEPENDANT(...) (void)0
+    #define ZA_LIFETIME_UPDATE_DEPENDENCY(...) (void)0
 
-    #define ZA_LIFETIME_DEPENDANT_RETURN_IF_TESTING_ERROR(dependeeType) (void)0
+    #define ZA_LIFETIME_RETURN_IF_TESTING_ERROR(dependeeType) (void)0
 
 #endif // ZA_ENABLE_LIFETIME_TRACKING
+
+
+////////////////////////////////////////////////////////////
+/// \file
+///
+/// \brief Dependant side of lifetime tracking (see `Zancle/Lifetime/LifetimeDependee.hpp`)
+///
+////////////////////////////////////////////////////////////

@@ -180,7 +180,7 @@ private:
     ////////////////////////////////////////////////////////////
     // Lifetime tracking
     ////////////////////////////////////////////////////////////
-    ZA_DEFINE_LIFETIME_DEPENDEE(PlaybackDevice, SoundBase);
+    ZA_LIFETIME_DEPENDED_ON_BY(PlaybackDevice, SoundBase); // `PlaybackDevice` is depended on by `SoundBase`
 };
 
 } // namespace za

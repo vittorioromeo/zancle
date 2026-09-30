@@ -74,7 +74,7 @@ bool SoundRecorder::start(CaptureDevice& captureDevice, unsigned int sampleRate)
     }
 
     m_lastCaptureDevice = &captureDevice;
-    ZA_UPDATE_LIFETIME_DEPENDANT(CaptureDevice, SoundRecorder, this, m_lastCaptureDevice);
+    ZA_LIFETIME_UPDATE_DEPENDENCY(this, CaptureDevice, m_lastCaptureDevice);
 
     return true;
 }

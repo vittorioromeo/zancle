@@ -65,8 +65,16 @@ LifetimeDependant& LifetimeDependant::operator=(const LifetimeDependant& rhs) no
 ////////////////////////////////////////////////////////////
 LifetimeDependant& LifetimeDependant::operator=(LifetimeDependant&& rhs) noexcept
 {
+    if (&rhs == this)
+        return *this;
+
+    subSelfAsDependant();
+
+    // Take over `rhs`'s registration, as the move constructor does
     m_dependeeName = rhs.m_dependeeName;
     m_dependee     = rhs.m_dependee;
+    rhs.m_dependee = nullptr;
+
     return *this;
 }
 

@@ -273,7 +273,7 @@ private:
     ////////////////////////////////////////////////////////////
     // Lifetime tracking
     ////////////////////////////////////////////////////////////
-    ZA_DEFINE_LIFETIME_DEPENDEE(SoundBuffer, Sound);
+    ZA_LIFETIME_DEPENDED_ON_BY(SoundBuffer, Sound); // `SoundBuffer` is depended on by `Sound`
 };
 
 } // namespace za

@@ -195,7 +195,7 @@ struct ZA_GRAPHICS_API GlyphMapping
     ////////////////////////////////////////////////////////////
     // Lifetime tracking
     ////////////////////////////////////////////////////////////
-    ZA_DEFINE_LIFETIME_DEPENDEE(GlyphMapping, GlyphMappedText);
+    ZA_LIFETIME_DEPENDED_ON_BY(GlyphMapping, GlyphMappedText); // `GlyphMapping` is depended on by `GlyphMappedText`
 };
 
 } // namespace za

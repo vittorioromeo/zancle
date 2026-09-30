@@ -120,7 +120,7 @@ struct SoundBase
     ////////////////////////////////////////////////////////////
     // Lifetime tracking
     ////////////////////////////////////////////////////////////
-    ZA_DEFINE_LIFETIME_DEPENDANT(PlaybackDevice);
+    ZA_LIFETIME_DEPENDS_ON(PlaybackDevice); // `SoundBase` depends on `PlaybackDevice`
 };
 
 } // namespace za::priv::MiniaudioUtils

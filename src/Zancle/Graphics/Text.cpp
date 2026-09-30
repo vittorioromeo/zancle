@@ -26,7 +26,7 @@ Text::Text(const Font& font, const Data& data) :
     m_outlineThickness(data.outlineThickness),
     m_bold(data.bold)
 {
-    ZA_UPDATE_LIFETIME_DEPENDANT(Font, Text, this, m_font);
+    ZA_LIFETIME_UPDATE_DEPENDENCY(this, Font, m_font);
 }
 
 
@@ -47,7 +47,7 @@ void Text::setFont(const Font& font)
     m_font               = &font;
     m_geometryNeedUpdate = true;
 
-    ZA_UPDATE_LIFETIME_DEPENDANT(Font, Text, this, m_font);
+    ZA_LIFETIME_UPDATE_DEPENDENCY(this, Font, m_font);
 }
 
 

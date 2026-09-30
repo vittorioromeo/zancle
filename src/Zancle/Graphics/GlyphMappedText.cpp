@@ -30,9 +30,9 @@ GlyphMappedText::GlyphMappedText(const FontFace&     fontFace,
     m_texture(&texture),
     m_glyphMapping(&glyphMapping)
 {
-    ZA_UPDATE_LIFETIME_DEPENDANT(FontFace, GlyphMappedText, this, m_fontFace);
-    ZA_UPDATE_LIFETIME_DEPENDANT(Texture, GlyphMappedText, this, m_texture);
-    ZA_UPDATE_LIFETIME_DEPENDANT(GlyphMapping, GlyphMappedText, this, m_glyphMapping);
+    ZA_LIFETIME_UPDATE_DEPENDENCY(this, FontFace, m_fontFace);
+    ZA_LIFETIME_UPDATE_DEPENDENCY(this, Texture, m_texture);
+    ZA_LIFETIME_UPDATE_DEPENDENCY(this, GlyphMapping, m_glyphMapping);
 }
 
 
@@ -61,9 +61,9 @@ void GlyphMappedText::setGlyphMapping(const FontFace& fontFace, const Texture& t
     m_glyphMapping       = &glyphMapping;
     m_geometryNeedUpdate = true;
 
-    ZA_UPDATE_LIFETIME_DEPENDANT(FontFace, GlyphMappedText, this, m_fontFace);
-    ZA_UPDATE_LIFETIME_DEPENDANT(Texture, GlyphMappedText, this, m_texture);
-    ZA_UPDATE_LIFETIME_DEPENDANT(GlyphMapping, GlyphMappedText, this, m_glyphMapping);
+    ZA_LIFETIME_UPDATE_DEPENDENCY(this, FontFace, m_fontFace);
+    ZA_LIFETIME_UPDATE_DEPENDENCY(this, Texture, m_texture);
+    ZA_LIFETIME_UPDATE_DEPENDENCY(this, GlyphMapping, m_glyphMapping);
 }
 
 

@@ -267,7 +267,7 @@ private:
     ////////////////////////////////////////////////////////////
     // Lifetime tracking
     ////////////////////////////////////////////////////////////
-    ZA_DEFINE_LIFETIME_DEPENDEE(CaptureDevice, SoundRecorder);
+    ZA_LIFETIME_DEPENDED_ON_BY(CaptureDevice, SoundRecorder); // `CaptureDevice` is depended on by `SoundRecorder`
 };
 
 } // namespace za

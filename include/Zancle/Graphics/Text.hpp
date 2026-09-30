@@ -256,7 +256,7 @@ private:
     ////////////////////////////////////////////////////////////
     // Lifetime tracking
     ////////////////////////////////////////////////////////////
-    ZA_DEFINE_LIFETIME_DEPENDANT(Font);
+    ZA_LIFETIME_DEPENDS_ON(Font); // `Text` depends on `Font`
 };
 
 } // namespace za

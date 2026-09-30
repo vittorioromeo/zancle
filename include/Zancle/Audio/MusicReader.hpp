@@ -269,7 +269,7 @@ private:
     ////////////////////////////////////////////////////////////
     // Lifetime tracking
     ////////////////////////////////////////////////////////////
-    ZA_DEFINE_LIFETIME_DEPENDEE(MusicReader, Music);
+    ZA_LIFETIME_DEPENDED_ON_BY(MusicReader, Music); // `MusicReader` is depended on by `Music`
 };
 
 } // namespace za
