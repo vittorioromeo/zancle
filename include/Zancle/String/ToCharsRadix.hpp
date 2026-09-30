@@ -8,10 +8,37 @@
 ////////////////////////////////////////////////////////////
 #include "Zancle/Vocabulary/Radix.hpp" // IWYU pragma: export
 
+#include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/Clzll.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
 #include "Zancle/Trait/IsIntegral.hpp"
+#include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/MakeUnsigned.hpp"
+
+
+namespace za::priv
+{
+////////////////////////////////////////////////////////////
+/// \brief Bits per digit of `radix` (every supported radix is a power of two), or `0` if `radix` is invalid
+///
+////////////////////////////////////////////////////////////
+[[nodiscard, gnu::always_inline]] constexpr unsigned int radixDigitBits(const Radix radix) noexcept
+{
+    switch (radix)
+    {
+        case Radix::Bin:
+            return 1u;
+        case Radix::Oct:
+            return 3u;
+        case Radix::Hex:
+            return 4u;
+    }
+
+    return 0u; // not one of the enumerators (e.g. `static_cast<Radix>(10)`)
+}
+
+} // namespace za::priv
 
 
 namespace za
@@ -28,7 +55,7 @@ namespace za
 /// digits are single ASCII characters and the flag is ignored.
 ///
 /// \return Pointer one past the last written character, or `nullptr` if the
-/// buffer is too small.
+/// buffer is too small (or `radix` is not a `Radix` enumerator).
 ///
 ////////////////////////////////////////////////////////////
 template <typename T>
@@ -37,35 +64,37 @@ template <typename T>
                                            const T           value,
                                            const Radix       radix,
                                            const bool        upperHex = false)
-    requires isIntegral<T>
+    requires(isIntegral<T> && !isSame<T, bool> && sizeof(T) <= sizeof(unsigned long long)) // no 128-bit integers
 {
-    // 64 chars covers up to a 64-bit value at `Radix::Bin` (the densest case).
-    char  tmp[64];
-    char* p = tmp + sizeof(tmp);
+    const unsigned int digitBits = priv::radixDigitBits(radix);
+    ZA_ASSERT(digitBits != 0u && "Invalid radix");
+
+    if (digitBits == 0u) [[unlikely]]
+        return nullptr;
 
     // Cast through the unsigned counterpart so a negative signed value is
     // re-interpreted as its two's-complement bit pattern.
-    using UT           = MakeUnsigned<T>;
-    auto       bits    = static_cast<UT>(value);
-    const auto divisor = static_cast<UT>(radix);
+    using UT        = MakeUnsigned<T>;
+    const auto bits = static_cast<unsigned long long>(static_cast<UT>(value));
+
+    // Every digit is a group of `digitBits` bits: the digit count follows from the top set bit
+    // (`| 1` so that zero is written as a single digit, and `clzll(0)` is avoided)
+    const auto significantBits = static_cast<unsigned int>(64 - ZA_CLZLL(bits | 1ull));
+    const auto n               = static_cast<SizeT>((significantBits + digitBits - 1u) / digitBits);
+
+    if (static_cast<SizeT>(last - first) < n)
+        return nullptr;
 
     constexpr char    digitsLo[] = "0123456789abcdef";
     constexpr char    digitsHi[] = "0123456789ABCDEF";
     const char* const lut        = upperHex ? digitsHi : digitsLo;
 
-    do
-    {
-        *--p = lut[bits % divisor];
-        bits = static_cast<UT>(bits / divisor);
-    } while (bits != 0u);
+    const unsigned long long digitMask = (1ull << digitBits) - 1u;
 
-    const auto n = static_cast<SizeT>((tmp + sizeof(tmp)) - p);
-
-    if (static_cast<SizeT>(last - first) < n)
-        return nullptr;
-
-    for (SizeT i = 0u; i < n; ++i)
-        first[i] = p[i];
+    // No divisions: shift and mask, writing straight into the output from its end
+    unsigned long long rest = bits;
+    for (char* p = first + n; p != first; rest >>= digitBits)
+        *--p = lut[rest & digitMask];
 
     return first + n;
 }

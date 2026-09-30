@@ -9,7 +9,9 @@
 #include "Zancle/Math/Rint.hpp"
 
 #include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/BitCast.hpp"
 #include "Zancle/Base/Clzll.hpp"
+#include "Zancle/Base/IntTypes.hpp"
 #include "Zancle/Base/IsInf.hpp"
 #include "Zancle/Base/IsNan.hpp"
 #include "Zancle/Base/Signbit.hpp"
@@ -114,6 +116,7 @@ template <typename T>
 [[nodiscard, gnu::always_inline, gnu::pure]] inline constexpr int decimalDigitCount(const T x) noexcept
 {
     static_assert(ZA_IS_UNSIGNED(T));
+    static_assert(sizeof(T) <= sizeof(unsigned long long), "128-bit integers are not supported");
 
     // Widen to 64-bit so a single `clzll`-based path covers every unsigned width.
     const unsigned long long n = x;
@@ -183,6 +186,70 @@ template <typename T>
     return end;
 }
 
+
+////////////////////////////////////////////////////////////
+/// \brief Write the decimal representation of a finite `double` that is at least `2^53` into `[first, last)`
+///
+/// Such values are integers (`mantissa * 2^exponent`), but may exceed the
+/// 64-bit range (up to `DBL_MAX`, 309 digits): they are printed exactly
+/// through a small base-`10^9` big integer.
+///
+/// \return Pointer one past the last written character, or `nullptr` if the buffer is too small.
+///
+////////////////////////////////////////////////////////////
+[[nodiscard]] constexpr char* largeDoubleToChars(char* const first, const char* const last, const double value)
+{
+    const auto bits     = ZA_BIT_CAST(za::U64, value);
+    const auto mantissa = (bits & ((za::U64{1} << 52) - 1u)) | (za::U64{1} << 52);
+    int        exponent = static_cast<int>((bits >> 52) & 0x7'FFu) - 1075; // `value == mantissa * 2^exponent`
+
+    ZA_ASSERT(exponent > 0 && exponent <= 971);
+
+    // Little-endian base-10^9 limbs: `DBL_MAX` has 309 digits, i.e. 35 limbs
+    constexpr za::U32 limbBase = 1'000'000'000u;
+
+    za::U32 limbs[36]{};
+    int     limbCount = 0;
+
+    for (za::U64 rest = mantissa; rest != 0u; rest /= limbBase)
+        limbs[limbCount++] = static_cast<za::U32>(rest % limbBase);
+
+    // Multiply by `2^exponent`, at most 2^29 at a time so that `limb * 2^29 + carry` fits in 64 bits
+    while (exponent > 0)
+    {
+        const int shift = exponent < 29 ? exponent : 29;
+        exponent -= shift;
+
+        za::U64 carry = 0u;
+        for (int i = 0; i < limbCount; ++i)
+        {
+            const za::U64 product = (za::U64{limbs[i]} << shift) + carry;
+            limbs[i]              = static_cast<za::U32>(product % limbBase);
+            carry                 = product / limbBase;
+        }
+
+        for (; carry != 0u; carry /= limbBase)
+            limbs[limbCount++] = static_cast<za::U32>(carry % limbBase);
+    }
+
+    // Most significant limb without leading zeros, then zero-padded 9-digit groups
+    char* p = unsignedToChars(first, last, limbs[limbCount - 1]);
+    if (p == nullptr || last - p < 9 * (limbCount - 1))
+        return nullptr;
+
+    for (int i = limbCount - 2; i >= 0; --i)
+    {
+        za::U32 group = limbs[i];
+
+        for (char* c = p + 9; c != p; group /= 10u)
+            *--c = static_cast<char>('0' + group % 10u);
+
+        p += 9;
+    }
+
+    return p;
+}
+
 } // namespace za::priv
 
 
@@ -196,7 +263,7 @@ namespace za
 ////////////////////////////////////////////////////////////
 template <typename T>
 [[nodiscard]] constexpr char* toChars(char* first, const char* const last, const T value)
-    requires isIntegral<T>
+    requires(isIntegral<T> && sizeof(T) <= sizeof(unsigned long long)) // no 128-bit integers
 {
     if constexpr (ZA_IS_SAME(T, bool))
     {
@@ -238,138 +305,135 @@ template <typename T>
 ////////////////////////////////////////////////////////////
 /// \brief Write a floating-point `value` into `[first, last)` with fixed `precision`.
 ///
-/// Matches `std::to_chars(..., chars_format::fixed, precision)` for finite values
-/// in the supported precision range. Special-value handling: `NaN` is written as
-/// `"nan"` (no sign), infinities as `"inf"` / `"-inf"`, negative zero preserves
-/// its sign (`"-0.00"`). Rounding uses the active FPU rounding mode (default:
-/// round-half-to-even, matching IEEE-754 and `std::to_chars`).
+/// Mirrors `std::to_chars(..., chars_format::fixed, precision)` for finite
+/// values, whatever their magnitude (up to `DBL_MAX`). Special-value handling:
+/// `NaN` is written as `"nan"` (no sign, unlike some standard libraries'
+/// `"-nan"`), infinities as `"inf"` / `"-inf"`, negative zero preserves its
+/// sign (`"-0.00"`). Rounding uses the active FPU rounding mode (default:
+/// round-half-to-even).
 ///
-/// \pre `precision >= 0 && precision <= 10`.
+/// `long double` values are formatted through `double`.
+///
+/// \pre `precision >= 0 && precision <= 10` (otherwise `nullptr` is returned).
 /// \pre `value` is finite when compiled with `-ffinite-math-only` (or
 ///      `-ffast-math`, which implies it). Under that flag the compiler may
 ///      legally fold `__builtin_isnan` / `__builtin_isinf` to `false`, so
 ///      NaN/inf inputs would silently produce garbage output.
 ///
-/// \return Pointer one past the last written character, or `nullptr` on:
-///         - buffer too small,
-///         - `value` outside the `long long`-representable range
-///           (≈ `±9.2e18`, scaled by `10^precision`), in which case the caller
-///           should pre-scale or use a different formatter.
+/// \return Pointer one past the last written character, or `nullptr` if the
+///         buffer is too small or `precision` is out of range.
 ///
-////////////////////////////////////////////////////////////
 template <typename T>
 [[nodiscard]] constexpr char* toChars(char* first, const char* const last, T value, const int precision = 6)
     requires isFloatingPoint<T>
 {
     ZA_ASSERT(precision >= 0 && precision <= 10);
 
-    // Promote narrow floats to `double` so the internal `value * 10^precision`
-    // multiplication preserves all the input's bits. `float`'s 24-bit mantissa
-    // fits losslessly into `double`'s 53-bit mantissa, so the cast is exact.
-    // Without this, e.g. `0.1f` at precision 10 would print "0.1000000000"
-    // instead of the true "0.1000000015".
-    if constexpr (sizeof(T) < sizeof(double))
+    if (precision < 0 || precision > 10) [[unlikely]] // `powersOf10` bounds, also in release builds
+        return nullptr;
+
+    // Format narrow floats as `double`: `float`'s 24-bit mantissa fits losslessly into `double`'s
+    // 53-bit mantissa, so e.g. `0.1f` at precision 10 prints the true "0.1000000015".
+    if constexpr (!ZA_IS_SAME(T, double))
+    {
         return toChars(first, last, static_cast<double>(value), precision);
-
-    char* p = first;
+    }
+    else
+    {
+        char* p = first;
 
 #if !__FINITE_MATH_ONLY__
-    // NaN: emit "nan" with no sign (matches `std::to_chars` and IEEE-754).
-    // Under `-ffinite-math-only`, this branch folds to dead code: that's
-    // intentional -- passing NaN under that flag is out of contract (see
-    // precondition in the doc).
-    if (ZA_ISNAN(value)) [[unlikely]]
-    {
-        if (last - p < 3)
-            return nullptr;
+        // NaN: emit "nan" with no sign. Under `-ffinite-math-only`, this branch folds
+        // to dead code: passing NaN under that flag is out of contract (see above).
+        if (ZA_ISNAN(value)) [[unlikely]]
+        {
+            if (last - p < 3)
+                return nullptr;
 
-        *p++ = 'n';
-        *p++ = 'a';
-        *p++ = 'n';
-        return p;
-    }
+            *p++ = 'n';
+            *p++ = 'a';
+            *p++ = 'n';
+            return p;
+        }
 #endif
 
-    // Sign via signbit so `-0.0` keeps its sign (matches `std::to_chars`).
-    if (ZA_SIGNBIT(value))
-    {
-        if (p >= last)
-            return nullptr;
+        // Sign via signbit so `-0.0` keeps its sign (matches `std::to_chars`).
+        if (ZA_SIGNBIT(value))
+        {
+            if (p >= last)
+                return nullptr;
 
-        *p++  = '-';
-        value = -value;
-    }
+            *p++  = '-';
+            value = -value;
+        }
 
 #if !__FINITE_MATH_ONLY__
-    // Infinity: emit "inf" after any sign already written. Same out-of-contract
-    // status as NaN under `-ffinite-math-only`.
-    if (ZA_ISINF(value)) [[unlikely]]
-    {
-        if (last - p < 3)
-            return nullptr;
+        // Infinity: emit "inf" after any sign already written.
+        if (ZA_ISINF(value)) [[unlikely]]
+        {
+            if (last - p < 3)
+                return nullptr;
 
-        *p++ = 'i';
-        *p++ = 'n';
-        *p++ = 'f';
-        return p;
-    }
+            *p++ = 'i';
+            *p++ = 'n';
+            *p++ = 'f';
+            return p;
+        }
 #endif
 
-    // Out-of-range guard: the integer-part conversion casts to `long long`,
-    // which is UB for values outside its range. Pick a threshold safely
-    // below `LLONG_MAX` (= 9.223e18) so that rounding doesn't push us over.
-    constexpr T safeLLongUpper = static_cast<T>(9'000'000'000'000'000'000LL);
+        // From `2^53` onwards, doubles are integers (possibly beyond 64 bits): no fractional digits
+        constexpr double twoTo53 = 9'007'199'254'740'992.0;
 
-    if (precision == 0)
-    {
-        if (value > safeLLongUpper) [[unlikely]]
+        unsigned long long fracDigits = 0u; // the first `precision` fractional digits, as an integer
+
+        if (value >= twoTo53)
+        {
+            p = priv::largeDoubleToChars(p, last, value);
+        }
+        else if (precision == 0)
+        {
+            // Round the whole value, so that ties go to the even integer
+            p = priv::unsignedToChars(p, last, static_cast<unsigned long long>(za::rint(value)));
+        }
+        else
+        {
+            // Split into the (exact) integer and fractional parts, so that only the fraction
+            // is scaled by `10^precision`: no overflow, whatever the magnitude
+            auto         intPart  = static_cast<unsigned long long>(value); // truncates: `value < 2^53`
+            const double fraction = value - static_cast<double>(intPart);   // exact
+
+            const auto multiplier = static_cast<unsigned long long>(priv::powersOf10[precision]);
+            fracDigits = static_cast<unsigned long long>(za::rint(fraction * static_cast<double>(multiplier)));
+
+            // Rounding up to the next integer (e.g. 0.9999999 at precision 6)
+            if (fracDigits == multiplier)
+            {
+                ++intPart;
+                fracDigits = 0u;
+            }
+
+            p = priv::unsignedToChars(p, last, intPart);
+        }
+
+        if (p == nullptr)
             return nullptr;
 
-        // `value` is non-negative here (signbit branch already negated it),
-        // so the unsigned cast is well-defined.
-        const auto roundedAsInt = static_cast<unsigned long long>(za::rint(value));
-        return priv::unsignedToChars(p, last, roundedAsInt);
+        if (precision == 0)
+            return p;
+
+        if (last - p < precision + 1) // '.' + `precision` digits
+            return nullptr;
+
+        *p++ = '.';
+
+        // Write the fractional digits into [p, p + precision), backward, zero-padded on the left
+        char* const fracEnd = p + precision;
+
+        for (char* c = fracEnd; c != p; fracDigits /= 10u)
+            *--c = static_cast<char>('0' + fracDigits % 10u);
+
+        return fracEnd;
     }
-
-    const long long multiplier = priv::powersOf10[precision];
-    const T         scaled     = value * static_cast<T>(multiplier);
-
-    if (scaled > safeLLongUpper) [[unlikely]]
-        return nullptr;
-
-    // `value` is non-negative at this point (signbit branch already negated it)
-    // and `scaled <= 9e18 < LLONG_MAX`, so the unsigned cast is well-defined.
-    const auto roundedScaledValue = static_cast<unsigned long long>(za::rint(scaled));
-    const auto finalIntPart       = roundedScaledValue / static_cast<unsigned long long>(multiplier);
-    auto       finalFracPart      = roundedScaledValue % static_cast<unsigned long long>(multiplier);
-
-    p = priv::unsignedToChars(p, last, finalIntPart);
-
-    if (p == nullptr)
-        return nullptr;
-
-    if (last - p < precision + 1) // '.' + `precision` digits
-        return nullptr;
-
-    *p++ = '.';
-
-    // Write the fractional digits directly into [p, p + precision), backward.
-    // The output is always exactly `precision` chars wide; any shortfall vs. the
-    // natural digit count is filled with leading zeros on the left.
-    char* const fracStart  = p;
-    char* const fracOutEnd = p + precision;
-    char*       c          = fracOutEnd - 1;
-
-    while (finalFracPart > 0)
-    {
-        *c-- = '0' + static_cast<char>(finalFracPart % 10);
-        finalFracPart /= 10;
-    }
-
-    while (c >= fracStart)
-        *c-- = '0';
-
-    return fracOutEnd;
 }
 
 } // namespace za

@@ -324,17 +324,25 @@ TEST_CASE("[Base] ToChars.hpp")
         CHECK_FLOAT_CONVERSION(3.5, "4", 0); // 3.5 → 4 (4 is even)
     }
 
-    SECTION("Out-of-range values return nullptr")
+    SECTION("Values that used to be out of range")
     {
-        char              buffer[64];
+        char              buffer[400];
         const char* const last = buffer + sizeof(buffer);
 
-        // Values beyond ~9.2e18 cannot be represented as `long long`.
-        CHECK(za::toChars(buffer, last, 1.0e20, 0) == nullptr);
-        CHECK(za::toChars(buffer, last, std::numeric_limits<double>::max(), 0) == nullptr);
+        // Beyond ~9.2e18: printed exactly
+        const char* end = za::toChars(buffer, last, 1.0e20, 0);
+        CHECK(za::StringView{buffer, static_cast<za::SizeT>(end - buffer)} == "100000000000000000000");
 
-        // At precision = 10, the multiplier is 10^10, so even 1e10 overflows.
-        CHECK(za::toChars(buffer, last, 1.0e10, 10) == nullptr);
+        end = za::toChars(buffer, last, std::numeric_limits<double>::max(), 0);
+        CHECK(end - buffer == 309);
+
+        // Precision 10 no longer overflows for 1e10
+        end = za::toChars(buffer, last, 1.0e10, 10);
+        CHECK(za::StringView{buffer, static_cast<za::SizeT>(end - buffer)} == "10000000000.0000000000");
+
+        // ...but does not fit in a small buffer
+        char small[16];
+        CHECK(za::toChars(small, small + sizeof(small), 1.0e20, 0) == nullptr);
     }
 
     SECTION("Buffer Overrun Checks")
@@ -367,5 +375,83 @@ TEST_CASE("[Base] ToChars.hpp")
         // Case where integer part fits but rest does not
         // "123.4" (5 chars), buffer for only "123" (3 chars)
         REQUIRE(za::toChars(buffer, buffer + 3, 123.4, 1) == nullptr);
+    }
+}
+
+
+namespace
+{
+namespace ToCharsLargeValuesTest // for unity builds
+{
+////////////////////////////////////////////////////////////
+// `__extension__`: 128-bit integers are a GCC/Clang extension (avoids `-Wpedantic`)
+__extension__ using I128 = __int128;
+__extension__ using U128 = unsigned __int128;
+
+
+////////////////////////////////////////////////////////////
+[[nodiscard]] za::StringView format(char (&buffer)[400], const double value, const int precision)
+{
+    const char* const end = za::toChars(buffer, buffer + 400, value, precision);
+    return end == nullptr ? za::StringView{"<nullptr>"} : za::StringView{buffer, static_cast<za::SizeT>(end - buffer)};
+}
+
+
+////////////////////////////////////////////////////////////
+template <typename T>
+concept CanFormat = requires(char* p, T v) { za::toChars(p, p, v); };
+
+} // namespace ToCharsLargeValuesTest
+} // namespace
+
+
+TEST_CASE("[Base] toChars(double) at any magnitude")
+{
+    using ToCharsLargeValuesTest::format;
+    char buffer[400];
+
+    SECTION("Values that used to exceed the 9e18 limit once scaled")
+    {
+        CHECK(format(buffer, 1e13, 6) == "10000000000000.000000");
+        CHECK(format(buffer, -123'456'789'012.5, 3) == "-123456789012.500");
+        CHECK(format(buffer, 9'007'199'254'740'991.0, 2) == "9007199254740991.00"); // 2^53 - 1
+        CHECK(format(buffer, 4'503'599'627'370'495.5, 1) == "4503599627370495.5");
+    }
+
+    SECTION("Values from 2^53 onwards are printed exactly")
+    {
+        CHECK(format(buffer, 9'007'199'254'740'992.0, 1) == "9007199254740992.0");        // 2^53
+        CHECK(format(buffer, 18'446'744'073'709'551'616.0, 0) == "18446744073709551616"); // 2^64
+        CHECK(format(buffer, 1e20, 2) == "100000000000000000000.00");
+        CHECK(format(buffer, 1e23, 0) == "99999999999999991611392"); // exact value of the double nearest to 1e23
+
+        CHECK(format(buffer, static_cast<double>(__FLT_MAX__), 0) == "340282346638528859811704183484516925440");
+        CHECK(format(buffer, -__DBL_MAX__, 1) ==
+              "-1797693134862315708145274237317043567980705675258449965989174768031572607800285387605895586327668781715"
+              "4"
+              "04589535143824642343213268894641827684675467035375169860499105765512820762454900903893289440758685084551"
+              "33942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368."
+              "0");
+    }
+
+    SECTION("Rounding carries into the integer part")
+    {
+        CHECK(format(buffer, 0.9999999, 6) == "1.000000");
+        CHECK(format(buffer, 99.9999999, 3) == "100.000");
+        CHECK(format(buffer, 2.5, 0) == "2"); // ties to even
+        CHECK(format(buffer, 3.5, 0) == "4");
+    }
+
+    SECTION("Buffer too small for a large value")
+    {
+        char small[10];
+        CHECK(za::toChars(small, small + 10, 1e20, 0) == nullptr);
+    }
+
+    SECTION("128-bit integers are rejected at compile time")
+    {
+        STATIC_CHECK(ToCharsLargeValuesTest::CanFormat<unsigned long long>);
+        STATIC_CHECK(!ToCharsLargeValuesTest::CanFormat<ToCharsLargeValuesTest::U128>);
+        STATIC_CHECK(!ToCharsLargeValuesTest::CanFormat<ToCharsLargeValuesTest::I128>);
     }
 }

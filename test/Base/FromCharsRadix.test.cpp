@@ -179,3 +179,56 @@ TEST_CASE("[Base] FromCharsRadix.hpp - round-trip with toCharsRadix")
         }
     }
 }
+
+
+namespace
+{
+namespace FromCharsRadixShiftTest // for unity builds
+{
+////////////////////////////////////////////////////////////
+template <typename T>
+[[nodiscard]] za::FromCharsError parse(const char* text, T& value, const za::Radix radix)
+{
+    return za::fromCharsRadix(text, text + ZA_STRLEN(text), value, radix).ec;
+}
+
+
+////////////////////////////////////////////////////////////
+template <typename T>
+concept CanParseRadix = requires(const char* p, T& v) { za::fromCharsRadix(p, p, v, za::Radix::Bin); };
+
+} // namespace FromCharsRadixShiftTest
+} // namespace
+
+
+TEST_CASE("[Base] fromCharsRadix overflow at every radix")
+{
+    using FromCharsRadixShiftTest::parse;
+
+    za::U8 u8 = 0;
+    CHECK(parse("11111111", u8, za::Radix::Bin) == za::FromCharsError::None);
+    CHECK(u8 == 255);
+    CHECK(parse("100000000", u8, za::Radix::Bin) == za::FromCharsError::ResultOutOfRange);
+    CHECK(parse("377", u8, za::Radix::Oct) == za::FromCharsError::None);
+    CHECK(u8 == 255);
+    CHECK(parse("400", u8, za::Radix::Oct) == za::FromCharsError::ResultOutOfRange);
+    CHECK(parse("FF", u8, za::Radix::Hex) == za::FromCharsError::None);
+    CHECK(parse("100", u8, za::Radix::Hex) == za::FromCharsError::ResultOutOfRange);
+
+    za::U64 u64 = 0;
+    CHECK(parse("1777777777777777777777", u64, za::Radix::Oct) == za::FromCharsError::None);
+    CHECK(u64 == ~za::U64{0});
+    CHECK(parse("2000000000000000000000", u64, za::Radix::Oct) == za::FromCharsError::ResultOutOfRange);
+    CHECK(parse("11111111111111111111111111111111111111111111111111111111111111111", u64, za::Radix::Bin) ==
+          za::FromCharsError::ResultOutOfRange); // 65 digits
+    CHECK(parse("ffffffffffffffff", u64, za::Radix::Hex) == za::FromCharsError::None);
+    CHECK(parse("10000000000000000", u64, za::Radix::Hex) == za::FromCharsError::ResultOutOfRange);
+
+    // Leading zeros never overflow
+    CHECK(parse("00000000000000000000000000000000000000001", u8, za::Radix::Bin) == za::FromCharsError::None);
+    CHECK(u8 == 1);
+
+    // `bool` is not an integer to parse
+    STATIC_CHECK(FromCharsRadixShiftTest::CanParseRadix<za::U32>);
+    STATIC_CHECK(!FromCharsRadixShiftTest::CanParseRadix<bool>);
+}

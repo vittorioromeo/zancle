@@ -7,10 +7,14 @@
 // Headers
 ////////////////////////////////////////////////////////////
 #include "Zancle/String/FromCharsResult.hpp" // IWYU pragma: export
+#include "Zancle/String/ToCharsRadix.hpp"    // `priv::radixDigitBits`
 
 #include "Zancle/Vocabulary/Radix.hpp"
 
+#include "Zancle/Base/Assert.hpp"
+
 #include "Zancle/Trait/IsIntegral.hpp"
+#include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/IsUnsigned.hpp"
 
 
@@ -34,15 +38,18 @@ namespace za
 ////////////////////////////////////////////////////////////
 template <typename T>
 [[nodiscard]] constexpr FromCharsResult fromCharsRadix(const char* first, const char* const last, T& value, const Radix radix)
-    requires(isIntegral<T> && isUnsigned<T>)
+    requires(isIntegral<T> && isUnsigned<T> && !isSame<T, bool>)
 {
-    if (first == last)
+    const unsigned int digitBits = priv::radixDigitBits(radix);
+    ZA_ASSERT(digitBits != 0u && "Invalid radix");
+
+    if (first == last || digitBits == 0u)
         return {first, FromCharsError::InvalidArgument};
 
-    const auto base = static_cast<T>(radix);
+    const unsigned int base = 1u << digitBits;
 
-    // Largest value of T (all bits set, since T is unsigned).
-    constexpr auto limit = static_cast<T>(~T(0));
+    // Shifting in another digit overflows iff any of the top `digitBits` bits is already set
+    const unsigned int overflowShift = sizeof(T) * 8u - digitBits;
 
     T    result   = 0;
     bool anyDigit = false;
@@ -67,11 +74,11 @@ template <typename T>
         if (digit >= base)
             break;
 
-        // Overflow check, mirroring the decimal `fromChars`.
-        if (result > limit / base || (result == limit / base && digit > limit % base))
+        // Overflow check, mirroring the decimal `fromChars` (no divisions: every radix is a power of two)
+        if ((result >> overflowShift) != 0u)
             return {first, FromCharsError::ResultOutOfRange};
 
-        result = static_cast<T>(result * base + digit);
+        result = static_cast<T>((result << digitBits) | digit);
         ++first;
         anyDigit = true;
     }

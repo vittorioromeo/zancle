@@ -1067,26 +1067,24 @@ TEST_CASE("[System] Fmt.hpp - boundary conditions")
         CHECK(out == za::String{"10000000000000.000"});
     }
 
-    SECTION("Double beyond toChars range reports Failed")
+    SECTION("Doubles of any magnitude are formatted")
     {
-        // 10^13 * 10^6 (default precision) = 10^19 > ~9.2e18, so the
-        // backend reports `Failed`. The sink is left unchanged.
+        // Used to fail beyond ~9.2e18 once scaled by `10^precision` (e.g. 10^13 at the default precision)
         za::String out = "prefix:";
 
-        CHECK(za::fmtTo(out, "{}", 10'000'000'000'000.0) == za::FmtResult::Failed);
-        CHECK(out == za::String{"prefix:"});
+        CHECK(za::fmtTo(out, "{}", 10'000'000'000'000.0) == za::FmtResult::Ok);
+        CHECK(out == za::String{"prefix:10000000000000.000000"});
+
+        za::String large;
+        CHECK(za::fmtTo(large, "{:.2f}", -std::numeric_limits<double>::max()) == za::FmtResult::Ok);
+        CHECK(large.size() == 1u + 309u + 1u + 2u);
+        CHECK(large.toStringView().substrByPosLen(0u, 6u) == "-17976");
+
+        za::String largest;
+        CHECK(za::fmtTo(largest, "{:.0f}", std::numeric_limits<double>::max()) == za::FmtResult::Ok);
+        CHECK(largest.size() == 309u);
     }
 
-    SECTION("Maximum finite double reports Failed (out of toChars range)")
-    {
-        // `std::numeric_limits<double>::max()` is ~1.8e308, far beyond
-        // the int64-scaled representation even at precision 0.
-        za::String out = "prefix:";
-
-        CHECK(za::fmtTo(out, "{}", std::numeric_limits<double>::max()) == za::FmtResult::Failed);
-        CHECK(za::fmtTo(out, "{:.0f}", std::numeric_limits<double>::max()) == za::FmtResult::Failed);
-        CHECK(out == za::String{"prefix:"});
-    }
 
     SECTION("Long double")
     {

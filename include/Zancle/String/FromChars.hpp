@@ -8,8 +8,11 @@
 ////////////////////////////////////////////////////////////
 #include "Zancle/String/FromCharsResult.hpp" // IWYU pragma: export
 
+#include "Zancle/Base/IsInf.hpp"
+
 #include "Zancle/Trait/IsFloatingPoint.hpp"
 #include "Zancle/Trait/IsIntegral.hpp"
+#include "Zancle/Trait/IsSame.hpp"
 #include "Zancle/Trait/IsUnsigned.hpp"
 #include "Zancle/Trait/MakeUnsigned.hpp"
 
@@ -56,7 +59,7 @@ namespace za
 ////////////////////////////////////////////////////////////
 template <typename T>
 [[nodiscard]] FromCharsResult fromChars(const char* first, const char* const last, T& value)
-    requires isIntegral<T>
+    requires(isIntegral<T> && !isSame<T, bool>)
 {
     if (first == last)
         return {first, FromCharsError::InvalidArgument};
@@ -100,12 +103,17 @@ template <typename T>
         }
     }();
 
+    // Hoisted out of the loop: `limit` depends on the sign, so these would otherwise be two
+    // runtime divisions per digit (at `-O0` in particular)
+    const auto limitDiv10 = static_cast<UnsignedT>(limit / 10u);
+    const auto limitMod10 = static_cast<UnsignedT>(limit % 10u);
+
     while (first != last && priv::isDigit(*first))
     {
         const auto digit = static_cast<UnsignedT>(*first - '0');
 
         // Check for overflow before multiplication
-        if (result > limit / 10u || (result == limit / 10u && digit > limit % 10u))
+        if (result > limitDiv10 || (result == limitDiv10 && digit > limitMod10))
             return {first, FromCharsError::ResultOutOfRange};
 
         result = static_cast<UnsignedT>(result * 10u + digit);
@@ -137,6 +145,10 @@ template <typename T>
 /// `long double` internally to retain precision before narrowing the
 /// result back into `T`.
 ///
+/// Values beyond the finite range of `T`, and nonzero values that would
+/// round to zero, are rejected with `FromCharsError::ResultOutOfRange`
+/// (like `std::from_chars`): `value` is left untouched.
+///
 ////////////////////////////////////////////////////////////
 template <typename T>
 [[nodiscard]] FromCharsResult fromChars(const char* first, const char* const last, T& value)
@@ -162,10 +174,12 @@ template <typename T>
     // Use long double for intermediate calculations to maximize precision.
     long double result          = 0.0l;
     bool        anyDigitsParsed = false;
+    bool        anyNonZeroDigit = false;
 
     // Parse whole number part
     while (first != last && priv::isDigit(*first))
     {
+        anyNonZeroDigit |= *first != '0';
         result = result * 10.0l + (*first - '0');
         ++first;
         anyDigitsParsed = true;
@@ -178,6 +192,7 @@ template <typename T>
         long double power = 0.1l;
         while (first != last && priv::isDigit(*first))
         {
+            anyNonZeroDigit |= *first != '0';
             result += (*first - '0') * power;
             power /= 10.0l;
             ++first;
@@ -188,6 +203,14 @@ template <typename T>
     // If no digits were parsed at all, it's an error.
     if (!anyDigitsParsed)
         return {initialFirst, FromCharsError::InvalidArgument};
+
+    // Out of range: too large for `T` (converting it would be UB), or a nonzero value that underflows to zero
+    constexpr long double maxFinite = ZA_IS_SAME(T, float)    ? static_cast<long double>(__FLT_MAX__)
+                                      : ZA_IS_SAME(T, double) ? static_cast<long double>(__DBL_MAX__)
+                                                              : __LDBL_MAX__;
+
+    if (ZA_ISINF(result) || result > maxFinite || (anyNonZeroDigit && static_cast<T>(result) == T{0}))
+        return {first, FromCharsError::ResultOutOfRange};
 
     if (isNegative)
         result = -result;

@@ -243,3 +243,102 @@ TEST_CASE("[Base] FromChars.hpp")
         }
     }
 }
+
+
+namespace
+{
+namespace FromCharsRangeTest // for unity builds
+{
+////////////////////////////////////////////////////////////
+template <typename T>
+[[nodiscard]] za::FromCharsError parse(const za::String& text, T& value)
+{
+    return za::fromChars(text.data(), text.data() + text.size(), value).ec;
+}
+
+
+////////////////////////////////////////////////////////////
+template <typename T>
+concept CanParse = requires(const char* p, T& v) { za::fromChars(p, p, v); };
+
+} // namespace FromCharsRangeTest
+} // namespace
+
+
+TEST_CASE("[Base] fromChars floating-point range errors")
+{
+    using FromCharsRangeTest::parse;
+
+    za::String huge{"1"};
+    for (int i = 0; i < 400; ++i)
+        huge += '0';
+
+    za::String tiny{"0."};
+    for (int i = 0; i < 400; ++i)
+        tiny += '0';
+    tiny += '1';
+
+    SECTION("double")
+    {
+        double value = 42.0;
+
+        CHECK(parse(huge, value) == za::FromCharsError::ResultOutOfRange);
+        CHECK(value == 42.0); // untouched
+
+        CHECK(parse(tiny, value) == za::FromCharsError::ResultOutOfRange);
+        CHECK(value == 42.0);
+
+        CHECK(parse(za::String{"-"} + huge, value) == za::FromCharsError::ResultOutOfRange);
+
+        // Zero is not an underflow
+        CHECK(parse(za::String{"0.000000000000000000000000000000000000000000000000000000000"}, value) ==
+              za::FromCharsError::None);
+        CHECK(value == 0.0);
+
+        CHECK(parse(za::String{"1e308"}, value) == za::FromCharsError::None); // exponents are not parsed: "1"
+    }
+
+    SECTION("float")
+    {
+        float value = 42.f;
+
+        CHECK(parse(za::String{"1000000000000000000000000000000000000000"}, value) ==
+              za::FromCharsError::ResultOutOfRange); // 1e39 > FLT_MAX
+        CHECK(value == 42.f);
+
+        CHECK(parse(za::String{"340000000000000000000000000000000000000"}, value) == za::FromCharsError::None);
+        CHECK(value > 3.39e38f);
+
+        CHECK(parse(za::String{"0.0000000000000000000000000000000000000000000000000001"}, value) ==
+              za::FromCharsError::ResultOutOfRange); // 1e-52 underflows `float`
+    }
+}
+
+
+TEST_CASE("[Base] fromChars integer overflow boundaries")
+{
+    using FromCharsRangeTest::parse;
+
+    za::I8 i8 = 0;
+    CHECK(parse(za::String{"-128"}, i8) == za::FromCharsError::None);
+    CHECK(i8 == -128);
+    CHECK(parse(za::String{"127"}, i8) == za::FromCharsError::None);
+    CHECK(i8 == 127);
+    CHECK(parse(za::String{"-129"}, i8) == za::FromCharsError::ResultOutOfRange);
+    CHECK(parse(za::String{"128"}, i8) == za::FromCharsError::ResultOutOfRange);
+
+    za::U8 u8 = 0;
+    CHECK(parse(za::String{"255"}, u8) == za::FromCharsError::None);
+    CHECK(u8 == 255);
+    CHECK(parse(za::String{"256"}, u8) == za::FromCharsError::ResultOutOfRange);
+
+    za::I64 i64 = 0;
+    CHECK(parse(za::String{"-9223372036854775808"}, i64) == za::FromCharsError::None);
+    CHECK(i64 == std::numeric_limits<za::I64>::min());
+    CHECK(parse(za::String{"-9223372036854775809"}, i64) == za::FromCharsError::ResultOutOfRange);
+    CHECK(parse(za::String{"9223372036854775808"}, i64) == za::FromCharsError::ResultOutOfRange);
+
+    // `bool` is not an integer to parse
+    STATIC_CHECK(FromCharsRangeTest::CanParse<int>);
+    STATIC_CHECK(!FromCharsRangeTest::CanParse<bool>);
+}

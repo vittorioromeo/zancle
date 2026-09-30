@@ -101,8 +101,8 @@ FmtResult fmtArg(FmtSink& sink, const T& arg, const FmtSpec& spec)
 
     const int prec = spec.precision >= 0 ? spec.precision : defaultFloatPrecision;
 
-    // 40 covers sign + ~20-digit integral part + '.' + up to 10 fractional digits + slack.
-    char buf[40];
+    // Sign + up to 309 integral digits (`DBL_MAX`) + '.' + up to 10 fractional digits.
+    char buf[1 + 309 + 1 + 10];
 
     char* const end = toChars(buf, buf + sizeof(buf), arg, prec);
 

@@ -42,6 +42,9 @@ StreamLike& operator<<(StreamLike& stream, const String& s)
 ////////////////////////////////////////////////////////////
 /// \brief Extract one whitespace-delimited word into `s`, mimicking `std::istream >> std::string`
 ///
+/// If no characters are extracted (only whitespace remained), `s` is left
+/// empty and, for streams with `setstate`/`failbit`, the fail bit is set.
+///
 ////////////////////////////////////////////////////////////
 template <typename StreamLike>
 StreamLike& operator>>(StreamLike& stream, String& s)
@@ -61,13 +64,18 @@ StreamLike& operator>>(StreamLike& stream, String& s)
     }
 
     // 2. Read non-whitespace characters until the next whitespace or EOF
-    if (c != -1)
+    while (c != -1 && !priv::isWhitespace(static_cast<char>(c)))
     {
-        while (c != -1 && !priv::isWhitespace(static_cast<char>(c)))
-        {
-            s.pushBack(static_cast<char>(stream.get())); // Consume and append the character
-            c = stream.peek();
-        }
+        s.pushBack(static_cast<char>(stream.get())); // Consume and append the character
+        c = stream.peek();
+    }
+
+    // 3. Like `std::istream >> std::string`, fail if nothing was extracted, so that
+    //    `while (in >> s)` stops instead of yielding a final empty word
+    if constexpr (requires { stream.setstate(StreamLike::failbit); })
+    {
+        if (s.empty())
+            stream.setstate(StreamLike::failbit);
     }
 
     return stream;
