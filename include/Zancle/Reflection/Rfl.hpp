@@ -49,6 +49,8 @@ SOFTWARE.
 #include "Zancle/Base/TypePackElement.hpp"
 
 #include "Zancle/Trait/DeclVal.hpp"
+#include "Zancle/Trait/IsReference.hpp"
+#include "Zancle/Trait/IsUnion.hpp"
 #include "Zancle/Trait/RemoveCVRef.hpp"
 #include "Zancle/Trait/RemoveReference.hpp"
 
@@ -161,86 +163,70 @@ struct Anything
 
 
 ////////////////////////////////////////////////////////////
+enum : SizeT
+{
+    maxFields = 64u //!< Limited by the number of structured binding branches in `tieAsTuple`
+};
+
+
+////////////////////////////////////////////////////////////
+template <SizeT>
+using IndexedAnything = Anything;
+
+
+////////////////////////////////////////////////////////////
+template <typename T, typename IdxSeq>
+inline constexpr bool isInitializableWithAnythings = false;
+
+
+////////////////////////////////////////////////////////////
+template <typename T, SizeT... Is>
+inline constexpr bool isInitializableWithAnythings<T, IndexSequence<Is...>> = requires { T{IndexedAnything<Is>{}...}; };
+
+
+////////////////////////////////////////////////////////////
+/// \brief Number of fields of the aggregate `T`, found by scanning initializer counts upwards from `N`
+///
+/// The valid initializer counts of an aggregate form a range: fewer
+/// values than fields are fine as long as the remaining fields can be
+/// default-initialized, so the range can start above zero (e.g. with
+/// reference members). The field count is the end of that range, found
+/// in `fieldCount + 2` cheap checks (typical aggregates are small).
+///
+/// C-style array members are counted element by element (their
+/// elements are initialized via brace elision), which is why they are
+/// not supported.
+///
+////////////////////////////////////////////////////////////
+template <typename T, SizeT N>
+[[nodiscard]] consteval SizeT countFieldsFrom()
+{
+    if constexpr (N > maxFields)
+    {
+        static_assert(sizeof(T) == 0, "Type is not aggregate initializable or has more than 64 fields.");
+        return 0u;
+    }
+    else if constexpr (!isInitializableWithAnythings<T, ZA_MAKE_INDEX_SEQUENCE(N)>)
+    {
+        return countFieldsFrom<T, N + 1u>(); // not yet at the start of the valid range
+    }
+    else if constexpr (isInitializableWithAnythings<T, ZA_MAKE_INDEX_SEQUENCE(N + 1u)>)
+    {
+        return countFieldsFrom<T, N + 1u>();
+    }
+    else
+    {
+        return N;
+    }
+}
+
+
+////////////////////////////////////////////////////////////
 template <typename T>
 [[nodiscard]] consteval SizeT countFields()
 {
-    Anything x;
-
-    // NOLINTBEGIN(readability-misleading-indentation)
-
-    // clang-format off
-         if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x}; }) { return 64u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};   }) { return 63u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};     }) { return 62u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};       }) { return 61u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};         }) { return 60u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};           }) { return 59u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};             }) { return 58u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};               }) { return 57u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                 }) { return 56u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                   }) { return 55u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                     }) { return 54u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                       }) { return 53u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                         }) { return 52u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                           }) { return 51u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                             }) { return 50u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                               }) { return 49u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                 }) { return 48u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                   }) { return 47u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                     }) { return 46u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                       }) { return 45u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                         }) { return 44u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                           }) { return 43u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                             }) { return 42u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                               }) { return 41u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                 }) { return 40u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                   }) { return 39u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                     }) { return 38u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                       }) { return 37u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                         }) { return 36u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                           }) { return 35u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                             }) { return 34u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                               }) { return 33u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                 }) { return 32u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                   }) { return 31u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                     }) { return 30u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                       }) { return 29u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                         }) { return 28u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                           }) { return 27u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                             }) { return 26u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                               }) { return 25u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                                 }) { return 24u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                                   }) { return 23u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                                     }) { return 22u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                                       }) { return 21u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                                         }) { return 20u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                                           }) { return 19u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                                             }) { return 18u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                                               }) { return 17u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                                                 }) { return 16u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                                                   }) { return 15u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                                                     }) { return 14u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x,x};                                                                                                       }) { return 13u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x,x};                                                                                                         }) { return 12u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x,x};                                                                                                           }) { return 11u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x,x};                                                                                                             }) { return 10u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x,x};                                                                                                               }) { return 9u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x,x};                                                                                                                 }) { return 8u; }
-    else if constexpr (requires { T{x,x,x,x,x,x,x};                                                                                                                   }) { return 7u; }
-    else if constexpr (requires { T{x,x,x,x,x,x};                                                                                                                     }) { return 6u; }
-    else if constexpr (requires { T{x,x,x,x,x};                                                                                                                       }) { return 5u; }
-    else if constexpr (requires { T{x,x,x,x};                                                                                                                         }) { return 4u; }
-    else if constexpr (requires { T{x,x,x};                                                                                                                           }) { return 3u; }
-    else if constexpr (requires { T{x,x};                                                                                                                             }) { return 2u; }
-    else if constexpr (requires { T{x};                                                                                                                               }) { return 1u; }
-    else if constexpr (requires { T{};                                                                                                                                }) { return 0u; }
-    // clang-format on
-    else
-    {
-        static_assert(sizeof(T) == 0, "Type is not aggregate initializable or has more than 64 fields.");
-    }
-
-    // NOLINTEND(readability-misleading-indentation)
+    static_assert(!ZA_IS_UNION(T), "union reflection is forbidden");
+    return countFieldsFrom<T, 0u>();
 }
 
 
@@ -317,12 +303,14 @@ namespace za::rfl
 {
 ////////////////////////////////////////////////////////////
 template <typename T>
+    requires(!za::isUnion<T>)
 inline constexpr SizeT numFields = priv::countFields<T>();
 
 
 ////////////////////////////////////////////////////////////
 template <typename T>
-constexpr auto tieAsTuple(T&& obj)
+    requires(za::isReference<T> && !za::isUnion<za::RemoveCVRefIndirect<T>>) // no dangling references to temporaries
+[[nodiscard, gnu::always_inline]] constexpr auto tieAsTuple(T&& obj)
 {
     enum : SizeT
     {
@@ -420,22 +408,33 @@ constexpr auto tieAsTuple(T&& obj)
 
 
 ////////////////////////////////////////////////////////////
-template <SizeT I>
-[[gnu::always_inline]] constexpr auto&& getField(auto&& obj)
+template <SizeT I, typename T>
+    requires(za::isReference<T> && !za::isUnion<za::RemoveCVRefIndirect<T>>) // no dangling references to temporaries
+[[nodiscard, gnu::always_inline]] constexpr auto& getField(T&& obj)
 {
-    return priv::getImpl<I>(tieAsTuple(ZA_FORWARD(obj)));
+    static_assert(I < numFields<za::RemoveCVRef<T>>, "field index out of range");
+    return priv::getImpl<I>(tieAsTuple(obj));
 }
 
 
+////////////////////////////////////////////////////////////
+/// \brief Type of the `I`-th field of `T`, with references removed
+///
+/// A reference member (e.g. `int&`) yields the referred-to type (`int`),
+/// as that is the type of the object `getField` accesses. Cv-qualifiers
+/// are kept (e.g. `const int` for a `const int` member).
+///
 ////////////////////////////////////////////////////////////
 template <SizeT I, typename T>
 using FieldType = ZA_REMOVE_REFERENCE(decltype(getField<I>(declVal<T&>())));
 
 
 ////////////////////////////////////////////////////////////
-[[gnu::always_inline]] constexpr void forEachField(auto&& obj, auto&& f)
+template <typename T>
+    requires(!za::isUnion<za::RemoveCVRefIndirect<T>>)
+[[gnu::always_inline]] constexpr void forEachField(T&& obj, auto&& f)
 {
-    tieAsTuple(ZA_FORWARD(obj)).forEach(ZA_FORWARD(f));
+    tieAsTuple(obj).forEach(f); // `obj` is an lvalue here, so temporaries are fine: they outlive this call
 }
 
 } // namespace za::rfl
@@ -447,16 +446,34 @@ using FieldType = ZA_REMOVE_REFERENCE(decltype(getField<I>(declVal<T&>())));
 /// \brief Compile-time reflection for aggregate types (core)
 ///
 /// `za::rfl` is a small fork of Boost.PFR that does not depend on the
-/// C++ standard library. It supports aggregate types of up to 64
-/// fields. This header carries the structural core:
+/// C++ standard library. This header carries the structural core:
 ///
-/// - `numFields<T>` -- number of public data members
-/// - `tieAsTuple(obj)` -- bind every field of `obj` into a tuple of refs
-/// - `getField<I>(obj)` -- fetch the `I`-th field by index
+/// - `numFields<T>` -- number of fields
+/// - `tieAsTuple(obj)` -- bind every field of `obj` into a tuple of references
+/// - `getField<I>(obj)` -- reference to the `I`-th field
 /// - `forEachField(obj, fn)` -- invoke `fn` on each field in declaration order
+/// - `FieldType<I, T>` -- type of the `I`-th field
 ///
-/// Unions and C-style array types are explicitly rejected by the
-/// public reflection entry points.
+/// Supported types are aggregates with up to 64 fields, whose fields
+/// are all declared in the same class (as required by structured
+/// bindings). Types with more fields fail to compile. Also supported:
+///
+/// - Reference members: they are accessed through (and `FieldType`
+///   reports) the referred-to object, e.g. `FieldType` of an `int&`
+///   member is `int`. `getFieldName` does not support them, though.
+/// - C-style arrays as the reflected type itself (e.g. `int[3]`), whose
+///   elements are its fields.
+///
+/// Not supported:
+///
+/// - Unions: rejected at compile time.
+/// - C-style array members: fields are counted per element (brace
+///   elision), so reflection fails to compile.
+/// - Bit-field members: references cannot bind to them, so reflection
+///   fails to compile.
+///
+/// `tieAsTuple` and `getField` only accept lvalues, as they return
+/// references into the object. `forEachField` also accepts temporaries.
 ///
 /// For compile-time **field-name** extraction, include
 /// `Zancle/Reflection/RflNames.hpp` instead. Field names live in a

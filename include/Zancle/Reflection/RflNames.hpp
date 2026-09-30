@@ -93,126 +93,167 @@ template <auto&... Refs>
 
 
 ////////////////////////////////////////////////////////////
-// Loose scratch buffer used during parsing. Tightened to exact size in
-// `computeStoredFieldNames` so end users only pay for the actual bytes.
+// The parsing functions below are plain (non-template) `consteval`
+// functions: they are compiled once, no matter how many types are
+// reflected. Only `computeStoredFieldNames` is instantiated per type.
 ////////////////////////////////////////////////////////////
-template <SizeT N>
-struct RawFieldNames
+
+
+////////////////////////////////////////////////////////////
+/// \brief Skip a character or string literal (e.g. in `Tmpl<'{'>`), returning the position past it
+///
+////////////////////////////////////////////////////////////
+[[nodiscard]] consteval const char* skipQuoted(const char* p) noexcept
 {
-    Array<char, 4096u>            chars{};
-    Array<unsigned short, N + 1u> offsets{};
-    SizeT                         total{};
+    const char quote = *p++;
+
+    while (*p != quote)
+        p += (*p == '\\') ? 2 : 1; // skip escaped characters, including quotes
+
+    return p + 1;
+}
+
+
+////////////////////////////////////////////////////////////
+/// \brief Skip a balanced `<...>` or `{...}` group, returning the position past it
+///
+/// Both pairs are tracked because GCC may emit either inside a segment
+/// (e.g. `<TmplArgs>` or `{anonymous}` for unnamed-namespace types).
+/// Quoted literals are skipped as a whole, as they may contain brackets.
+///
+////////////////////////////////////////////////////////////
+[[nodiscard]] consteval const char* skipBracketed(const char* p) noexcept
+{
+    int depth = 0;
+
+    do
+    {
+        const char c = *p;
+
+        if (c == '\'' || c == '"')
+        {
+            p = skipQuoted(p);
+            continue;
+        }
+
+        if (c == '<' || c == '{')
+            ++depth;
+        else if (c == '>' || c == '}')
+            --depth;
+
+        ++p;
+    } while (depth > 0);
+
+    return p;
+}
+
+
+////////////////////////////////////////////////////////////
+/// \brief Position of the first segment of the reference pack in `sig`
+///
+////////////////////////////////////////////////////////////
+[[nodiscard]] consteval const char* findFirstSegment(const char* p) noexcept
+{
+    while (true)
+    {
+        SizeT k = 0u;
+
+        while (kOpenMarker[k] != '\0' && p[k] == kOpenMarker[k])
+            ++k;
+
+        if (kOpenMarker[k] == '\0')
+            return p + k;
+
+        ++p;
+    }
+}
+
+
+////////////////////////////////////////////////////////////
+struct NameRange
+{
+    const char* begin;
+    const char* end;
 };
 
 
 ////////////////////////////////////////////////////////////
-// Walks the signature once, char-by-char, tracking `<>` depth so that commas
-// inside template arguments are not mistaken for segment separators. Within
-// each segment, the rightmost depth-0 occurrence of `kNameMarkerCh` (".",
-// "::") marks the start of the field name.
-//
-// `parseRawNames` is keyed on `N` only -- it is shared across every type that
-// has the same field count, so the heavy compile-time work happens once per
-// distinct field count rather than once per distinct type.
+/// \brief Extract the field name of the segment starting at `p`, and advance `p` to the next segment
+///
+/// The name starts after the rightmost depth-0 `kNameMarkerCh` (".", "::").
+///
 ////////////////////////////////////////////////////////////
-template <SizeT N>
-[[nodiscard]] consteval RawFieldNames<N> parseRawNames(const char* sig) noexcept
+[[nodiscard]] consteval NameRange parseNextName(const char*& p) noexcept
 {
-    RawFieldNames<N> r{};
+    const char* nameStart = p;
 
-    if constexpr (N == 0u)
+    while (true)
     {
-        return r;
-    }
-    else
-    {
-        const char* p = sig;
+        const char c = *p;
 
-        // Locate the open marker at the start of the pack body.
-        while (true)
+        if (c == ',' || c == kCloseChar)
+            break;
+
+        if (c == kNameMarkerCh)
         {
-            bool match = true;
-
-            for (SizeT k = 0u; kOpenMarker[k] != '\0'; ++k)
-            {
-                if (p[k] != kOpenMarker[k])
-                {
-                    match = false;
-                    break;
-                }
-            }
-
-            if (match)
-            {
-                p += sizeof(kOpenMarker) - 1u;
-                break;
-            }
-
+            nameStart = p + kNameMarkerLen;
+            p         = nameStart;
+        }
+        else if (c == '<' || c == '{')
+        {
+            p = skipBracketed(p);
+        }
+        else if (c == '\'' || c == '"')
+        {
+            p = skipQuoted(p);
+        }
+        else
+        {
             ++p;
         }
-
-        SizeT writeIdx = 0u;
-        for (SizeT i = 0u; i < N; ++i)
-        {
-            r.offsets[i] = static_cast<unsigned short>(writeIdx);
-
-            const char* nameStart = p;
-
-            // Hot path at depth 0: find the next segment terminator while
-            // tracking the rightmost name marker.
-            while (true)
-            {
-                const char c = *p;
-
-                if (c == ',' || c == kCloseChar)
-                    break;
-
-                if (c == kNameMarkerCh)
-                {
-                    nameStart = p + kNameMarkerLen;
-                    p         = nameStart;
-                    continue;
-                }
-
-                if (c == '<' || c == '{')
-                {
-                    // Depth > 0: skip to matching close. Both `<>` and `{}`
-                    // are tracked as balanced pairs because GCC may emit
-                    // either inside a segment (e.g. `<TmplArgs>` or
-                    // `{anonymous}` for unnamed-namespace types).
-                    int depth = 1;
-                    ++p;
-
-                    while (depth > 0)
-                    {
-                        const char d = *p;
-
-                        if (d == '<' || d == '{')
-                            ++depth;
-                        else if (d == '>' || d == '}')
-                            --depth;
-
-                        ++p;
-                    }
-
-                    continue;
-                }
-
-                ++p;
-            }
-
-            for (const char* c = nameStart; c != p; ++c)
-                r.chars[writeIdx++] = *c;
-
-            if (*p == ',')
-                p += 2u; // skip ", "
-        }
-
-        r.offsets[N] = static_cast<unsigned short>(writeIdx);
-        r.total      = writeIdx;
-
-        return r;
     }
+
+    const NameRange result{nameStart, p};
+
+    if (*p == ',')
+        p += 2u; // skip ", "
+
+    return result;
+}
+
+
+////////////////////////////////////////////////////////////
+/// \brief Locations of the `N` field names within a signature, and their total length
+///
+////////////////////////////////////////////////////////////
+template <SizeT N>
+struct FieldNameRanges
+{
+    NameRange ranges[N];
+    SizeT     totalLength;
+};
+
+
+////////////////////////////////////////////////////////////
+/// \brief Find the `N` field names in `sig` in a single pass
+///
+/// Keyed on `N` only: shared by every type with the same field count.
+///
+////////////////////////////////////////////////////////////
+template <SizeT N>
+[[nodiscard]] consteval FieldNameRanges<N> findFieldNameRanges(const char* sig) noexcept
+{
+    FieldNameRanges<N> result{};
+
+    const char* p = findFirstSegment(sig);
+
+    for (SizeT i = 0u; i < N; ++i)
+    {
+        result.ranges[i] = parseNextName(p);
+        result.totalLength += static_cast<SizeT>(result.ranges[i].end - result.ranges[i].begin);
+    }
+
+    return result;
 }
 
 
@@ -244,16 +285,24 @@ template <typename T, SizeT... Is>
         // are valid as `auto&` non-type template arguments.
         constexpr auto        fakeTuple = tieAsTuple(getFakeObject<T>());
         constexpr const char* sig       = getRawSignature<fakeTuple.template get<Is>()...>();
-        constexpr auto        raw       = parseRawNames<n>(sig);
+        constexpr auto        found     = findFieldNameRanges<n>(sig);
 
-        PackedFieldNames<n, raw.total> packed{};
+        static_assert(found.totalLength <= 0xFF'FFu, "field names are too long");
 
-        for (SizeT i = 0u; i < raw.total; ++i)
-            packed.chars[i] = raw.chars[i];
+        // Exactly sized: only the name characters are stored
+        PackedFieldNames<n, found.totalLength> packed{};
 
-        for (SizeT i = 0u; i <= n; ++i)
-            packed.offsets[i] = raw.offsets[i];
+        SizeT writeIdx = 0u;
 
+        for (SizeT i = 0u; i < n; ++i)
+        {
+            packed.offsets[i] = static_cast<unsigned short>(writeIdx);
+
+            for (const char* c = found.ranges[i].begin; c != found.ranges[i].end; ++c)
+                packed.chars[writeIdx++] = *c;
+        }
+
+        packed.offsets[n] = static_cast<unsigned short>(writeIdx);
         return packed;
     }
 }
@@ -285,6 +334,7 @@ constexpr StringView getFieldName() noexcept
 {
     static_assert(!ZA_IS_UNION(T), "union reflection is forbidden");
     static_assert(!ZA_IS_ARRAY(T), "impossible to extract name from C-style array");
+    static_assert(I < numFields<T>, "field index out of range");
 
     constexpr const auto& packed = priv::storedFieldNames<T>;
 
@@ -334,6 +384,14 @@ static_assert(getFieldName<FieldNameSelfCheck, 1u>() == StringView{"beta"});
 /// recovered by parsing the compiler's `__PRETTY_FUNCTION__` of a
 /// single NTTP-heavy template, with results memoized per type.
 ///
-/// Unions and C-style array types are explicitly rejected.
+/// Supports the same types as the core, except:
+///
+/// - Types with reference members fail to compile: extracting names
+///   requires constant references to the fields of a never-created
+///   object, and a reference member has nothing to refer to.
+/// - C-style arrays as the reflected type are rejected, as their
+///   elements have no names.
+///
+/// Only Clang and GCC are supported.
 ///
 ////////////////////////////////////////////////////////////
