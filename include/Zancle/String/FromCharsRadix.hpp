@@ -18,6 +18,29 @@
 #include "Zancle/Trait/IsUnsigned.hpp"
 
 
+namespace za::priv
+{
+////////////////////////////////////////////////////////////
+/// \brief Value of the hexadecimal digit `c`, or `16` if `c` is not a hexadecimal digit
+///
+////////////////////////////////////////////////////////////
+[[nodiscard, gnu::always_inline]] inline constexpr unsigned int hexDigitValue(const char c) noexcept
+{
+    if (c >= '0' && c <= '9')
+        return static_cast<unsigned int>(c - '0');
+
+    if (c >= 'a' && c <= 'f')
+        return static_cast<unsigned int>(c - 'a' + 10);
+
+    if (c >= 'A' && c <= 'F')
+        return static_cast<unsigned int>(c - 'A' + 10);
+
+    return 16u;
+}
+
+} // namespace za::priv
+
+
 namespace za
 {
 ////////////////////////////////////////////////////////////
@@ -28,6 +51,11 @@ namespace za
 /// first character that is not a valid digit for the chosen radix, and
 /// signals overflow via `FromCharsError::ResultOutOfRange`.
 ///
+/// On `FromCharsError::ResultOutOfRange`, the returned pointer is past all
+/// the digits (not just the ones that fit), and `value` is left untouched.
+/// On `FromCharsError::InvalidArgument` (no digits), the returned pointer
+/// is `first`: nothing is consumed.
+///
 /// Hex parsing accepts both lowercase (`a`..`f`) and uppercase (`A`..`F`)
 /// digits; the choice is irrelevant for octal and binary.
 ///
@@ -37,7 +65,7 @@ namespace za
 ///
 ////////////////////////////////////////////////////////////
 template <typename T>
-[[nodiscard]] constexpr FromCharsResult fromCharsRadix(const char* first, const char* const last, T& value, const Radix radix)
+[[nodiscard]] constexpr FromCharsResult fromCharsRadix(const char* const first, const char* const last, T& value, const Radix radix)
     requires(isIntegral<T> && isUnsigned<T> && !isSame<T, bool>)
 {
     const unsigned int digitBits = priv::radixDigitBits(radix);
@@ -51,43 +79,35 @@ template <typename T>
     // Shifting in another digit overflows iff any of the top `digitBits` bits is already set
     const unsigned int overflowShift = sizeof(T) * 8u - digitBits;
 
-    T    result   = 0;
-    bool anyDigit = false;
+    const char* p      = first;
+    T           result = 0;
 
-    while (first != last)
+    // The first character that is not a digit of the chosen radix ends the parse (e.g. '8' under
+    // `Radix::Oct`, 'a' under `Radix::Bin`), matching the decimal `fromChars`
+    for (; p != last; ++p)
     {
-        const char c = *first;
-
-        T digit = 0;
-        if (c >= '0' && c <= '9')
-            digit = static_cast<T>(c - '0');
-        else if (c >= 'a' && c <= 'f')
-            digit = static_cast<T>(c - 'a' + 10);
-        else if (c >= 'A' && c <= 'F')
-            digit = static_cast<T>(c - 'A' + 10);
-        else
-            break; // First non-digit character ends the parse.
-
-        // Reject digits outside the chosen radix (e.g. '8' under `Radix::Oct`,
-        // 'a' under `Radix::Bin`). This is a parse stop, not an error: matches
-        // `fromChars` decimal semantics on the first non-digit byte.
+        const unsigned int digit = priv::hexDigitValue(*p);
         if (digit >= base)
             break;
 
         // Overflow check, mirroring the decimal `fromChars` (no divisions: every radix is a power of two)
         if ((result >> overflowShift) != 0u)
-            return {first, FromCharsError::ResultOutOfRange};
+        {
+            // Consume the rest of the number, so that parsing can resume after it
+            while (p != last && priv::hexDigitValue(*p) < base)
+                ++p;
 
-        result = static_cast<T>((result << digitBits) | digit);
-        ++first;
-        anyDigit = true;
+            return {p, FromCharsError::ResultOutOfRange};
+        }
+
+        result = static_cast<T>((result << digitBits) | static_cast<T>(digit));
     }
 
-    if (!anyDigit)
+    if (p == first)
         return {first, FromCharsError::InvalidArgument};
 
     value = result;
-    return {first, FromCharsError::None};
+    return {p, FromCharsError::None};
 }
 
 } // namespace za

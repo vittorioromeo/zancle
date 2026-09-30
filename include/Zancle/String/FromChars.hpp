@@ -6,9 +6,9 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
-#include "Zancle/String/FromCharsResult.hpp" // IWYU pragma: export
+#include "Zancle/Config.hpp"
 
-#include "Zancle/Base/IsInf.hpp"
+#include "Zancle/String/FromCharsResult.hpp" // IWYU pragma: export
 
 #include "Zancle/Trait/IsFloatingPoint.hpp"
 #include "Zancle/Trait/IsIntegral.hpp"
@@ -44,6 +44,14 @@ template <typename T>
     }
 }
 
+
+////////////////////////////////////////////////////////////
+/// \brief Floating-point parsing (see `za::fromChars`), defined in `FromChars.cpp`
+///
+////////////////////////////////////////////////////////////
+[[nodiscard]] ZA_SYSTEM_API FromCharsResult fromCharsFloat(const char* first, const char* last, float& value);
+[[nodiscard]] ZA_SYSTEM_API FromCharsResult fromCharsDouble(const char* first, const char* last, double& value);
+
 } // namespace za::priv
 
 
@@ -52,27 +60,34 @@ namespace za
 ////////////////////////////////////////////////////////////
 /// \brief Parse an integer from `[first, last)` into `value`
 ///
-/// Stricter than `strtol`: only base-10 digits and an optional leading
-/// sign are accepted. Detects overflow before it happens and signals
-/// it via `FromCharsError::ResultOutOfRange`.
+/// Mirrors `std::from_chars`: only base-10 digits and an optional leading
+/// sign are accepted (unlike `std::from_chars`, a leading `'+'` is also
+/// accepted). Overflow is detected before it happens.
+///
+/// On `FromCharsError::ResultOutOfRange`, the returned pointer is past all
+/// the digits (not just the ones that fit), and `value` is left untouched.
+/// On `FromCharsError::InvalidArgument` (no digits), the returned pointer
+/// is `first`: nothing is consumed.
 ///
 ////////////////////////////////////////////////////////////
 template <typename T>
-[[nodiscard]] FromCharsResult fromChars(const char* first, const char* const last, T& value)
+[[nodiscard]] FromCharsResult fromChars(const char* const first, const char* const last, T& value)
     requires(isIntegral<T> && !isSame<T, bool>)
 {
-    if (first == last)
+    const char* p = first;
+
+    if (p == last)
         return {first, FromCharsError::InvalidArgument};
 
     bool isNegative = false;
-    if (*first == '-')
+    if (*p == '-')
     {
         isNegative = true;
-        ++first;
+        ++p;
     }
-    else if (*first == '+')
+    else if (*p == '+')
     {
-        ++first;
+        ++p;
     }
 
     if constexpr (ZA_IS_UNSIGNED(T))
@@ -81,10 +96,8 @@ template <typename T>
             return {first, FromCharsError::InvalidArgument};
     }
 
-    if (first == last || !priv::isDigit(*first))
-    {
+    if (p == last || !priv::isDigit(*p))
         return {first, FromCharsError::InvalidArgument};
-    }
 
     using UnsignedT = MakeUnsigned<T>;
 
@@ -108,16 +121,22 @@ template <typename T>
     const auto limitDiv10 = static_cast<UnsignedT>(limit / 10u);
     const auto limitMod10 = static_cast<UnsignedT>(limit % 10u);
 
-    while (first != last && priv::isDigit(*first))
+    while (p != last && priv::isDigit(*p))
     {
-        const auto digit = static_cast<UnsignedT>(*first - '0');
+        const auto digit = static_cast<UnsignedT>(*p - '0');
 
         // Check for overflow before multiplication
         if (result > limitDiv10 || (result == limitDiv10 && digit > limitMod10))
-            return {first, FromCharsError::ResultOutOfRange};
+        {
+            // Consume the rest of the number, so that parsing can resume after it
+            while (p != last && priv::isDigit(*p))
+                ++p;
+
+            return {p, FromCharsError::ResultOutOfRange};
+        }
 
         result = static_cast<UnsignedT>(result * 10u + digit);
-        ++first;
+        ++p;
     }
 
     if constexpr (!ZA_IS_UNSIGNED(T))
@@ -133,91 +152,53 @@ template <typename T>
         value = static_cast<T>(result);
     }
 
-    return {first, FromCharsError::None}; // Success
+    return {p, FromCharsError::None}; // Success
 }
 
 
 ////////////////////////////////////////////////////////////
 /// \brief Parse a floating-point number from `[first, last)` into `value`
 ///
-/// Accepts an optional sign, an integer part, and an optional fractional
-/// part. Exponents (`e`/`E`) are not currently supported. Uses
-/// `long double` internally to retain precision before narrowing the
-/// result back into `T`.
+/// Mirrors `std::from_chars` (`chars_format::general`): the result is the
+/// correctly rounded (nearest, ties to even) value of the input, whatever
+/// its number of digits. Accepts:
 ///
-/// Values beyond the finite range of `T`, and nonzero values that would
-/// round to zero, are rejected with `FromCharsError::ResultOutOfRange`
-/// (like `std::from_chars`): `value` is left untouched.
+/// - An optional sign (unlike `std::from_chars`, a leading `'+'` is also accepted).
+/// - Digits with an optional decimal point (`"12"`, `"1.5"`, `"5."`, `".5"`).
+/// - An optional exponent (`"1e5"`, `"2.5E-3"`), consumed only if digits follow
+///   (`"3em"` parses as `3`, stopping at `'e'`).
+/// - `"inf"`, `"infinity"`, `"nan"`, and `"nan(chars)"`, case-insensitively.
+///
+/// Values beyond the finite range of `T`, and nonzero values that round to
+/// zero, yield `FromCharsError::ResultOutOfRange`, with the returned pointer
+/// past the whole number. Without digits, `FromCharsError::InvalidArgument`
+/// is returned with `first`. On errors, `value` is left untouched.
+///
+/// `long double` values are parsed as `double`.
 ///
 ////////////////////////////////////////////////////////////
 template <typename T>
-[[nodiscard]] FromCharsResult fromChars(const char* first, const char* const last, T& value)
+[[nodiscard]] FromCharsResult fromChars(const char* const first, const char* const last, T& value)
     requires isFloatingPoint<T>
 {
-    if (first == last)
-        return {first, FromCharsError::InvalidArgument};
-
-    const char* initialFirst = first;
-
-    bool isNegative = false;
-
-    if (*first == '-')
+    if constexpr (ZA_IS_SAME(T, float))
     {
-        isNegative = true;
-        ++first;
+        return priv::fromCharsFloat(first, last, value);
     }
-    else if (*first == '+')
+    else if constexpr (ZA_IS_SAME(T, double))
     {
-        ++first;
+        return priv::fromCharsDouble(first, last, value);
     }
-
-    // Use long double for intermediate calculations to maximize precision.
-    long double result          = 0.0l;
-    bool        anyDigitsParsed = false;
-    bool        anyNonZeroDigit = false;
-
-    // Parse whole number part
-    while (first != last && priv::isDigit(*first))
+    else
     {
-        anyNonZeroDigit |= *first != '0';
-        result = result * 10.0l + (*first - '0');
-        ++first;
-        anyDigitsParsed = true;
+        double     parsed = 0.0;
+        const auto result = priv::fromCharsDouble(first, last, parsed);
+
+        if (result.ec == FromCharsError::None)
+            value = static_cast<T>(parsed);
+
+        return result;
     }
-
-    // Parse fractional part
-    if (first != last && *first == '.')
-    {
-        ++first;
-        long double power = 0.1l;
-        while (first != last && priv::isDigit(*first))
-        {
-            anyNonZeroDigit |= *first != '0';
-            result += (*first - '0') * power;
-            power /= 10.0l;
-            ++first;
-            anyDigitsParsed = true;
-        }
-    }
-
-    // If no digits were parsed at all, it's an error.
-    if (!anyDigitsParsed)
-        return {initialFirst, FromCharsError::InvalidArgument};
-
-    // Out of range: too large for `T` (converting it would be UB), or a nonzero value that underflows to zero
-    constexpr long double maxFinite = ZA_IS_SAME(T, float)    ? static_cast<long double>(__FLT_MAX__)
-                                      : ZA_IS_SAME(T, double) ? static_cast<long double>(__DBL_MAX__)
-                                                              : __LDBL_MAX__;
-
-    if (ZA_ISINF(result) || result > maxFinite || (anyNonZeroDigit && static_cast<T>(result) == T{0}))
-        return {first, FromCharsError::ResultOutOfRange};
-
-    if (isNegative)
-        result = -result;
-
-    value = static_cast<T>(result);
-
-    return {first, FromCharsError::None}; // Success
 }
 
 } // namespace za

@@ -455,3 +455,39 @@ TEST_CASE("[Base] toChars(double) at any magnitude")
         STATIC_CHECK(!ToCharsLargeValuesTest::CanFormat<ToCharsLargeValuesTest::I128>);
     }
 }
+
+
+TEST_CASE("[Base] toChars(double) rounds exactly")
+{
+    using ToCharsLargeValuesTest::format;
+    char buffer[400];
+
+    SECTION("The exact binary value decides, not a rounded intermediate product")
+    {
+        CHECK(format(buffer, 2.675, 2) == "2.67"); // 2.67499999999999982236431605997495353221893310546875
+        CHECK(format(buffer, 6578.925, 2) == "6578.93");
+        CHECK(format(buffer, 1.7278225, 6) == "1.727823");
+        CHECK(format(buffer, 1.0000005, 6) == "1.000001");
+        CHECK(format(buffer, 123'456'789.98765432, 3) == "123456789.988");
+    }
+
+    SECTION("Exact ties round to even")
+    {
+        CHECK(format(buffer, 0.5, 0) == "0");
+        CHECK(format(buffer, 1.5, 0) == "2");
+        CHECK(format(buffer, 0.125, 2) == "0.12");
+        CHECK(format(buffer, 0.375, 2) == "0.38");
+        CHECK(format(buffer, -0.625, 2) == "-0.62");
+        CHECK(format(buffer, 4'503'599'627'370'494.5, 0) == "4503599627370494"); // 2^52 - 1.5
+        CHECK(format(buffer, 4'503'599'627'370'495.5, 0) == "4503599627370496");
+    }
+
+    SECTION("Tiny values")
+    {
+        CHECK(format(buffer, 1e-11, 10) == "0.0000000000");
+        CHECK(format(buffer, 5e-11, 10) == "0.0000000001"); // the double is slightly above the tie
+        CHECK(format(buffer, 4.9406564584124654e-324, 10) == "0.0000000000");
+        CHECK(format(buffer, -4.9406564584124654e-324, 3) == "-0.000");
+        CHECK(format(buffer, 2.2250738585072014e-308, 1) == "0.0");
+    }
+}

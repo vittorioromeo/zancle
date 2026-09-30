@@ -6,14 +6,13 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
-#include "Zancle/Math/Rint.hpp"
-
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/BitCast.hpp"
 #include "Zancle/Base/Clzll.hpp"
 #include "Zancle/Base/IntTypes.hpp"
 #include "Zancle/Base/IsInf.hpp"
 #include "Zancle/Base/IsNan.hpp"
+#include "Zancle/Base/MulWide.hpp"
 #include "Zancle/Base/Signbit.hpp"
 
 #include "Zancle/Trait/IsFloatingPoint.hpp"
@@ -250,6 +249,71 @@ template <typename T>
     return p;
 }
 
+
+////////////////////////////////////////////////////////////
+/// \brief `fraction * multiplier` rounded to the nearest integer, exactly, with ties to even
+///
+/// `fraction` is in `[0, 1)` and `multiplier` is at most `10^10`. The result
+/// may equal `multiplier` (rounding up to the next integer). For ties, the
+/// parity is that of the result, or of the integer part (`integerPartOdd`)
+/// when `multiplier == 1` (i.e. when no fractional digit is printed).
+///
+/// Exact: `fraction` is exactly `mantissa / 2^shift`, and `mantissa * multiplier`
+/// (below `2^53 * 10^10 < 2^87`) is computed exactly in 128 bits. This does not
+/// depend on the FPU rounding mode, and avoids the double rounding of
+/// `rint(fraction * multiplier)`.
+///
+////////////////////////////////////////////////////////////
+[[nodiscard]] constexpr U64 roundScaledFraction(const double fraction, const U64 multiplier, const bool integerPartOdd) noexcept
+{
+    ZA_ASSERT(fraction >= 0.0 && fraction < 1.0);
+
+    // `fraction == mantissa * 2^-shift` (subnormals: no implicit bit, and the exponent of the smallest normal)
+    const auto bits          = ZA_BIT_CAST(U64, fraction);
+    const auto exponentField = static_cast<int>(bits >> 52);
+    const U64  mantissa      = (bits & ((U64{1} << 52) - 1u)) | (exponentField != 0 ? U64{1} << 52 : U64{0});
+    const int  shift         = 1075 - (exponentField != 0 ? exponentField : 1); // at least 53, as `fraction < 1`
+
+    // `product == mantissa * multiplier == high * 2^64 + low`
+    U64       high = 0u;
+    const U64 low  = mulWide(mantissa, multiplier, high);
+
+    // `result = product >> shift`, rounded according to the discarded bits (`remainder`) vs half (`2^(shift - 1)`)
+    U64  result      = 0u;
+    bool aboveHalf   = false;
+    bool exactlyHalf = false;
+
+    if (shift < 64)
+    {
+        result              = (high << (64 - shift)) | (low >> shift);
+        const U64 remainder = low & ((U64{1} << shift) - 1u);
+        const U64 half      = U64{1} << (shift - 1);
+
+        aboveHalf   = remainder > half;
+        exactlyHalf = remainder == half;
+    }
+    else if (shift == 64)
+    {
+        result      = high;
+        aboveHalf   = low > (U64{1} << 63);
+        exactlyHalf = low == (U64{1} << 63);
+    }
+    else if (shift < 128)
+    {
+        const int s             = shift - 64; // the remainder is `(high & mask) * 2^64 + low`
+        result                  = high >> s;
+        const U64 remainderHigh = high & ((U64{1} << s) - 1u);
+        const U64 halfHigh      = U64{1} << (s - 1);
+
+        aboveHalf   = remainderHigh > halfHigh || (remainderHigh == halfHigh && low != 0u);
+        exactlyHalf = remainderHigh == halfHigh && low == 0u;
+    }
+    // else: `product < 2^87 <= half`, so the result is zero
+
+    const bool odd = multiplier == 1u ? integerPartOdd : (result & 1u) != 0u;
+    return result + ((aboveHalf || (exactlyHalf && odd)) ? 1u : 0u);
+}
+
 } // namespace za::priv
 
 
@@ -309,8 +373,8 @@ template <typename T>
 /// values, whatever their magnitude (up to `DBL_MAX`). Special-value handling:
 /// `NaN` is written as `"nan"` (no sign, unlike some standard libraries'
 /// `"-nan"`), infinities as `"inf"` / `"-inf"`, negative zero preserves its
-/// sign (`"-0.00"`). Rounding uses the active FPU rounding mode (default:
-/// round-half-to-even).
+/// sign (`"-0.00"`). Rounding is exact, to nearest with ties to even,
+/// independently of the FPU rounding mode.
 ///
 /// `long double` values are formatted through `double`.
 ///
@@ -390,11 +454,6 @@ template <typename T>
         {
             p = priv::largeDoubleToChars(p, last, value);
         }
-        else if (precision == 0)
-        {
-            // Round the whole value, so that ties go to the even integer
-            p = priv::unsignedToChars(p, last, static_cast<unsigned long long>(za::rint(value)));
-        }
         else
         {
             // Split into the (exact) integer and fractional parts, so that only the fraction
@@ -403,9 +462,9 @@ template <typename T>
             const double fraction = value - static_cast<double>(intPart);   // exact
 
             const auto multiplier = static_cast<unsigned long long>(priv::powersOf10[precision]);
-            fracDigits = static_cast<unsigned long long>(za::rint(fraction * static_cast<double>(multiplier)));
+            fracDigits            = priv::roundScaledFraction(fraction, multiplier, (intPart & 1u) != 0u);
 
-            // Rounding up to the next integer (e.g. 0.9999999 at precision 6)
+            // Rounding up to the next integer (e.g. 0.9999999 at precision 6, or 2.5 -> 3 at precision 0)
             if (fracDigits == multiplier)
             {
                 ++intPart;

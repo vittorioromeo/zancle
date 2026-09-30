@@ -232,3 +232,33 @@ TEST_CASE("[Base] fromCharsRadix overflow at every radix")
     STATIC_CHECK(FromCharsRadixShiftTest::CanParseRadix<za::U32>);
     STATIC_CHECK(!FromCharsRadixShiftTest::CanParseRadix<bool>);
 }
+
+
+TEST_CASE("[Base] fromCharsRadix pointer semantics")
+{
+    SECTION("Overflow consumes the whole number and leaves the value untouched")
+    {
+        za::U8            u8   = 42;
+        const char* const text = "1ffffffffffffffffz";
+        const auto        r    = za::fromCharsRadix(text, text + ZA_STRLEN(text), u8, za::Radix::Hex);
+        CHECK(r.ec == za::FromCharsError::ResultOutOfRange);
+        CHECK(r.ptr == text + 17); // at 'z'
+        CHECK(u8 == 42);
+
+        const char* const bin  = "0101010101201";
+        const auto        rBin = za::fromCharsRadix(bin, bin + ZA_STRLEN(bin), u8, za::Radix::Bin);
+        CHECK(rBin.ec == za::FromCharsError::ResultOutOfRange);
+        CHECK(rBin.ptr == bin + 10); // at '2', not a binary digit
+        CHECK(u8 == 42);
+    }
+
+    SECTION("Invalid inputs consume nothing")
+    {
+        za::U32           v    = 42u;
+        const char* const text = "-1";
+        const auto        r    = za::fromCharsRadix(text, text + 2, v, za::Radix::Hex);
+        CHECK(r.ec == za::FromCharsError::InvalidArgument);
+        CHECK(r.ptr == text);
+        CHECK(v == 42u);
+    }
+}
