@@ -85,3 +85,16 @@ TEST_CASE("[System] za::MemoryInputStream")
         }
     }
 }
+
+
+TEST_CASE("[System] za::MemoryInputStream over no data")
+{
+    // E.g. an empty vector's `data()`
+    za::MemoryInputStream memoryInputStream(nullptr, 0u);
+
+    char output[4];
+    CHECK(memoryInputStream.read(output, 4u).value() == 0u);
+    CHECK(memoryInputStream.seek(10u).value() == 0u);
+    CHECK(memoryInputStream.tell().value() == 0u);
+    CHECK(memoryInputStream.getSize().value() == 0u);
+}

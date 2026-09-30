@@ -21,6 +21,7 @@
 #include "Zancle/Vocabulary/PassKey.hpp"
 
 #include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/IntTypes.hpp"
 #include "Zancle/Base/PtrDiffT.hpp"
 #include "Zancle/Base/ScopeGuard.hpp"
 #include "Zancle/Base/SizeT.hpp"
@@ -53,6 +54,47 @@
 namespace
 {
 ////////////////////////////////////////////////////////////
+// Make room for `size` bytes in `target` (after its current contents if `isAppend`, otherwise
+// replacing them), and fill them via `fFillBuffer(char* buffer, SizeT size) -> bool`, skipping
+// the zero-initialization a plain `resize` would do. On failure, `target` is left empty (or
+// with its original contents if `isAppend`) instead of exposing uninitialized bytes.
+template <typename T>
+[[nodiscard]] bool fillTargetWithFileContents(T& target, const za::SizeT size, const bool isAppend, auto&& fFillBuffer)
+{
+    if constexpr (ZA_IS_SAME(T, za::String))
+    {
+        ZA_ASSERT(!isAppend);
+        target.clear(); // no need to preserve the old contents when growing
+
+        bool filled = false;
+        target.resizeAndOverwrite(size,
+                                  [&](char* const buffer, const za::SizeT n)
+        {
+            filled = fFillBuffer(buffer, n);
+            return filled ? n : za::SizeT{0};
+        });
+
+        return filled;
+    }
+    else
+    {
+        static_assert(ZA_IS_SAME(T, za::Vector<char>));
+
+        if (!isAppend)
+            target.clear(); // no need to preserve the old contents when growing
+
+        const za::SizeT origin = target.size();
+        target.reserve(origin + size);
+
+        const bool filled = fFillBuffer(target.data() + origin, size);
+        target.unsafeSetSize(filled ? origin + size : origin);
+
+        return filled;
+    }
+}
+
+
+////////////////////////////////////////////////////////////
 // Convert either a `StringView` or a `Path` into a UTF-8 `std::string` for
 // use with C stdio's narrow-char `fopen`. Used by the fallback path.
 [[maybe_unused, gnu::always_inline]] inline std::string toUtf8FilenameForStdio(za::StringView v)
@@ -79,7 +121,10 @@ bool readFromFileFallback(const Filename& filename, T& target, const bool isAppe
 
     const auto fail = [&]
     {
-        za::priv::errMsg("Failed to read from file '{}'\n", filename);
+        if (!isAppend)
+            target.clear();
+
+        za::priv::errMsg("Failed to read from file '{}'", filename);
         return false;
     };
 
@@ -116,18 +161,9 @@ bool readFromFileFallback(const Filename& filename, T& target, const bool isAppe
 
     const auto size = static_cast<za::SizeT>(rawSize);
 
-    za::SizeT got = 0u;
-
-    dispatchReadFileContentsIntoBufferImpl(target,
-                                           size,
-                                           isAppend,
-                                           [&](char* buf, za::SizeT n)
-    {
-        got = std::fread(buf, 1u, n, file);
-        return n;
-    });
-
-    if (got != size)
+    if (!fillTargetWithFileContents(target, size, isAppend, [&](char* const buffer, const za::SizeT n) {
+        return std::fread(buffer, 1u, n, file) == n;
+    }))
         return fail();
 
     return true;
@@ -162,11 +198,14 @@ bool readFromFileFallback(const Filename& filename, T& target, const bool isAppe
 
 
 ////////////////////////////////////////////////////////////
+// Share everything, like `_wfopen` (and thus `InFile` / `FileInputStream`) does: otherwise, opening
+// fails with a sharing violation while another process has the file open for writing (e.g. an
+// editor saving a shader that is being hot-reloaded)
 [[nodiscard]] inline ::HANDLE nativeCreateFileW(const wchar_t* nullTerminatedPath)
 {
     return ::CreateFileW(nullTerminatedPath,
                          GENERIC_READ,
-                         FILE_SHARE_READ,
+                         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                          nullptr,
                          OPEN_EXISTING,
                          FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN,
@@ -317,20 +356,12 @@ inline void nativeClose(::HANDLE handle)
 
 
 ////////////////////////////////////////////////////////////
-// Path-native overload: on Linux/BSD/Emscripten `Path::c_str()` is already a
-// UTF-8 `const char*` (per `Zancle/IO/Path.hpp`'s value_type macro), so it
-// can be handed straight to `::open` with no per-call allocation. On other
-// POSIX platforms (macOS/iOS/Android) Path stores `wchar_t`, so we go through
-// a single `to<std::string>()` UTF-8 conversion -- then call `::open` directly
-// rather than delegating to the StringView opener (which would re-convert).
+// Path-native overload: on POSIX, `Path::c_str()` is already a narrow
+// `const char*`, so it can be handed straight to `::open` with no per-call
+// allocation.
 [[nodiscard]] bool nativeOpenAndStat(const za::Path& filename, int& outFd, za::SizeT& outSize)
 {
-    #if defined(ZA_SYSTEM_LINUX_OR_BSD) || defined(ZA_SYSTEM_EMSCRIPTEN)
     const int fd = nativeOpenCStr(filename.c_str());
-    #else
-    const auto utf8 = filename.to<std::string>();
-    const int  fd   = nativeOpenCStr(utf8.c_str());
-    #endif
 
     if (fd < 0)
         return false;
@@ -378,39 +409,16 @@ inline void nativeClose(int fd)
 #endif
 
 
-template <typename T>
-void dispatchReadFileContentsIntoBufferImpl(T& target, const za::SizeT size, const bool isAppend, auto&& fFillBuffer)
-{
-    if constexpr (ZA_IS_SAME(T, std::string))
-    {
-        target.resize_and_overwrite(size, fFillBuffer);
-    }
-    else if constexpr (ZA_IS_SAME(T, za::String))
-    {
-        target.resizeAndOverwrite(size, fFillBuffer);
-    }
-    else
-    {
-        static_assert(ZA_IS_SAME(T, za::Vector<char>));
-
-        const za::SizeT origin    = isAppend ? target.size() : 0u;
-        const za::SizeT finalSize = origin + size;
-
-        target.reserve(finalSize);
-        fFillBuffer(target.data() + origin, size);
-        target.unsafeSetSize(finalSize);
-    }
-}
-
 ////////////////////////////////////////////////////////////
 // `Filename` is either `za::StringView` or `const za::Path&`; both
 // resolve to a matching `nativeOpenAndStat` overload above. The Path-taking
 // version skips the UTF-8 → UTF-16 conversion on Windows and skips the
-// `to<std::string>()` allocation on Linux/BSD/Emscripten.
+// `to<std::string>()` allocation on POSIX.
 // `isAppend` is meaningful only when `T == za::Vector<char>`: when true, the
 // file's bytes are appended to `target` (preserving existing content); when
-// false, `target` is replaced. For string types it must be `false` and the
-// behavior is replace.
+// false, `target` is replaced. For `za::String` it must be `false` and the
+// behavior is replace. On failure, `target` is left empty (or unchanged if
+// `isAppend`).
 template <typename Filename, typename T>
 bool readFromFileImpl(const Filename& filename, T& target, const bool isAppend)
 {
@@ -428,7 +436,10 @@ bool readFromFileImpl(const Filename& filename, T& target, const bool isAppend)
     za::SizeT size = 0u;
     if (!nativeOpenAndStat(filename, handle, size))
     {
-        za::priv::errMsg("Failed to read from file '{}'\n", filename);
+        if (!isAppend)
+            target.clear();
+
+        za::priv::errMsg("Failed to read from file '{}'", filename);
         return false;
     }
 
@@ -442,23 +453,11 @@ bool readFromFileImpl(const Filename& filename, T& target, const bool isAppend)
         return true;
     }
 
-    // `resize_and_overwrite` (std::string, C++23) and the analogous
-    // `resizeAndOverwrite` on `za::String` skip the zero-init pass that
-    // a plain `resize` would do.
-    bool readOk = false;
-
-    dispatchReadFileContentsIntoBufferImpl(target,
-                                           size,
-                                           isAppend,
-                                           [&](char* buf, za::SizeT n)
+    if (!fillTargetWithFileContents(target, size, isAppend, [&](char* const buffer, const za::SizeT n) {
+        return nativeReadFully(handle, buffer, n);
+    }))
     {
-        readOk = nativeReadFully(handle, buf, n);
-        return n;
-    });
-
-    if (!readOk)
-    {
-        za::priv::errMsg("Failed to read the full contents of file '{}'\n", filename);
+        za::priv::errMsg("Failed to read the full contents of file '{}'", filename);
         return false;
     }
 
@@ -474,39 +473,44 @@ namespace za
 ////////////////////////////////////////////////////////////
 bool writeToFile(za::StringView filename, za::StringView contents)
 {
-    // `Path{StringView}` is unavailable; route via `std::string` (matches the
-    // pre-migration behavior, which constructed `std::ofstream` the same way).
-    auto optFile = OutFile::open(Path{filename.to<std::string>()}, FileOpenMode::bin);
-    if (!optFile.hasValue())
-    {
-        priv::errMsg("Failed to write to file '{}'\n", filename);
-        return false;
-    }
-
-    // Destructor closes; explicit close errors would be lost here, but the
-    // write itself is reported and that's the meaningful failure path.
-    return optFile->write(contents.data(), contents.size());
+    return writeToFile(Path{filename}, contents);
 }
 
 
 ////////////////////////////////////////////////////////////
 bool writeToFile(const Path& filename, za::StringView contents)
 {
-    auto optFile = OutFile::open(filename, FileOpenMode::bin);
-    if (!optFile.hasValue())
+    // Write everything to a temporary file in the same directory (a rename is only atomic within
+    // a filesystem), then replace `filename` with it
+    Path temporaryFilename = filename;
+    temporaryFilename += ".za-tmp";
+
+    const auto fail = [&](const char* const reason)
     {
-        priv::errMsg("Failed to write to file '{}'\n", filename);
+        (void)temporaryFilename.removeFromDisk();
+        priv::errMsg("Failed to write to file '{}' ({})", filename, reason);
         return false;
+    };
+
+    {
+        auto optFile = OutFile::open(temporaryFilename, FileOpenMode::bin);
+        if (!optFile.hasValue())
+            return fail("cannot create the temporary file");
+
+        // Always close (before removing the file, which Windows forbids while it is open)
+        const bool written = optFile->write(contents.data(), contents.size());
+        const bool closed  = optFile->close();
+
+        if (!written || !closed)
+            return fail(written ? "error while closing" : "error while writing");
     }
 
-    return optFile->write(contents.data(), contents.size());
-}
+    // Atomic, and retried briefly on Windows, where a freshly written file is often held open for a
+    // few milliseconds by other processes (e.g. antivirus scanners)
+    if (!temporaryFilename.renameTo(filename))
+        return fail("cannot replace the file");
 
-
-////////////////////////////////////////////////////////////
-bool readFromFile(za::StringView filename, std::string& target)
-{
-    return readFromFileImpl(filename, target, /* isAppend */ false);
+    return true;
 }
 
 
@@ -519,13 +523,6 @@ bool readFromFile(za::StringView filename, za::String& target)
 
 ////////////////////////////////////////////////////////////
 bool readFromFile(za::StringView filename, za::Vector<char>& target)
-{
-    return readFromFileImpl(filename, target, /* isAppend */ false);
-}
-
-
-////////////////////////////////////////////////////////////
-bool readFromFile(const Path& filename, std::string& target)
 {
     return readFromFileImpl(filename, target, /* isAppend */ false);
 }
@@ -574,11 +571,13 @@ namespace
 // Map our `FileOpenMode` flags to a `fopen`-style mode string.
 //
 // `OutFile` is always opened for writing, so the table only distinguishes
-// truncate-vs-append and text-vs-binary. The `in` / `ate` flags are
-// meaningless on an output handle and ignored. Returns one of:
+// truncate-vs-append and text-vs-binary. `ate` truncates (like `std::ofstream`
+// without `app` or `in`), and read-write (`in`) is not supported. Returns one of:
 //     "w", "wb", "a", "ab"
-[[nodiscard, gnu::const]] constexpr const char* mapOutFileOpenMode(const za::FileOpenMode mode) noexcept
+[[nodiscard]] constexpr const char* mapOutFileOpenMode(const za::FileOpenMode mode) noexcept
 {
+    ZA_ASSERT((mode & za::FileOpenMode::in) == za::FileOpenMode::none && "`OutFile` cannot be opened for reading");
+
     const bool append = (mode & za::FileOpenMode::app) != za::FileOpenMode::none;
     const bool binary = (mode & za::FileOpenMode::bin) != za::FileOpenMode::none;
 
@@ -604,13 +603,25 @@ void closeAndReport(std::FILE* const file, const char* const kindName)
         za::priv::errMsg("za::{}: `fclose` reported an error; buffered output may have been lost", kindName);
 }
 
+
+////////////////////////////////////////////////////////////
+// Offsets as `PtrDiffT` (which may be 32-bit) from the 64-bit `tellFile`
+[[nodiscard]] bool toPtrDiff(const za::I64 position, za::PtrDiffT& out) noexcept
+{
+    if (position < 0 || static_cast<za::I64>(static_cast<za::PtrDiffT>(position)) != position)
+        return false;
+
+    out = static_cast<za::PtrDiffT>(position);
+    return true;
+}
+
 } // namespace
 
 
 ////////////////////////////////////////////////////////////
 struct OutFile::Impl
 {
-    std::FILE* file; //!< Non-null on a live `OutFile`; null only in a moved-from object.
+    std::FILE* file; //!< Non-null on a live `OutFile`; null in a moved-from or closed object.
 };
 
 
@@ -681,12 +692,24 @@ bool OutFile::flush()
 
 
 ////////////////////////////////////////////////////////////
+bool OutFile::close()
+{
+    std::FILE* const file = m_impl->file;
+    if (file == nullptr)
+        return false;
+
+    m_impl->file = nullptr;
+    return std::fclose(file) == 0;
+}
+
+
+////////////////////////////////////////////////////////////
 bool OutFile::seekPos(za::PtrDiffT absolutePos)
 {
     if (m_impl->file == nullptr)
         return false;
 
-    return std::fseek(m_impl->file, static_cast<long>(absolutePos), SEEK_SET) == 0;
+    return seekFile(m_impl->file, static_cast<za::I64>(absolutePos), SEEK_SET);
 }
 
 
@@ -696,12 +719,7 @@ bool OutFile::tellPos(za::PtrDiffT& out)
     if (m_impl->file == nullptr)
         return false;
 
-    const long pos = std::ftell(m_impl->file);
-    if (pos < 0)
-        return false;
-
-    out = static_cast<za::PtrDiffT>(pos);
-    return true;
+    return toPtrDiff(tellFile(m_impl->file), out);
 }
 
 
@@ -723,18 +741,21 @@ namespace
 // Map our `FileOpenMode` flags to a `fopen`-style mode string for input.
 //
 // `InFile` always opens for reading. The only meaningful distinction left
-// is text vs. binary; `app` / `out` / `trunc` are ignored on the input
+// is text vs. binary; `app` / `out` / `trunc` are not supported on the input
 // side. `ate` (open at end) is handled separately by `open()` via a
 // post-`fopen` seek -- mirroring `std::ios::ate` semantics.
-[[nodiscard, gnu::const]] constexpr const char* mapInFileOpenMode(const za::FileOpenMode mode) noexcept
+[[nodiscard]] constexpr const char* mapInFileOpenMode(const za::FileOpenMode mode) noexcept
 {
+    ZA_ASSERT((mode & (za::FileOpenMode::out | za::FileOpenMode::app | za::FileOpenMode::trunc)) == za::FileOpenMode::none &&
+              "`InFile` cannot be opened for writing");
+
     return (mode & za::FileOpenMode::bin) != za::FileOpenMode::none ? "rb" : "r";
 }
 
 
 ////////////////////////////////////////////////////////////
 // Map `SeekDir` to a stdio `SEEK_*` constant.
-[[nodiscard, gnu::const]] constexpr int mapSeekDirToStdio(const za::SeekDir dir) noexcept
+[[nodiscard]] constexpr int mapSeekDirToStdio(const za::SeekDir dir) noexcept
 {
     switch (dir)
     {
@@ -883,7 +904,7 @@ bool InFile::seekPos(za::PtrDiffT absolutePos)
     // is no longer adjacent to the next read.
     m_impl->peeked = peekCacheEmpty;
 
-    return std::fseek(m_impl->file, static_cast<long>(absolutePos), SEEK_SET) == 0;
+    return seekFile(m_impl->file, static_cast<za::I64>(absolutePos), SEEK_SET);
 }
 
 
@@ -897,13 +918,13 @@ bool InFile::seekPos(za::PtrDiffT offset, SeekDir dir)
     // byte ahead of the logical cursor (we already pulled the cached byte
     // via `fgetc`). For `SeekDir::cur`, compensate so the seek lands at
     // the offset the caller expects. `tellPos` performs the symmetric
-    // adjustment at line ~910.
+    // adjustment.
     if (dir == SeekDir::cur && m_impl->peeked != peekCacheEmpty && m_impl->peeked != EOF)
         offset -= 1;
 
     m_impl->peeked = peekCacheEmpty;
 
-    return std::fseek(m_impl->file, static_cast<long>(offset), mapSeekDirToStdio(dir)) == 0;
+    return seekFile(m_impl->file, static_cast<za::I64>(offset), mapSeekDirToStdio(dir));
 }
 
 
@@ -913,17 +934,16 @@ bool InFile::tellPos(za::PtrDiffT& out)
     if (m_impl->file == nullptr)
         return false;
 
-    const long pos = std::ftell(m_impl->file);
+    const za::I64 pos = tellFile(m_impl->file);
     if (pos < 0)
         return false;
 
     // A peeked-but-unconsumed byte sits one position "before" the FILE's
     // logical cursor (we already pulled it via `fgetc`). Adjust so callers
     // see a stable cursor across peek calls.
-    const long adj = (m_impl->peeked != peekCacheEmpty && m_impl->peeked != EOF) ? 1 : 0;
+    const za::I64 adj = (m_impl->peeked != peekCacheEmpty && m_impl->peeked != EOF) ? 1 : 0;
 
-    out = static_cast<za::PtrDiffT>(pos - adj);
-    return true;
+    return toPtrDiff(pos - adj, out);
 }
 
 

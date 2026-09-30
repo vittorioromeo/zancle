@@ -23,7 +23,7 @@ MemoryInputStream::MemoryInputStream(const void* data, za::SizeT sizeInBytes) :
     m_data(static_cast<const unsigned char*>(data)),
     m_size(sizeInBytes)
 {
-    ZA_ASSERT(m_data != nullptr && "MemoryInputStream must be initialized with non-null data");
+    ZA_ASSERT((m_data != nullptr || m_size == 0u) && "MemoryInputStream must be initialized with non-null data");
 }
 
 

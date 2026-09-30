@@ -29,6 +29,8 @@ public:
     ////////////////////////////////////////////////////////////
     /// \brief Construct from a pointer to `sizeInBytes` bytes of data
     ///
+    /// `data` may be null if `sizeInBytes` is zero (e.g. an empty vector's `data()`).
+    ///
     ////////////////////////////////////////////////////////////
     MemoryInputStream(const void* data, za::SizeT sizeInBytes);
 

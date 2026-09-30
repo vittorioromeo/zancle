@@ -26,16 +26,19 @@
 #include "Zancle/Base/IntTypes.hpp"
 #include "Zancle/Base/Macros.hpp"
 #include "Zancle/Base/SizeT.hpp"
+#include "Zancle/Base/Strlen.hpp"
 
 #include "Zancle/Trait/IsSame.hpp"
-#include "Zancle/Trait/RemoveCVRef.hpp"
 
 #include <filesystem>
 #include <string>
-#include <string_view>
 #include <system_error>
 
 #include <cstdlib>
+
+#ifdef ZA_SYSTEM_WINDOWS
+    #include "Zancle/Base/WindowsHeader.hpp"
+#endif
 
 
 namespace
@@ -44,6 +47,80 @@ namespace
 [[nodiscard, gnu::always_inline]] constexpr char asciiToLower(const char c) noexcept
 {
     return (c >= 'A' && c <= 'Z') ? static_cast<char>(c + 32) : c;
+}
+
+
+////////////////////////////////////////////////////////////
+/// \brief `std::filesystem::path` from `size` bytes of UTF-8 at `data`
+///
+/// `std::filesystem::path`'s own `char` constructors use the "native narrow
+/// encoding", which is the ANSI code page on Windows with MSVC and libc++
+/// (but UTF-8 with libstdc++). Going through `char8_t` means UTF-8 everywhere.
+/// Elsewhere the native narrow encoding is used verbatim (bytes, UTF-8 in
+/// practice), so that non-UTF-8 file names still round-trip.
+///
+////////////////////////////////////////////////////////////
+[[nodiscard]] std::filesystem::path fsPathFromUtf8(const char* const data, const za::SizeT size)
+{
+#ifdef ZA_SYSTEM_WINDOWS
+    const auto* const begin = reinterpret_cast<const char8_t*>(data);
+    return std::filesystem::path(begin, begin + size);
+#else
+    return std::filesystem::path(data, data + size);
+#endif
+}
+
+
+////////////////////////////////////////////////////////////
+template <typename Char>
+[[nodiscard]] za::SizeT nullTerminatedLength(const Char* str) noexcept
+{
+    za::SizeT length = 0u;
+
+    while (str[length] != Char{})
+        ++length;
+
+    return length;
+}
+
+
+////////////////////////////////////////////////////////////
+/// \brief Run `operation(ec) -> bool` (a filesystem modification), retrying briefly on transient Windows errors
+///
+/// On Windows, other processes (e.g. antivirus scanners, search indexers) commonly hold freshly
+/// written or deleted files open for a few milliseconds. Meanwhile, replacing such a file fails with
+/// an access or sharing error, and a deleted file lingers ("delete pending"), so that removing its
+/// directory fails as not empty, and re-creating a just-removed directory fails as access denied.
+/// Measured on Windows 11 with Defender: ~7% of renames over a freshly written file, ~3% of directory
+/// removals right after removing their last file, and ~33% of directory re-creations fail this way.
+///
+/// Elsewhere (and on genuine errors) `operation` runs exactly once.
+///
+////////////////////////////////////////////////////////////
+template <typename Operation>
+[[nodiscard]] bool retryTransientErrors(Operation&& operation)
+{
+#ifdef ZA_SYSTEM_WINDOWS
+    constexpr int maxAttempts = 10; // at most ~45ms of waiting
+
+    for (int attempt = 1;; ++attempt)
+    {
+        std::error_code ec;
+        if (operation(ec))
+            return true;
+
+        const bool transient = ec == std::errc::permission_denied || ec == std::errc::device_or_resource_busy ||
+                               ec == std::errc::directory_not_empty;
+
+        if (!transient || attempt == maxAttempts)
+            return false;
+
+        ::Sleep(static_cast<::DWORD>(attempt));
+    }
+#else
+    std::error_code ec;
+    return operation(ec);
+#endif
 }
 
 } // namespace
@@ -55,18 +132,6 @@ namespace za
 struct Path::Impl
 {
     std::filesystem::path fsPath;
-
-    Impl() = default;
-
-    template <typename T>
-        requires(!za::isSame<za::RemoveCVRefIndirect<T>, Impl>)
-    explicit Impl(T&& source) : fsPath{ZA_FORWARD(source)}
-    {
-    }
-
-    explicit Impl(const za::String& source) : fsPath{std::string_view{source.data(), source.size()}}
-    {
-    }
 };
 
 
@@ -109,7 +174,8 @@ bool Path::setCurrentDirectory(const Path& path)
 za::Optional<Path> Path::getHomeDirectory()
 {
 #ifdef ZA_SYSTEM_WINDOWS
-    if (const char* const userProfile = std::getenv("USERPROFILE"))
+    // Wide: the narrow environment uses the ANSI code page, which cannot represent every user name
+    if (const wchar_t* const userProfile = ::_wgetenv(L"USERPROFILE"))
         return za::makeOptional(Path{userProfile});
 #else
     if (const char* const home = std::getenv("HOME"))
@@ -125,29 +191,43 @@ Path::Path() = default;
 
 
 ////////////////////////////////////////////////////////////
-template <typename T>
-Path::Path(const T& source) : m_impl(source)
+Path::Path(const char* source) : Path(0, source, ZA_STRLEN(source))
 {
 }
 
-template ZA_SYSTEM_API Path::Path(const za::String&);
-template ZA_SYSTEM_API Path::Path(const std::string&);
-template ZA_SYSTEM_API Path::Path(const std::basic_string<wchar_t>&);
-template ZA_SYSTEM_API Path::Path(const std::u32string&);
-template ZA_SYSTEM_API Path::Path(const std::filesystem::path&);
 
 ////////////////////////////////////////////////////////////
-template <typename T>
-Path::Path(const T* source) : m_impl(source)
+Path::Path(const wchar_t* source) : Path(0, source, nullTerminatedLength(source))
 {
 }
 
-template ZA_SYSTEM_API Path::Path(const char*);
-template ZA_SYSTEM_API Path::Path(const wchar_t*);
-template ZA_SYSTEM_API Path::Path(const char32_t*);
 
 ////////////////////////////////////////////////////////////
-Path::Path(int, const void* fsPath) : m_impl(*static_cast<const std::filesystem::path*>(fsPath))
+Path::Path(const char32_t* source) : Path(0, source, nullTerminatedLength(source))
+{
+}
+
+
+////////////////////////////////////////////////////////////
+Path::Path(int, const void* fsPath) : m_impl{*static_cast<const std::filesystem::path*>(fsPath)}
+{
+}
+
+
+////////////////////////////////////////////////////////////
+Path::Path(int, const char* data, const za::SizeT size) : m_impl{fsPathFromUtf8(data, size)}
+{
+}
+
+
+////////////////////////////////////////////////////////////
+Path::Path(int, const wchar_t* data, const za::SizeT size) : m_impl{std::filesystem::path(data, data + size)}
+{
+}
+
+
+////////////////////////////////////////////////////////////
+Path::Path(int, const char32_t* data, const za::SizeT size) : m_impl{std::filesystem::path(data, data + size)}
 {
 }
 
@@ -284,18 +364,17 @@ bool Path::extensionIs(const za::StringView str) const
 {
     // Delegate the "what is the extension substring" decision to
     // `std::filesystem::path::extension()` so we always match its
-    // semantics for `.`, `..`, leading-dot stems, etc.
-    // `.native()` returns a reference, so the only allocation is
-    // inside `extension()`'s returned path -- which is SSO-friendly
-    // for typical extensions like `.png`.
-    const auto  extPath   = m_impl->fsPath.extension();
-    const auto& nativeExt = extPath.native();
+    // semantics for `.`, `..`, leading-dot stems, etc. Compare in UTF-8,
+    // like `str`: on Windows, narrowing the native UTF-16 code units would
+    // make non-ASCII characters alias ASCII ones (e.g. U+0170 as 'p').
+    // Typical extensions like `.png` fit in the small-string buffer.
+    const auto ext = m_impl->fsPath.extension().u8string();
 
-    if (nativeExt.size() != str.size())
+    if (ext.size() != str.size())
         return false;
 
-    for (za::SizeT i = 0u; i < nativeExt.size(); ++i)
-        if (asciiToLower(static_cast<char>(nativeExt[i])) != asciiToLower(str[i]))
+    for (za::SizeT i = 0u; i < ext.size(); ++i)
+        if (asciiToLower(static_cast<char>(ext[i])) != asciiToLower(str[i]))
             return false;
 
     return true;
@@ -312,8 +391,8 @@ bool Path::hasParent() const
 ////////////////////////////////////////////////////////////
 bool Path::removeFromDisk() const
 {
-    std::error_code ec;
-    return std::filesystem::remove(m_impl->fsPath, ec) && !ec;
+    // A missing path yields `false` without an error, and is not retried
+    return retryTransientErrors([&](std::error_code& ec) { return std::filesystem::remove(m_impl->fsPath, ec) && !ec; });
 }
 
 
@@ -328,28 +407,33 @@ bool Path::copyFileTo(const Path& path) const
 ////////////////////////////////////////////////////////////
 bool Path::createLeafDirectory() const
 {
-    std::error_code ec;
-    return std::filesystem::create_directory(m_impl->fsPath, ec) && !ec;
+    // An existing directory yields `false` without an error, and is not retried
+    return retryTransientErrors([&](std::error_code& ec)
+    { return std::filesystem::create_directory(m_impl->fsPath, ec) && !ec; });
 }
 
 
 ////////////////////////////////////////////////////////////
 bool Path::createDirectoryTree() const
 {
-    std::error_code ec;
-    const bool      created = std::filesystem::create_directories(m_impl->fsPath, ec);
+    return retryTransientErrors([&](std::error_code& ec)
+    {
+        const bool created = std::filesystem::create_directories(m_impl->fsPath, ec);
 
-    // `create_directories` returns false when the path already exists; that's not an error.
-    return !ec && (created || std::filesystem::is_directory(m_impl->fsPath, ec));
+        // `create_directories` returns false when the path already exists; that's not an error.
+        return !ec && (created || std::filesystem::is_directory(m_impl->fsPath, ec));
+    });
 }
 
 
 ////////////////////////////////////////////////////////////
 bool Path::renameTo(const Path& target) const
 {
-    std::error_code ec;
-    std::filesystem::rename(m_impl->fsPath, target.m_impl->fsPath, ec);
-    return !ec;
+    return retryTransientErrors([&](std::error_code& ec)
+    {
+        std::filesystem::rename(m_impl->fsPath, target.m_impl->fsPath, ec);
+        return !ec;
+    });
 }
 
 
@@ -362,16 +446,16 @@ bool Path::forEachEntry(za::FunctionRef<void(const Path&)> callback) const
     if (ec)
         return false;
 
-    const std::filesystem::directory_iterator end;
-    for (; it != end; it.increment(ec))
+    // Check `ec` after every `increment`: on error, the iterator becomes the end
+    // iterator, which would otherwise end the loop as if the listing were complete
+    for (const std::filesystem::directory_iterator end; it != end;)
     {
+        const auto& entryPath = it->path();
+        callback(Path{0, &entryPath});
+
+        it.increment(ec);
         if (ec)
             return false;
-
-        const auto& entryPath = it->path();
-        const Path  entry{0, &entryPath};
-
-        callback(entry);
     }
 
     return true;
@@ -457,10 +541,23 @@ bool Path::operator==(const Path& rhs) const
 
 
 ////////////////////////////////////////////////////////////
-template <typename T>
-bool Path::operator==(const T* str) const
+bool Path::operator==(const char* str) const
 {
-    return m_impl->fsPath == std::filesystem::path(str);
+    return *this == Path{str};
+}
+
+
+////////////////////////////////////////////////////////////
+bool Path::operator==(const wchar_t* str) const
+{
+    return *this == Path{str};
+}
+
+
+////////////////////////////////////////////////////////////
+bool Path::operator==(const char32_t* str) const
+{
+    return *this == Path{str};
 }
 
 
@@ -509,16 +606,3 @@ za::FmtResult fmtArg(za::FmtSink& sink, const PathDebugFormatter& dbg, const za:
 }
 
 } // namespace za::priv
-
-
-////////////////////////////////////////////////////////////
-namespace za
-{
-
-
-////////////////////////////////////////////////////////////
-template ZA_SYSTEM_API bool Path::operator== <char>(const char*) const;
-template ZA_SYSTEM_API bool Path::operator== <wchar_t>(const wchar_t*) const;
-template ZA_SYSTEM_API bool Path::operator== <char32_t>(const char32_t*) const;
-
-} // namespace za

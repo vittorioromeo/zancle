@@ -9,6 +9,8 @@
 #include "Zancle/Scn/Scn.hpp"
 #include "Zancle/Scn/ScnString.hpp"
 
+#include "Zancle/Fmt/FmtToString.hpp"
+
 #include "Zancle/IO/Path.hpp"
 
 #include "Zancle/String/String.hpp"
@@ -377,7 +379,7 @@ TEST_CASE("[System] za::writeToFile and za::readFromFile")
 
         CHECK(za::writeToFile(path, "Hello world"_sv));
 
-        std::string contents;
+        za::String contents;
         CHECK(za::readFromFile(path, contents));
         CHECK(contents == "Hello world");
     }
@@ -389,7 +391,7 @@ TEST_CASE("[System] za::writeToFile and za::readFromFile")
 
         CHECK(za::writeToFile(path, ""_sv));
 
-        std::string contents = "stale";
+        za::String contents = "stale";
         CHECK(za::readFromFile(path, contents));
         CHECK(contents.empty());
     }
@@ -400,8 +402,9 @@ TEST_CASE("[System] za::writeToFile and za::readFromFile")
         // The file does not exist on disk yet.
         const za::Path& path = temporaryFile.getPath();
 
-        std::string contents;
+        za::String contents = "stale";
         CHECK(!za::readFromFile(path, contents));
+        CHECK(contents.empty()); // left empty on failure
     }
 
     SECTION("Binary content with embedded NULs and high bytes is preserved")
@@ -416,7 +419,7 @@ TEST_CASE("[System] za::writeToFile and za::readFromFile")
 
         CHECK(za::writeToFile(path, payload));
 
-        std::string contents;
+        za::String contents;
         CHECK(za::readFromFile(path, contents));
         CHECK(contents.size() == sizeof(raw));
         CHECK(za::StringView(contents.data(), contents.size()) == payload);
@@ -445,10 +448,10 @@ TEST_CASE("[System] za::writeToFile and za::readFromFile")
 
         CHECK(za::writeToFile(path, za::StringView(payload.data(), payload.size())));
 
-        std::string contents;
+        za::String contents;
         CHECK(za::readFromFile(path, contents));
         REQUIRE(contents.size() == payload.size());
-        CHECK(contents == payload);
+        CHECK(za::StringView(contents.data(), contents.size()) == za::StringView(payload.data(), payload.size()));
     }
 
     SECTION("Read overwrites pre-existing content in target")
@@ -458,7 +461,7 @@ TEST_CASE("[System] za::writeToFile and za::readFromFile")
 
         CHECK(za::writeToFile(path, "short"_sv));
 
-        std::string contents = "this is a much longer pre-existing string that should be overwritten";
+        za::String contents = "this is a much longer pre-existing string that should be overwritten";
         CHECK(za::readFromFile(path, contents));
         CHECK(contents == "short");
     }
@@ -601,13 +604,6 @@ TEST_CASE("[System] za::writeToFile and za::readFromFile")
         const za::StringView pathView{pathOwning.data(), pathOwning.size()};
 
         CHECK(za::writeToFile(pathView, "Hello via StringView"_sv));
-
-        SECTION("Read into std::string via StringView")
-        {
-            std::string contents;
-            CHECK(za::readFromFile(pathView, contents));
-            CHECK(contents == "Hello via StringView");
-        }
 
         SECTION("Read into za::String via StringView")
         {
@@ -783,4 +779,245 @@ TEST_CASE("[System] za::FileOpenMode")
         STATIC_CHECK((combined & za::FileOpenMode::bin) == za::FileOpenMode::bin);
         STATIC_CHECK((combined & za::FileOpenMode::out) == za::FileOpenMode::none);
     }
+}
+
+
+namespace
+{
+namespace IOReviewTest // for unity builds
+{
+////////////////////////////////////////////////////////////
+[[nodiscard]] za::Path withTemporarySuffix(const za::Path& path)
+{
+    za::Path result = path;
+    result += ".za-tmp";
+    return result;
+}
+
+
+////////////////////////////////////////////////////////////
+/// \brief RAII temporary directory for tests
+///
+class TemporaryDirectory
+{
+public:
+    explicit TemporaryDirectory() : m_path(za::testing::getTemporaryFilePath())
+    {
+        [[maybe_unused]] const bool created = m_path.createLeafDirectory();
+        ZA_ASSERT(created && "Failed to create temporary directory");
+    }
+
+    ~TemporaryDirectory()
+    {
+        (void)m_path.forEachEntry([](const za::Path& entry) { (void)entry.removeFromDisk(); });
+        (void)m_path.removeFromDisk();
+    }
+
+    TemporaryDirectory(const TemporaryDirectory&)            = delete;
+    TemporaryDirectory& operator=(const TemporaryDirectory&) = delete;
+
+    [[nodiscard]] const za::Path& getPath() const
+    {
+        return m_path;
+    }
+
+private:
+    za::Path m_path;
+};
+
+} // namespace IOReviewTest
+} // namespace
+
+
+TEST_CASE("[System] za::writeToFile atomicity")
+{
+    using namespace za::literals;
+    using IOReviewTest::withTemporarySuffix;
+
+    SECTION("Replaces existing contents and leaves no temporary file behind")
+    {
+        const TemporaryFile temporaryFile("old contents, longer than the new ones");
+        const za::Path&     path = temporaryFile.getPath();
+
+        CHECK(za::writeToFile(path, "new"_sv));
+
+        za::String contents;
+        CHECK(za::readFromFile(path, contents));
+        CHECK(contents == "new");
+
+        CHECK(!withTemporarySuffix(path).exists());
+    }
+
+    SECTION("Fails in a missing directory, leaving nothing behind")
+    {
+        const za::Path path = za::testing::getTemporaryFilePath() / za::Path{"file.txt"};
+
+        CHECK(!za::writeToFile(path, "data"_sv));
+        CHECK(!path.exists());
+        CHECK(!withTemporarySuffix(path).exists());
+    }
+
+    SECTION("Fails if the target is a directory, which is left untouched")
+    {
+        const IOReviewTest::TemporaryDirectory directory;
+
+        CHECK(za::writeToFile(directory.getPath() / za::Path{"inner.txt"}, "inner"_sv));
+
+        CHECK(!za::writeToFile(directory.getPath(), "data"_sv));
+        CHECK(directory.getPath().isDirectory());
+        CHECK(!withTemporarySuffix(directory.getPath()).exists());
+
+        za::String contents;
+        CHECK(za::readFromFile(directory.getPath() / za::Path{"inner.txt"}, contents));
+        CHECK(contents == "inner");
+    }
+}
+
+
+TEST_CASE("[System] za::OutFile::close")
+{
+    const TemporaryFile temporaryFile;
+
+    auto optFile = za::OutFile::open(temporaryFile.getPath(), za::FileOpenMode::bin);
+    REQUIRE(optFile.hasValue());
+
+    CHECK(optFile->write("abc", 3u));
+    CHECK(optFile->close());
+
+    // Closed: every operation fails, and closing again is an error too
+    za::PtrDiffT position = 0;
+    CHECK(!optFile->write("def", 3u));
+    CHECK(!optFile->flush());
+    CHECK(!optFile->seekPos(0));
+    CHECK(!optFile->tellPos(position));
+    CHECK(!optFile->close());
+
+    za::String contents;
+    CHECK(za::readFromFile(temporaryFile.getPath(), contents));
+    CHECK(contents == "abc");
+}
+
+
+TEST_CASE("[System] za::readFromFile failures")
+{
+    const IOReviewTest::TemporaryDirectory directory; // reading a directory fails (on open or on read)
+
+    SECTION("za::String target is left empty")
+    {
+        za::String contents = "stale";
+        CHECK(!za::readFromFile(directory.getPath(), contents));
+        CHECK(contents.empty());
+    }
+
+    SECTION("za::Vector<char> target is left empty")
+    {
+        za::Vector<char> contents;
+        for (const char c : {'s', 't', 'a', 'l', 'e'})
+            contents.pushBack(c);
+
+        CHECK(!za::readFromFile(directory.getPath(), contents));
+        CHECK(contents.empty());
+    }
+
+    SECTION("appendFromFile leaves the target unchanged")
+    {
+        za::Vector<char> contents;
+        for (const char c : {'k', 'e', 'e', 'p'})
+            contents.pushBack(c);
+
+        CHECK(!za::appendFromFile(directory.getPath(), contents));
+        REQUIRE(contents.size() == 4u);
+        CHECK(za::StringView(contents.data(), contents.size()) == za::StringView{"keep"});
+    }
+}
+
+
+TEST_CASE("[System] za::readFromFile while the file is open for writing")
+{
+    // On Windows, reading used to fail with a sharing violation
+    const TemporaryFile temporaryFile;
+
+    auto optFile = za::OutFile::open(temporaryFile.getPath(), za::FileOpenMode::bin);
+    REQUIRE(optFile.hasValue());
+    CHECK(optFile->write("in progress", 11u));
+    CHECK(optFile->flush());
+
+    za::String contents;
+    CHECK(za::readFromFile(temporaryFile.getPath(), contents));
+    CHECK(contents == "in progress");
+}
+
+
+TEST_CASE("[System] za::OutFile and za::InFile positions beyond 4 GiB")
+{
+    if constexpr (sizeof(za::PtrDiffT) >= 8u)
+    {
+        // Seeking past the end does not grow the file until something is written
+        constexpr auto largePosition = static_cast<za::PtrDiffT>(5'000'000'000ll);
+
+        const TemporaryFile temporaryFile("Hello world");
+
+        {
+            auto optFile = za::InFile::open(temporaryFile.getPath(), za::FileOpenMode::bin);
+            REQUIRE(optFile.hasValue());
+
+            za::PtrDiffT position = 0;
+            CHECK(optFile->seekPos(largePosition));
+            CHECK(optFile->tellPos(position));
+            CHECK(position == largePosition);
+
+            CHECK(optFile->seekPos(-largePosition, za::SeekDir::cur));
+            CHECK(optFile->tellPos(position));
+            CHECK(position == 0);
+        }
+
+        {
+            auto optFile = za::OutFile::open(temporaryFile.getPath(), za::FileOpenMode::bin);
+            REQUIRE(optFile.hasValue());
+
+            za::PtrDiffT position = 0;
+            CHECK(optFile->seekPos(largePosition));
+            CHECK(optFile->tellPos(position));
+            CHECK(position == largePosition);
+        }
+    }
+}
+
+
+TEST_CASE("[System] File names are UTF-8 in every API")
+{
+    using namespace za::literals;
+
+    // "zancle-é-ń-🐌-<pid>.txt", in UTF-8
+    const auto tempDirectory = za::Path::getTempDirectory();
+    REQUIRE(tempDirectory.hasValue());
+
+    const za::String name = za::fmtToString("zancle-\xc3\xa9-\xc5\x84-\xf0\x9f\x90\x8c-{}.txt",
+                                            za::testing::getProcessUniqueId());
+
+    const za::Path   path     = *tempDirectory / za::Path{name};
+    const za::String fullName = path.to<za::String>();
+
+    // Written through a `StringView` name, read back through every other kind of name
+    REQUIRE(za::writeToFile(za::StringView{fullName}, "unicode"_sv));
+
+    za::String contents;
+    CHECK(za::readFromFile(path, contents));
+    CHECK(contents == "unicode");
+
+    CHECK(za::readFromFile(za::StringView{fullName}, contents));
+    CHECK(contents == "unicode");
+
+    // The same name, from UTF-32
+    std::u32string utf32Name = U"zancle-\u00E9-\u0144-\U0001F40C-";
+    for (const char c : za::fmtToString("{}.txt", za::testing::getProcessUniqueId()))
+        utf32Name += static_cast<char32_t>(c);
+
+    CHECK(path.getFilename() == za::Path{utf32Name});
+
+    auto optFile = za::InFile::open(za::Path{fullName}, za::FileOpenMode::bin);
+    CHECK(optFile.hasValue());
+    optFile.reset();
+
+    CHECK(path.removeFromDisk());
 }

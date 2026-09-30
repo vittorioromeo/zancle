@@ -9,6 +9,8 @@
 
 #include "Zancle/Config.hpp"
 
+#include "Zancle/Base/IntTypes.hpp"
+
 #include <cstdio>
 
 
@@ -25,5 +27,23 @@ namespace za
 {
 ////////////////////////////////////////////////////////////
 [[nodiscard]] ZA_SYSTEM_API std::FILE* openFile(const Path& filename, const char* mode);
+
+
+////////////////////////////////////////////////////////////
+/// \brief `std::fseek` with a 64-bit offset (`long` is 32-bit on Windows)
+///
+/// \return `true` on success
+///
+////////////////////////////////////////////////////////////
+[[nodiscard]] ZA_SYSTEM_API bool seekFile(std::FILE* file, za::I64 offset, int origin);
+
+
+////////////////////////////////////////////////////////////
+/// \brief `std::ftell` with a 64-bit result (`long` is 32-bit on Windows)
+///
+/// \return Position, or a negative value on error
+///
+////////////////////////////////////////////////////////////
+[[nodiscard]] ZA_SYSTEM_API za::I64 tellFile(std::FILE* file);
 
 } // namespace za

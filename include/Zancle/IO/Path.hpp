@@ -15,6 +15,44 @@
 #include "Zancle/Vocabulary/Optional.hpp"
 
 #include "Zancle/Base/IntTypes.hpp"
+#include "Zancle/Base/SizeT.hpp"
+
+#include "Zancle/Trait/IsSame.hpp"
+#include "Zancle/Trait/RemoveCVRef.hpp"
+
+
+namespace za::priv
+{
+////////////////////////////////////////////////////////////
+/// \brief Contiguous string types `za::Path` can be constructed from (e.g. `za::StringView`, `std::string`, `std::wstring`)
+///
+////////////////////////////////////////////////////////////
+template <typename Char>
+concept PathCharType = za::isSame<Char, char> || za::isSame<Char, wchar_t> || za::isSame<Char, char32_t>;
+
+
+////////////////////////////////////////////////////////////
+template <typename T>
+concept PathSourceString = requires(const T& source) {
+    source.size();
+    requires PathCharType<za::RemoveCVRef<decltype(*source.data())>>;
+};
+
+
+////////////////////////////////////////////////////////////
+/// \brief Matches `std::filesystem::path` (which cannot be forward-declared portably)
+///
+////////////////////////////////////////////////////////////
+template <typename T>
+concept StdFilesystemPath = requires(const T& path) {
+    typename T::value_type;
+    typename T::string_type;
+    T::preferred_separator;
+    path.native();
+    path.lexically_normal();
+};
+
+} // namespace za::priv
 
 
 namespace za
@@ -25,20 +63,33 @@ namespace za
 ///
 /// PImpl wrapper around `std::filesystem::path` so that `<filesystem>` does not leak.
 ///
+/// Narrow strings (`const char*`, `za::StringView`, `za::String`, `std::string`, ...)
+/// are always interpreted as UTF-8, on every platform and standard library, matching
+/// `to<std::string>()` / `to<za::String>()`. (Unlike `std::filesystem::path`, which
+/// uses the ANSI code page on Windows with MSVC and libc++.)
+///
 /// All filesystem operations are non-throwing: `bool` results signal success or
 /// failure, and operations that produce a new `Path` (`absolute`, `tempDirectoryPath`)
 /// return `za::Optional<Path>` so OS errors can be propagated without exceptions.
 ///
 /// For stream insertion (`std::ostream << Path`), include `Zancle/IO/PathStreamOp.hpp`.
 ///
+/// On Windows, the operations that modify the filesystem (`removeFromDisk`,
+/// `createLeafDirectory`, `createDirectoryTree`, `renameTo`) retry transient
+/// access, sharing, and "directory not empty" errors for up to ~45ms: other
+/// processes (e.g. antivirus scanners, search indexers) commonly keep freshly
+/// written or deleted files open for a few milliseconds, during which, e.g.,
+/// a deleted file still occupies its directory. Genuine errors are thus
+/// reported that much later. Elsewhere, every operation is attempted once.
+///
 ////////////////////////////////////////////////////////////
 class [[nodiscard]] ZA_SYSTEM_API Path
 {
 public:
-#if defined(ZA_SYSTEM_EMSCRIPTEN) || defined(ZA_SYSTEM_LINUX_OR_BSD)
-    using value_type = char;
-#else
+#ifdef ZA_SYSTEM_WINDOWS
     using value_type = wchar_t;
+#else
+    using value_type = char;
 #endif
 
     ////////////////////////////////////////////////////////////
@@ -76,18 +127,42 @@ public:
     /* implicit */ Path();
 
     ////////////////////////////////////////////////////////////
-    /// \brief Construct from a string-like or `std::filesystem::path` source
+    /// \brief Construct from a contiguous string of `char` (UTF-8), `wchar_t`, or `char32_t`
+    ///
+    /// E.g. `za::StringView`, `za::String`, `std::string`, `std::wstring`, `std::u32string`.
     ///
     ////////////////////////////////////////////////////////////
-    template <typename T>
-    /* implicit */ Path(const T& source);
+    template <priv::PathSourceString T>
+    /* implicit */ Path(const T& source) : Path(0, source.data(), static_cast<za::SizeT>(source.size()))
+    {
+    }
 
     ////////////////////////////////////////////////////////////
-    /// \brief Construct from a null-terminated `T*` (e.g. `const char*`, `const wchar_t*`)
+    /// \brief Construct from a `std::filesystem::path`
     ///
     ////////////////////////////////////////////////////////////
-    template <typename T>
-    /* implicit */ Path(const T* source);
+    template <priv::StdFilesystemPath T>
+    /* implicit */ Path(const T& source) : Path(0, static_cast<const void*>(&source))
+    {
+    }
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Construct from a null-terminated UTF-8 string
+    ///
+    ////////////////////////////////////////////////////////////
+    /* implicit */ Path(const char* source);
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Construct from a null-terminated wide string
+    ///
+    ////////////////////////////////////////////////////////////
+    /* implicit */ Path(const wchar_t* source);
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Construct from a null-terminated UTF-32 string
+    ///
+    ////////////////////////////////////////////////////////////
+    /* implicit */ Path(const char32_t* source);
 
     ////////////////////////////////////////////////////////////
     /// \brief Destructor
@@ -171,7 +246,8 @@ public:
     /// destruction, by mutation (`operator/=`, `operator+=`, copy/move-assignment),
     /// or by moving from `*this`.
     ///
-    /// \warning The encoding is platform-dependent. Pass this only to OS APIs
+    /// \warning The encoding is platform-dependent (UTF-16 on Windows, the OS's
+    ///          narrow encoding elsewhere). Pass this only to OS APIs
     ///          (CreateFileW, open, ...). For cross-platform code or non-OS APIs,
     ///          prefer `to<std::string>()` (UTF-8) or `to<std::wstring>()`.
     ///
@@ -290,8 +366,10 @@ public:
     ////////////////////////////////////////////////////////////
     /// \brief Rename or move the file/directory at this path to `target`
     ///
-    /// Non-throwing. Returns `false` if the source does not exist, the target
-    /// is on a different filesystem with no fallback, or any OS-level error occurs.
+    /// Non-throwing. An existing file at `target` is replaced, atomically.
+    /// Returns `false` if the source does not exist, the target is on a
+    /// different filesystem with no fallback, or any OS-level error occurs.
+    /// Transient errors are retried on Windows (see the class documentation).
     ///
     ////////////////////////////////////////////////////////////
     [[nodiscard]] bool renameTo(const Path& target) const;
@@ -352,8 +430,9 @@ public:
     /// \brief Constructs a `Path` from `str` and compares it for equality with the current path
     ///
     ////////////////////////////////////////////////////////////
-    template <typename T>
-    [[nodiscard]] bool operator==(const T* str) const;
+    [[nodiscard]] bool operator==(const char* str) const;
+    [[nodiscard]] bool operator==(const wchar_t* str) const;
+    [[nodiscard]] bool operator==(const char32_t* str) const;
 
 private:
     ////////////////////////////////////////////////////////////
@@ -363,6 +442,14 @@ private:
     ///
     ////////////////////////////////////////////////////////////
     [[nodiscard]] explicit Path(int, const void* fsPath);
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Private constructors from `size` code units at `data` (`char` is UTF-8)
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] explicit Path(int, const char* data, za::SizeT size);
+    [[nodiscard]] explicit Path(int, const wchar_t* data, za::SizeT size);
+    [[nodiscard]] explicit Path(int, const char32_t* data, za::SizeT size);
 
     ////////////////////////////////////////////////////////////
     // Member data

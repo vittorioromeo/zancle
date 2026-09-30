@@ -24,6 +24,7 @@
 
 #include <filesystem>
 #include <string>
+#include <string_view>
 
 
 using za::testing::TemporaryFile;
@@ -445,6 +446,41 @@ TEST_CASE("[System] za::Path")
         CHECK(dst.removeFromDisk());
     }
 
+    SECTION("renameTo() replaces an existing file, even right after both were written")
+    {
+        const TemporaryFile src;
+        const TemporaryFile dst;
+
+        const auto writeFreshly = [](const za::Path& path, const za::StringView contents)
+        {
+            auto optFile = za::OutFile::open(path, za::FileOpenMode::bin);
+            return optFile.hasValue() && optFile->write(contents.data(), contents.size()) && optFile->close();
+        };
+
+        // Repeated: on Windows, freshly written files are briefly held open by other processes
+        // (e.g. antivirus scanners, search indexers), which used to make this fail intermittently
+        int failures = 0;
+
+        for (int i = 0; i < 50; ++i)
+        {
+            REQUIRE(writeFreshly(dst.getPath(), za::StringView{"old"}));
+            REQUIRE(writeFreshly(src.getPath(), za::StringView{"new"}));
+
+            if (!src.getPath().renameTo(dst.getPath()))
+            {
+                ++failures;
+                continue;
+            }
+
+            za::String contents;
+            CHECK(za::readFromFile(dst.getPath(), contents));
+            CHECK(contents == "new");
+            CHECK(!src.getPath().exists());
+        }
+
+        CHECK(failures == 0);
+    }
+
     SECTION("renameTo() fails for a missing source")
     {
         const za::Path missing("this/really/does/not/exist.tmp");
@@ -548,5 +584,161 @@ TEST_CASE("[System] za::Path")
         CHECK_NOTHROW((void)za::Path(U"hello-ñ").extensionIs(".png"));
         CHECK(!za::Path(U"hello-🐌").extensionIs(".png"));
         CHECK(za::Path(U"hello-🐌.png").extensionIs(".png"));
+    }
+}
+
+
+TEST_CASE("[System] za::Path narrow strings are UTF-8")
+{
+    // "é-ń-🐌.txt", in UTF-8
+    constexpr const char* utf8 = "\xc3\xa9-\xc5\x84-\xf0\x9f\x90\x8c.txt";
+    const za::Path        fromUtf32{U"é-ń-🐌.txt"};
+
+    SECTION("Every narrow source")
+    {
+        CHECK(za::Path{utf8} == fromUtf32);
+        CHECK(za::Path{std::string{utf8}} == fromUtf32);
+        CHECK(za::Path{std::string_view{utf8}} == fromUtf32);
+        CHECK(za::Path{za::StringView{utf8}} == fromUtf32);
+        CHECK(za::Path{za::String{utf8}} == fromUtf32);
+        CHECK(fromUtf32 == utf8);
+    }
+
+    SECTION("Round trips through UTF-8")
+    {
+        CHECK(fromUtf32.to<std::string>() == utf8);
+        CHECK(fromUtf32.to<za::String>() == za::String{utf8});
+        CHECK(za::Path{fromUtf32.to<std::string>()} == fromUtf32);
+        CHECK(za::Path{fromUtf32.to<za::String>()} == fromUtf32);
+        CHECK(fromUtf32.to<std::u32string>() == std::u32string{U"é-ń-🐌.txt"});
+    }
+
+    SECTION("Joining")
+    {
+        const za::Path joined = za::Path{"dir"} / za::Path{za::StringView{utf8}};
+        CHECK(joined.getFilename() == fromUtf32);
+        CHECK(joined.getExtension() == za::Path{".txt"});
+        CHECK(joined.getStem() == za::Path{U"é-ń-🐌"});
+    }
+}
+
+
+TEST_CASE("[System] za::Path::extensionIs with non-ASCII extensions")
+{
+    // U+0170 would alias 'p' if UTF-16 code units were narrowed to `char`
+    CHECK(!za::Path{U"image.Űng"}.extensionIs(".png"));
+    CHECK(za::Path{U"image.Űng"}.extensionIs(".\xc5\xb0ng"));
+
+    CHECK(za::Path{U"IMAGE.PNG"}.extensionIs(".png"));
+    CHECK(za::Path{U"image.png"}.extensionIs(".PNG"));
+    CHECK(!za::Path{U"image.png"}.extensionIs(".pn"));
+}
+
+
+TEST_CASE("[System] za::Path::forEachEntry")
+{
+    const za::Path directory = za::testing::getTemporaryFilePath();
+    REQUIRE(directory.createLeafDirectory());
+
+    const za::Path fileA = directory / za::Path{"a.txt"};
+    const za::Path fileB = directory / za::Path{"b.txt"};
+    REQUIRE(za::writeToFile(fileA, za::StringView{"a"}));
+    REQUIRE(za::writeToFile(fileB, za::StringView{"b"}));
+
+    SECTION("Lists every entry")
+    {
+        int  count = 0;
+        bool sawA  = false;
+        bool sawB  = false;
+
+        CHECK(directory.forEachEntry([&](const za::Path& entry)
+        {
+            ++count;
+            sawA |= entry == fileA;
+            sawB |= entry == fileB;
+        }));
+
+        CHECK(count == 2);
+        CHECK(sawA);
+        CHECK(sawB);
+    }
+
+    SECTION("Fails on a regular file or a missing path")
+    {
+        int count = 0;
+        CHECK(!fileA.forEachEntry([&](const za::Path&) { ++count; }));
+        CHECK(!(directory / za::Path{"missing"}).forEachEntry([&](const za::Path&) { ++count; }));
+        CHECK(count == 0);
+    }
+
+    CHECK(fileA.removeFromDisk());
+    CHECK(fileB.removeFromDisk());
+    CHECK(directory.removeFromDisk());
+}
+
+
+TEST_CASE("[System] za::Path filesystem modifications in quick succession")
+{
+    // On Windows, other processes (e.g. antivirus scanners) briefly keep freshly written or deleted
+    // files open: without retries, a deleted file still occupies its directory for a few
+    // milliseconds, and a just-removed directory cannot be re-created yet. Repeat to catch it.
+    constexpr int iterations = 50;
+
+    const za::Path directory = za::testing::getTemporaryFilePath();
+    const za::Path nested    = directory / za::Path{"nested"};
+    const za::Path file      = nested / za::Path{"file.txt"};
+
+    const auto writeFreshly = [](const za::Path& path)
+    {
+        auto optFile = za::OutFile::open(path, za::FileOpenMode::bin);
+        return optFile.hasValue() && optFile->write("data", 4u) && optFile->close();
+    };
+
+    SECTION("createLeafDirectory / removeFromDisk")
+    {
+        int failures = 0;
+
+        for (int i = 0; i < iterations; ++i)
+        {
+            failures += directory.createLeafDirectory() ? 0 : 1;
+            failures += nested.createLeafDirectory() ? 0 : 1;
+            failures += writeFreshly(file) ? 0 : 1;
+            failures += file.removeFromDisk() ? 0 : 1;
+            failures += nested.removeFromDisk() ? 0 : 1;
+            failures += directory.removeFromDisk() ? 0 : 1;
+        }
+
+        CHECK(failures == 0);
+    }
+
+    SECTION("createDirectoryTree / removeFromDisk")
+    {
+        int failures = 0;
+
+        for (int i = 0; i < iterations; ++i)
+        {
+            failures += nested.createDirectoryTree() ? 0 : 1;
+            failures += writeFreshly(file) ? 0 : 1;
+            failures += file.removeFromDisk() ? 0 : 1;
+            failures += nested.removeFromDisk() ? 0 : 1;
+            failures += directory.removeFromDisk() ? 0 : 1;
+        }
+
+        CHECK(failures == 0);
+    }
+
+    SECTION("Genuine failures are still reported")
+    {
+        REQUIRE(nested.createDirectoryTree());
+        REQUIRE(writeFreshly(file));
+
+        CHECK(!directory.createLeafDirectory()); // already exists
+        CHECK(!nested.removeFromDisk());         // not empty
+        CHECK(!(nested / za::Path{"missing"}).removeFromDisk());
+        CHECK(!file.renameTo(za::Path{"missing_directory/file.txt"}));
+
+        CHECK(file.removeFromDisk());
+        CHECK(nested.removeFromDisk());
+        CHECK(directory.removeFromDisk());
     }
 }

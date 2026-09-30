@@ -16,8 +16,6 @@
 
 #include "Zancle/Base/SizeT.hpp"
 
-#include <cstdio> // TODO P2: try to remove
-
 
 #ifdef ZA_SYSTEM_ANDROID
 namespace za::priv
@@ -104,21 +102,10 @@ public:
     ////////////////////////////////////////////////////////////
     [[nodiscard]] za::Optional<za::SizeT> getSize() override;
 
-private:
-    ////////////////////////////////////////////////////////////
-    /// \brief Deleter that closes the wrapped stdio file
-    ///
-    ////////////////////////////////////////////////////////////
-    struct ZA_SYSTEM_API FileCloser
-    {
-        void operator()(std::FILE* file);
-    };
-
-public:
     ////////////////////////////////////////////////////////////
     /// \private
     ////////////////////////////////////////////////////////////
-    explicit FileInputStream(za::PassKey<FileInputStream>&&, za::UniquePtr<std::FILE, FileCloser>&& file);
+    explicit FileInputStream(za::PassKey<FileInputStream>&&, void* file) noexcept;
 
 #ifdef ZA_SYSTEM_ANDROID
     ////////////////////////////////////////////////////////////
@@ -135,7 +122,7 @@ private:
     za::UniquePtr<priv::ResourceStream> m_androidFile;
 #endif
 
-    za::UniquePtr<std::FILE, FileCloser> m_file; //!< stdio file stream
+    void* m_file{}; //!< Owned stdio `FILE*` (type-erased to keep `<cstdio>` out of this header), or null
 };
 
 } // namespace za

@@ -20,26 +20,61 @@
 #include "Zancle/IO/Path.hpp"
 
 #include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/Exchange.hpp"
+#include "Zancle/Base/IntTypes.hpp"
 #include "Zancle/Base/Macros.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
 #include <cstdio>
 
 
+namespace
+{
+////////////////////////////////////////////////////////////
+[[nodiscard, gnu::always_inline]] inline std::FILE* asFile(void* const file) noexcept
+{
+    return static_cast<std::FILE*>(file);
+}
+
+} // namespace
+
+
 namespace za
 {
 ////////////////////////////////////////////////////////////
-void FileInputStream::FileCloser::operator()(std::FILE* file)
+FileInputStream::~FileInputStream()
 {
-    if (file != nullptr)
-        std::fclose(file);
+    if (m_file != nullptr)
+        std::fclose(asFile(m_file));
 }
 
 
 ////////////////////////////////////////////////////////////
-FileInputStream::~FileInputStream()                                     = default;
-FileInputStream::FileInputStream(FileInputStream&&) noexcept            = default;
-FileInputStream& FileInputStream::operator=(FileInputStream&&) noexcept = default;
+FileInputStream::FileInputStream(FileInputStream&& rhs) noexcept :
+#ifdef ZA_SYSTEM_ANDROID
+    m_androidFile(ZA_MOVE(rhs.m_androidFile)),
+#endif
+    m_file(za::exchange(rhs.m_file, nullptr))
+{
+}
+
+
+////////////////////////////////////////////////////////////
+FileInputStream& FileInputStream::operator=(FileInputStream&& rhs) noexcept
+{
+    if (&rhs == this)
+        return *this;
+
+    if (m_file != nullptr)
+        std::fclose(asFile(m_file));
+
+#ifdef ZA_SYSTEM_ANDROID
+    m_androidFile = ZA_MOVE(rhs.m_androidFile);
+#endif
+
+    m_file = za::exchange(rhs.m_file, nullptr);
+    return *this;
+}
 
 
 ////////////////////////////////////////////////////////////
@@ -58,8 +93,8 @@ za::Optional<FileInputStream> FileInputStream::open(const Path& filename)
     }
 #endif
 
-    if (auto file = za::UniquePtr<std::FILE, FileCloser>(openFile(filename, "rb")))
-        return za::makeOptional<FileInputStream>(za::PassKey<FileInputStream>{}, ZA_MOVE(file));
+    if (std::FILE* const file = openFile(filename, "rb"))
+        return za::makeOptional<FileInputStream>(za::PassKey<FileInputStream>{}, static_cast<void*>(file));
 
     return za::nullOpt;
 }
@@ -69,15 +104,20 @@ za::Optional<FileInputStream> FileInputStream::open(const Path& filename)
 za::Optional<za::SizeT> FileInputStream::read(void* data, za::SizeT size)
 {
 #ifdef ZA_SYSTEM_ANDROID
-    if (priv::getActivityStatesPtr() != nullptr)
+    if (m_androidFile != nullptr)
     {
-        ZA_ASSERT(m_androidFile != nullptr);
         return m_androidFile->read(data, size);
     }
 #endif
 
     ZA_ASSERT(m_file != nullptr);
-    return za::makeOptional(std::fread(data, 1, size, m_file.get()));
+
+    // A short read is either the end of the file (not an error) or an I/O error
+    const za::SizeT count = std::fread(data, 1u, size, asFile(m_file));
+    if (count != size && std::ferror(asFile(m_file)) != 0)
+        return za::nullOpt;
+
+    return za::makeOptional(count);
 }
 
 
@@ -85,16 +125,15 @@ za::Optional<za::SizeT> FileInputStream::read(void* data, za::SizeT size)
 za::Optional<za::SizeT> FileInputStream::seek(za::SizeT position)
 {
 #ifdef ZA_SYSTEM_ANDROID
-    if (priv::getActivityStatesPtr() != nullptr)
+    if (m_androidFile != nullptr)
     {
-        ZA_ASSERT(m_androidFile != nullptr);
         return m_androidFile->seek(position);
     }
 #endif
 
     ZA_ASSERT(m_file != nullptr);
 
-    if (std::fseek(m_file.get(), static_cast<long>(position), SEEK_SET))
+    if (static_cast<za::I64>(position) < 0 || !seekFile(asFile(m_file), static_cast<za::I64>(position), SEEK_SET))
         return za::nullOpt;
 
     return tell();
@@ -105,17 +144,21 @@ za::Optional<za::SizeT> FileInputStream::seek(za::SizeT position)
 za::Optional<za::SizeT> FileInputStream::tell()
 {
 #ifdef ZA_SYSTEM_ANDROID
-    if (priv::getActivityStatesPtr() != nullptr)
+    if (m_androidFile != nullptr)
     {
-        ZA_ASSERT(m_androidFile != nullptr);
         return m_androidFile->tell();
     }
 #endif
 
     ZA_ASSERT(m_file != nullptr);
 
-    const auto position = std::ftell(m_file.get());
-    return position < 0 ? za::nullOpt : za::makeOptional(static_cast<za::SizeT>(position));
+    const za::I64 position = tellFile(asFile(m_file));
+
+    // `SizeT` may be 32-bit
+    if (position < 0 || static_cast<za::I64>(static_cast<za::SizeT>(position)) != position)
+        return za::nullOpt;
+
+    return za::makeOptional(static_cast<za::SizeT>(position));
 }
 
 
@@ -123,33 +166,29 @@ za::Optional<za::SizeT> FileInputStream::tell()
 za::Optional<za::SizeT> FileInputStream::getSize()
 {
 #ifdef ZA_SYSTEM_ANDROID
-    if (priv::getActivityStatesPtr() != nullptr)
+    if (m_androidFile != nullptr)
     {
-        ZA_ASSERT(m_androidFile != nullptr);
         return m_androidFile->getSize();
     }
 #endif
 
     ZA_ASSERT(m_file != nullptr);
 
-    const auto position = tell().value();
-    std::fseek(m_file.get(), 0, SEEK_END);
+    const za::Optional<za::SizeT> position = tell();
+    if (!position.hasValue() || !seekFile(asFile(m_file), 0, SEEK_END))
+        return za::nullOpt;
 
     za::Optional<za::SizeT> size = tell(); // Use a single local variable for NRVO
 
-    if (!seek(position).hasValue())
-    {
+    if (!seek(*position).hasValue())
         size.reset();
-        return size; // Empty optional
-    }
 
     return size;
 }
 
 
 ////////////////////////////////////////////////////////////
-FileInputStream::FileInputStream(za::PassKey<FileInputStream>&&, za::UniquePtr<std::FILE, FileCloser>&& file) :
-    m_file(ZA_MOVE(file))
+FileInputStream::FileInputStream(za::PassKey<FileInputStream>&&, void* const file) noexcept : m_file(file)
 {
 }
 

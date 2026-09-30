@@ -93,3 +93,30 @@ TEST_CASE("[System] za::FileInputStream")
     }
 #endif
 }
+
+
+TEST_CASE("[System] za::FileInputStream positions beyond 4 GiB")
+{
+    if constexpr (sizeof(za::SizeT) >= 8u)
+    {
+        constexpr za::SizeT largePosition = 5'000'000'000ull;
+
+        const TemporaryFile temporaryFile("Hello world");
+        auto                fileInputStream = za::FileInputStream::open(temporaryFile.getPath()).value();
+
+        // Seeking past the end is allowed; reading there is the end of the file, not an error
+        CHECK(fileInputStream.seek(largePosition).value() == largePosition);
+        CHECK(fileInputStream.tell().value() == largePosition);
+
+        char buffer[4];
+        CHECK(fileInputStream.read(buffer, 4u).value() == 0u);
+
+        // `getSize` restores the position
+        CHECK(fileInputStream.getSize().value() == 11u);
+        CHECK(fileInputStream.tell().value() == largePosition);
+
+        CHECK(fileInputStream.seek(6u).value() == 6u);
+        CHECK(fileInputStream.read(buffer, 4u).value() == 4u);
+        CHECK(za::StringView(buffer, 4u) == za::StringView{"worl"});
+    }
+}

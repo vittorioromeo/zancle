@@ -13,7 +13,6 @@
 #include "Zancle/Vocabulary/Optional.hpp"
 #include "Zancle/Vocabulary/PassKey.hpp"
 
-#include "Zancle/Base/FwdStdString.hpp" // TODO P1: remove?
 #include "Zancle/Base/PtrDiffT.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
@@ -39,7 +38,21 @@ class Path;
 namespace za
 {
 ////////////////////////////////////////////////////////////
-/// \brief Helper function to write to a file.
+/// \brief Replace the contents of a file (creating it if needed) with `contents`, atomically
+///
+/// The data is written to a temporary file next to `filename` (same name,
+/// plus a `.za-tmp` suffix), which then replaces `filename` via a rename.
+/// Readers (and a crash, or a full disk) therefore never observe a
+/// partially-written file: `filename` holds either its old contents or
+/// the new ones. Every write, flush, and close error is detected.
+///
+/// As the file is replaced, a symbolic link at `filename` is replaced by a
+/// regular file, and the new file has default permissions. Concurrent
+/// writers to the same `filename` race on the temporary file.
+///
+/// `za::StringView` file names are interpreted as UTF-8.
+///
+/// \return `true` on success; on failure, `filename` is left untouched
 ///
 ////////////////////////////////////////////////////////////
 [[nodiscard]] ZA_SYSTEM_API bool writeToFile(za::StringView filename, za::StringView contents);
@@ -47,13 +60,15 @@ namespace za
 
 
 ////////////////////////////////////////////////////////////
-/// \brief Helper function to read the contents of a file
+/// \brief Replace `target` with the contents of a file
+///
+/// `za::StringView` file names are interpreted as UTF-8.
+///
+/// \return `true` on success; on failure, `target` is left empty
 ///
 ////////////////////////////////////////////////////////////
-[[nodiscard]] ZA_SYSTEM_API bool readFromFile(za::StringView filename, std::string& target);
 [[nodiscard]] ZA_SYSTEM_API bool readFromFile(za::StringView filename, za::String& target);
 [[nodiscard]] ZA_SYSTEM_API bool readFromFile(za::StringView filename, za::Vector<char>& target);
-[[nodiscard]] ZA_SYSTEM_API bool readFromFile(const Path& filename, std::string& target);
 [[nodiscard]] ZA_SYSTEM_API bool readFromFile(const Path& filename, za::String& target);
 [[nodiscard]] ZA_SYSTEM_API bool readFromFile(const Path& filename, za::Vector<char>& target);
 
@@ -64,8 +79,8 @@ namespace za
 /// Like `readFromFile(..., za::Vector<char>&)` but preserves the existing
 /// content of `target` and writes the file's bytes after it. The new range
 /// after a successful call is `target.data()[oldSize, oldSize + fileSize)`.
-/// Skips zero-init via `unsafeSetSize`. On failure, `target` may be in a
-/// partially-grown state; existing content up to `oldSize` is unchanged.
+/// Skips zero-init via `unsafeSetSize`. On failure, `target` keeps its
+/// original contents and size (its capacity may have grown).
 ///
 ////////////////////////////////////////////////////////////
 [[nodiscard]] ZA_SYSTEM_API bool appendFromFile(za::StringView filename, za::Vector<char>& target);
@@ -134,8 +149,9 @@ enum class SeekDir
 /// locale. RAII: construction is only possible through the factory,
 /// which returns `za::nullOpt` if the file can't be opened; once
 /// you have an `OutFile` it represents an open file. The destructor
-/// closes the underlying handle (silently -- callers cannot detect a
-/// close error in this design).
+/// closes the underlying handle, only logging close errors: call
+/// `close()` explicitly to detect them (e.g. buffered data that could
+/// not be written because the disk is full).
 ///
 /// Move-only. Every fallible I/O operation returns its own success
 /// status via `[[nodiscard]] bool`; there is no sticky-good flag.
@@ -159,6 +175,11 @@ public:
     ////////////////////////////////////////////////////////////
     /// \brief Open a file for output.
     ///
+    /// Supported flags: `out` (implied), `app` (append instead of
+    /// truncating), `trunc` (the default without `app`), `ate` (like
+    /// `std::ofstream`, it still truncates), and `bin` (no newline
+    /// translation on Windows). `in` (read-write) is not supported.
+    ///
     /// \return `OutFile` on success, `za::nullOpt` on open failure.
     ///
     ////////////////////////////////////////////////////////////
@@ -174,6 +195,15 @@ public:
 
     [[nodiscard]] bool write(const char* data, za::SizeT size);
     [[nodiscard]] bool flush();
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Flush and close the file, reporting any error
+    ///
+    /// Afterwards, every operation fails (returns `false`), including
+    /// another `close()`, and the destructor does nothing.
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] bool close();
 
     [[nodiscard]] bool seekPos(za::PtrDiffT absolutePos);
     [[nodiscard]] bool tellPos(za::PtrDiffT& out);
@@ -228,6 +258,10 @@ class ZA_SYSTEM_API InFile
 public:
     ////////////////////////////////////////////////////////////
     /// \brief Open a file for input.
+    ///
+    /// Supported flags: `in` (implied), `ate` (start at the end), and
+    /// `bin` (no newline translation on Windows). `out`, `app`, and
+    /// `trunc` are not supported.
     ///
     /// \return `InFile` on success, `za::nullOpt` on open failure.
     ///
@@ -305,6 +339,8 @@ private:
 /// directly.
 ///
 /// Implementation details are hidden behind PImpl to keep expensive
-/// standard library headers out of the public API.
+/// standard library headers out of the public API. Positions and offsets
+/// are 64-bit where `za::PtrDiffT` is, so files larger than 2 GiB are
+/// supported.
 ///
 ////////////////////////////////////////////////////////////
