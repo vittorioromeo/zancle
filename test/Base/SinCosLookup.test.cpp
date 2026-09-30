@@ -6,9 +6,11 @@
 #include "Zancle/Math/Cos.hpp"
 #include "Zancle/Math/Fabs.hpp"
 #include "Zancle/Math/Fmax.hpp"
-#include "Zancle/Math/Nextafter.hpp"
 #include "Zancle/Math/Sin.hpp"
 
+#include "Zancle/Base/BitCast.hpp"
+#include "Zancle/Base/InitializerList.hpp" // IWYU pragma: keep
+#include "Zancle/Base/IntTypes.hpp"
 #include "Zancle/Base/Signbit.hpp"
 
 
@@ -189,29 +191,66 @@ TEST_CASE("[Base] Base/SinCosLookup.hpp")
 
     SECTION("Results never exceed `sinCosLookupMaxMagnitude`")
     {
-        // Every `float` angle in `[-2*Pi, 2*Pi]`, plus a coarser sweep up to large angles
-        const auto maxMagnitude = [](const float from, const float to, const int stride)
+        // Within a table cell, the table entries are fixed and the correction `d` grows with the angle,
+        // so `s + d * c` (and `c - d * s`) is monotonic there, rounding included: the largest magnitude
+        // of each cell is reached at one of its ends. Checking the floats around every cell edge thus
+        // covers every angle, without walking billions of floats.
+        const auto magnitudeAt = [](const float x)
         {
+            const auto [sine, cosine] = za::sinCosLookup(x);
+
+            return za::fmax(za::fmax(za::fabs(sine), za::fabs(cosine)),
+                            za::fmax(za::fabs(za::sinLookup(x)), za::fabs(za::cosLookup(x))));
+        };
+
+        // `radius` consecutive floats on each side of `center` (stepping through bit patterns, which
+        // are ordered by magnitude), for a nonzero `center`
+        const auto maxMagnitudeAround = [&](const float center, const za::U32 radius)
+        {
+            const auto centerBits = ZA_BIT_CAST(za::U32, center);
+
             float result = 0.f;
+            for (za::U32 bits = centerBits - radius; bits != centerBits + radius + 1u; ++bits)
+                result = za::fmax(result, magnitudeAt(ZA_BIT_CAST(float, bits)));
 
-            for (float x = from; x < to;)
+            return result;
+        };
+
+        // The floats around every cell edge of `turns` whole turns, from `firstAngle`
+        const auto maxMagnitudeOverCellEdges = [&](const double firstAngle, const int turns)
+        {
+            constexpr double step = 6.283185307179586476925286766559 / static_cast<double>(za::priv::sinTableSize);
+
+            float result = 0.f;
+            for (int i = 0; i <= turns * static_cast<int>(za::priv::sinTableSize); ++i)
             {
-                const auto [sine, cosine] = za::sinCosLookup(x);
+                const auto edge = static_cast<float>(firstAngle + i * step);
 
-                result = za::fmax(result, za::fmax(za::fabs(sine), za::fabs(cosine)));
-                result = za::fmax(result, za::fmax(za::fabs(za::sinLookup(x)), za::fabs(za::cosLookup(x))));
-
-                for (int i = 0; i < stride; ++i)
-                    x = za::nextafter(x, to);
+                if (edge != 0.f)
+                    result = za::fmax(result, maxMagnitudeAround(edge, 64u));
             }
 
             return result;
         };
 
-        const float nearPeaks = maxMagnitude(-za::tau, za::tau, 1);
-        CHECK(nearPeaks > 1.f); // documented overshoot
-        CHECK(nearPeaks <= za::sinCosLookupMaxMagnitude);
+        // Every cell in `[-2*Pi, 2*Pi]`
+        const float nearZero = maxMagnitudeOverCellEdges(-6.283185307179586476925286766559, 2); // -2*Pi
+        CHECK(nearZero > 1.f);                                                                  // documented overshoot
+        CHECK(nearZero <= za::sinCosLookupMaxMagnitude);
 
-        CHECK(maxMagnitude(-100'000.f, 100'000.f, 64) <= za::sinCosLookupMaxMagnitude);
+        // One whole turn of cells at larger angles, where floats are sparser
+        for (const double angle : {1'000.0, 10'000.0, 99'000.0})
+        {
+            CHECK(maxMagnitudeOverCellEdges(angle, 1) <= za::sinCosLookupMaxMagnitude);
+            CHECK(maxMagnitudeOverCellEdges(-angle, 1) <= za::sinCosLookupMaxMagnitude);
+        }
+
+        // Coarse sweep of `[-1e5, 1e5]`, as a sanity check of the reasoning above
+        float sweep = 0.f;
+        for (const float sign : {1.f, -1.f})
+            for (za::U32 bits = 0u; bits < ZA_BIT_CAST(za::U32, 100'000.f); bits += 997u)
+                sweep = za::fmax(sweep, magnitudeAt(sign * ZA_BIT_CAST(float, bits)));
+
+        CHECK(sweep <= za::sinCosLookupMaxMagnitude);
     }
 }
