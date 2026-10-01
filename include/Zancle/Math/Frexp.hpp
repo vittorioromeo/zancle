@@ -39,7 +39,7 @@ template <typename T>
     else if constexpr (ZA_IS_SAME(T, long double))
         return ZA_MATH_FREXPL(arg0, exp);
     else
-        static_assert(false);
+        static_assert(false, "`za::frexp` takes exactly `float`, `double`, or `long double`");
 }
 
 } // namespace za

@@ -107,6 +107,18 @@ Non-exhaustive table:
 | `std::int32_t`     | `zb::I32`         |
 | `std::size_t`      | `zb::SizeT`       |
 
+Differences that are easy to miss:
+
+- `za::String::substrByPosLen` (like `za::StringView`'s) returns a `za::StringView` into the string, unlike `std::string::substr`, which returns a new string.
+    - The view dangles once the string is modified or destroyed. For an owning copy, write `za::String{s.substrByPosLen(pos, len)}`.
+
+- Constructing a `za::String` from a `za::StringView` is explicit (as for `std::string` from `std::string_view`): write `za::String s{view};`, not `za::String s = view;`.
+    - Assigning (`s = view;`) and appending (`s += view;`) a view work as usual.
+
+- The math wrappers (`za::sqrt`, `za::sin`, `za::pow`, ...) take exactly `float`, `double`, or `long double`, and the two-argument ones take two arguments of the same type.
+    - Unlike `<cmath>`, integers are not converted to `double`, and mixed `float`/`double` arguments are not promoted: convert explicitly (e.g. `za::sqrt(static_cast<float>(n))`), so that every conversion is visible.
+    - `za::abs` also accepts signed integers, like `std::abs`.
+
 
 
 ## Aggregatification Of Types
