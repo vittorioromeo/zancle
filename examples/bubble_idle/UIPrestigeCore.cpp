@@ -6,7 +6,8 @@
 
 #include "Zancle/ImGui/IncludeImGui.hpp"
 
-#include <climits>
+#include "Zancle/Base/Limits.hpp"
+
 #include <cstdio>
 
 void Main::uiPrestigeDrawCoreUpgrades()
@@ -37,7 +38,8 @@ void Main::uiPrestigeDrawCoreUpgrades()
                                         "Manually popping a bubble now also pops nearby bubbles automatically!\n\n"
                                         "(Note: combo multiplier still only increases once per successful click.)\n\n"
                                         "(Note: this effect can be toggled at will.)"))
-            doTip("Popping a bubble now also pops\nnearby bubbles automatically!", /* maxPrestigeLevel */ UINT_MAX);
+            doTip("Popping a bubble now also pops\nnearby bubbles automatically!",
+                  /* maxPrestigeLevel */ ZA_UNSIGNED_INT_MAX);
 
         if (checkUiUnlock(49u, pt->perm.multiPopPurchased))
         {
@@ -78,7 +80,7 @@ void Main::uiPrestigeDrawCoreUpgrades()
                                     pt->perm.windPurchased,
                                     "A giant fan (off-screen) will produce an intense wind, making bubbles move and "
                                     "flow much faster.\n\n(Note: this effect can be toggled at will.)"))
-        doTip("Hold onto something!", /* maxPrestigeLevel */ UINT_MAX);
+        doTip("Hold onto something!", /* maxPrestigeLevel */ ZA_UNSIGNED_INT_MAX);
 
     if (checkUiUnlock(50u, pt->perm.windPurchased))
     {
@@ -158,7 +160,8 @@ void Main::uiPrestigeDrawCoreUpgrades()
                                     pt->perm.smartCatsPurchased,
                                     "Cats have graduated!\n\nThey still cannot resist their popping insticts, but "
                                     "they will go for star bubbles and bombs first, ensuring they are not wasted!"))
-        doTip("Cats will now prioritize popping\nspecial bubbles over basic ones!", /* maxPrestigeLevel */ UINT_MAX);
+        doTip("Cats will now prioritize popping\nspecial bubbles over basic ones!",
+              /* maxPrestigeLevel */ ZA_UNSIGNED_INT_MAX);
 
     if (checkUiUnlock(51u, pt->perm.smartCatsPurchased))
     {
@@ -172,7 +175,7 @@ void Main::uiPrestigeDrawCoreUpgrades()
                                         "Through the sheer power of their intellect, they also get a x2 multiplier "
                                         "on all bubble values.\n\n(Note: this effect can be toggled at will.)"))
             doTip("Genius cats prioritize bombs and\ncan be instructed to ignore certain bubbles!",
-                  /* maxPrestigeLevel */ UINT_MAX);
+                  /* maxPrestigeLevel */ ZA_UNSIGNED_INT_MAX);
     }
 
     if (checkUiUnlock(52u, pt->perm.geniusCatsPurchased))
@@ -209,7 +212,7 @@ void Main::uiPrestigeDrawCoreUpgrades()
                                         pt->perm.unicatTranscendencePurchased,
                                         "Unicats transcend their physical form, becoming a higher entity that "
                                         "transforms bubbles into nova bubbles, worth x50."))
-            doTip("Are you ready for that sweet x50?", /* maxPrestigeLevel */ UINT_MAX);
+            doTip("Are you ready for that sweet x50?", /* maxPrestigeLevel */ ZA_UNSIGNED_INT_MAX);
 
         if (checkUiUnlock(54u, pt->perm.unicatTranscendencePurchased))
         {
@@ -219,7 +222,7 @@ void Main::uiPrestigeDrawCoreUpgrades()
                                             pt->perm.unicatTranscendenceAOEPurchased,
                                             "Unicats can now transform all bubbles in range at once. Also unlocks "
                                             "Unicat range upgrades."))
-                doTip("It's about to get crazy...", /* maxPrestigeLevel */ UINT_MAX);
+                doTip("It's about to get crazy...", /* maxPrestigeLevel */ ZA_UNSIGNED_INT_MAX);
 
             if (pt->perm.unicatTranscendencePurchased)
             {
@@ -243,7 +246,7 @@ void Main::uiPrestigeDrawCoreUpgrades()
                                         "Devilcats become touched by the flames of hell, opening stationary portals "
                                         "that teleport bubbles into the abyss, with a x50 multiplier. Also unlocks "
                                         "Devilcat range upgrades."))
-            doTip("I'm starting to get a bit scared...", /* maxPrestigeLevel */ UINT_MAX);
+            doTip("I'm starting to get a bit scared...", /* maxPrestigeLevel */ ZA_UNSIGNED_INT_MAX);
 
         if (pt->perm.devilcatHellsingedPurchased)
         {
@@ -267,7 +270,8 @@ void Main::uiPrestigeDrawCoreUpgrades()
                                         pt->perm.astroCatInspirePurchased,
                                         "Astrocats are now equipped with fancy patriotic flags, inspiring cats "
                                         "watching them fly by to work faster!"))
-            doTip("Astrocats will inspire other cats\nto work faster when flying by!", /* maxPrestigeLevel */ UINT_MAX);
+            doTip("Astrocats will inspire other cats\nto work faster when flying by!",
+                  /* maxPrestigeLevel */ ZA_UNSIGNED_INT_MAX);
 
         if (checkUiUnlock(57u, pt->perm.astroCatInspirePurchased))
         {

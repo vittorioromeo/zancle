@@ -13,7 +13,7 @@
 #include "Zancle/Geometry/Angle.hpp"
 #include "Zancle/Geometry/Vec3.hpp"
 
-#include "Zancle/Math/FloatMax.hpp"
+#include "Zancle/Base/Limits.hpp"
 
 #include "Zancle/Trait/HasVirtualDestructor.hpp"
 #include "Zancle/Trait/IsConstructible.hpp"

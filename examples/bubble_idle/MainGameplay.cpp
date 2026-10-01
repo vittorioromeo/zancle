@@ -71,9 +71,9 @@
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/GetArraySize.hpp"
 #include "Zancle/Base/IntTypes.hpp"
+#include "Zancle/Base/Limits.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
-#include <climits>
 #include <cstdio>
 
 ////////////////////////////////////////////////////////////
@@ -818,28 +818,28 @@ void Main::gameLoopReminderBuyCombo()
     if (handPoppedBubbles >= 25u && buyReminder == 0)
     {
         buyReminder = 1;
-        doTip("Remember to buy the combo upgrade!", /* maxPrestigeLevel */ UINT_MAX);
+        doTip("Remember to buy the combo upgrade!", /* maxPrestigeLevel */ ZA_UNSIGNED_INT_MAX);
     }
     else if (handPoppedBubbles >= 50u && buyReminder == 1)
     {
         buyReminder = 2;
-        doTip("You should really buy the upgrade now!", /* maxPrestigeLevel */ UINT_MAX);
+        doTip("You should really buy the upgrade now!", /* maxPrestigeLevel */ ZA_UNSIGNED_INT_MAX);
     }
     else if (handPoppedBubbles >= 100u && buyReminder == 2)
     {
         buyReminder = 3;
-        doTip("What are you trying to prove...?", /* maxPrestigeLevel */ UINT_MAX);
+        doTip("What are you trying to prove...?", /* maxPrestigeLevel */ ZA_UNSIGNED_INT_MAX);
     }
     else if (handPoppedBubbles >= 200u && buyReminder == 3)
     {
         buyReminder = 4;
-        doTip("There is no achievement for doing this!", /* maxPrestigeLevel */ UINT_MAX);
+        doTip("There is no achievement for doing this!", /* maxPrestigeLevel */ ZA_UNSIGNED_INT_MAX);
     }
     else if (handPoppedBubbles >= 300u && buyReminder == 4)
     {
         buyReminder = 5;
         doTip("Fine, have it your way!\nHere's your dumb achievement!\nAnd now buy the upgrade!",
-              /* maxPrestigeLevel */ UINT_MAX);
+              /* maxPrestigeLevel */ ZA_UNSIGNED_INT_MAX);
     }
 }
 

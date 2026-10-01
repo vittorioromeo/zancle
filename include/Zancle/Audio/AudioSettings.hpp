@@ -11,7 +11,7 @@
 #include "Zancle/Geometry/Angle.hpp"
 #include "Zancle/Geometry/Vec3.hpp"
 
-#include "Zancle/Math/FloatMax.hpp"
+#include "Zancle/Base/Limits.hpp"
 
 
 namespace za

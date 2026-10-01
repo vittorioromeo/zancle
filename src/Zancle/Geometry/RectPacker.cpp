@@ -19,6 +19,7 @@
 #include "Zancle/Vocabulary/Span.hpp"
 
 #include "Zancle/Base/Assert.hpp"
+#include "Zancle/Base/Limits.hpp"
 #include "Zancle/Base/Memcpy.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
@@ -52,7 +53,7 @@ struct RectPacker::Impl
     {
         // `stbrp_init_target` requires at least one node and `int`-representable dimensions
         ZA_ASSERT(size.x > 0u && size.y > 0u && "Bin size must be non-zero");
-        ZA_ASSERT(size.x <= unsigned{__INT_MAX__} && size.y <= unsigned{__INT_MAX__} && "Bin size must fit in an `int`");
+        ZA_ASSERT(size.x <= unsigned{ZA_INT_MAX} && size.y <= unsigned{ZA_INT_MAX} && "Bin size must fit in an `int`");
 
         // TODO P1: add limits header to Zancle/Base and fix all hardcoded values/macros
 

@@ -29,9 +29,9 @@
 #include "Zancle/Geometry/Rect2.hpp"
 
 #include "Zancle/Math/Clamp.hpp"
-#include "Zancle/Math/FloatMax.hpp"
 
 #include "Zancle/Base/IntTypes.hpp"
+#include "Zancle/Base/Limits.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
 #include <cstdio>

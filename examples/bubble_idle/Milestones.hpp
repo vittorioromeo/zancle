@@ -4,13 +4,12 @@
 #include "ShrineType.hpp"
 
 #include "Zancle/Base/IntTypes.hpp"
-
-#include <climits>
+#include "Zancle/Base/Limits.hpp"
 
 
 ////////////////////////////////////////////////////////////
 using MilestoneTimestamp                  = za::U64;
-static inline constexpr auto maxMilestone = ULLONG_MAX;
+static inline constexpr auto maxMilestone = ZA_UNSIGNED_LONG_LONG_MAX;
 
 ////////////////////////////////////////////////////////////
 struct [[nodiscard]] Milestones

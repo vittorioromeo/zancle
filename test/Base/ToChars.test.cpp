@@ -6,6 +6,7 @@
 #include "Zancle/String/StringView.hpp"
 
 #include "Zancle/Base/IntTypes.hpp"
+#include "Zancle/Base/Limits.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
 #include <limits>
@@ -425,8 +426,8 @@ TEST_CASE("[Base] toChars(double) at any magnitude")
         CHECK(format(buffer, 1e20, 2) == "100000000000000000000.00");
         CHECK(format(buffer, 1e23, 0) == "99999999999999991611392"); // exact value of the double nearest to 1e23
 
-        CHECK(format(buffer, static_cast<double>(__FLT_MAX__), 0) == "340282346638528859811704183484516925440");
-        CHECK(format(buffer, -__DBL_MAX__, 1) ==
+        CHECK(format(buffer, static_cast<double>(ZA_FLOAT_MAX), 0) == "340282346638528859811704183484516925440");
+        CHECK(format(buffer, -ZA_DOUBLE_MAX, 1) ==
               "-1797693134862315708145274237317043567980705675258449965989174768031572607800285387605895586327668781715"
               "4"
               "04589535143824642343213268894641827684675467035375169860499105765512820762454900903893289440758685084551"

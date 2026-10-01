@@ -3,6 +3,7 @@
 #include "Zancle/Container/AnkerlUnorderedDense.hpp"
 
 #include "Zancle/Base/IntTypes.hpp"
+#include "Zancle/Base/Limits.hpp"
 #include "Zancle/Base/Memcpy.hpp"
 #include "Zancle/Base/Memset.hpp"
 #include "Zancle/Base/SizeT.hpp"
@@ -135,7 +136,7 @@ TEST_CASE("[Base] za::ankerl floating-point hashers")
         CHECK(hashOf<HashD>(subD) != hashOf<HashD>(0.0));
     }
 
-#if defined(__LDBL_MANT_DIG__) && __LDBL_MANT_DIG__ == 64
+#if ZA_LONG_DOUBLE_MANT_DIG == 64
     SECTION("x87 long double padding bytes do not affect the hash")
     {
         // Only the first 10 bytes of an x87 `long double` hold its value, the

@@ -23,8 +23,8 @@
 
 #include "Zancle/Math/Clamp.hpp"
 #include "Zancle/Math/Constants.hpp"
-#include "Zancle/Math/FloatMax.hpp"
 
+#include "Zancle/Base/Limits.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
 #include <cstdio>

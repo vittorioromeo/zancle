@@ -48,7 +48,6 @@
 #include "Zancle/Math/Clamp.hpp"
 #include "Zancle/Math/Constants.hpp"
 #include "Zancle/Math/Cos.hpp"
-#include "Zancle/Math/FloatMax.hpp"
 #include "Zancle/Math/MinMax.hpp"
 #include "Zancle/Math/Pow.hpp"
 #include "Zancle/Math/Sin.hpp"
@@ -56,6 +55,7 @@
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/GetArraySize.hpp"
 #include "Zancle/Base/IntTypes.hpp"
+#include "Zancle/Base/Limits.hpp"
 #include "Zancle/Base/SizeT.hpp"
 #include "Zancle/Base/Strlen.hpp"
 

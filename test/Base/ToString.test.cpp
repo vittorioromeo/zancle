@@ -4,6 +4,8 @@
 
 #include "Zancle/String/ToString.hpp"
 
+#include "Zancle/Base/Limits.hpp"
+
 
 TEST_CASE("[Base] Base/ToString.hpp")
 {
@@ -80,9 +82,9 @@ TEST_CASE("[Base] Base/ToString.hpp")
 TEST_CASE("[Base] toString of large floating-point values")
 {
     CHECK(za::toString(1e13) == "10000000000000.000000"); // used to fail (assertion, or huge allocation)
-    CHECK(za::toString(__FLT_MAX__) == "340282346638528859811704183484516925440.000000");
-    CHECK(za::toString(__DBL_MAX__).size() == 309u + 1u + 6u);
-    CHECK(za::toString(-__DBL_MAX__).size() == 1u + 309u + 1u + 6u);
+    CHECK(za::toString(ZA_FLOAT_MAX) == "340282346638528859811704183484516925440.000000");
+    CHECK(za::toString(ZA_DOUBLE_MAX).size() == 309u + 1u + 6u);
+    CHECK(za::toString(-ZA_DOUBLE_MAX).size() == 1u + 309u + 1u + 6u);
 
     za::String s{"x="};
     za::appendToString(s, 1e20);

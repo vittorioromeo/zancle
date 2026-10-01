@@ -7,18 +7,14 @@
 #include "Zancle/Math/Ceil.hpp"
 #include "Zancle/Math/Cos.hpp"
 #include "Zancle/Math/Cosh.hpp"
-#include "Zancle/Math/DoubleMax.hpp"
 #include "Zancle/Math/Exp.hpp"
 #include "Zancle/Math/Fabs.hpp"
-#include "Zancle/Math/FloatEpsilon.hpp"
-#include "Zancle/Math/FloatMax.hpp"
 #include "Zancle/Math/Floor.hpp"
 #include "Zancle/Math/Fmax.hpp"
 #include "Zancle/Math/Fmin.hpp"
 #include "Zancle/Math/Fmod.hpp"
 #include "Zancle/Math/Log.hpp"
 #include "Zancle/Math/Log10.hpp"
-#include "Zancle/Math/LongDoubleMax.hpp"
 #include "Zancle/Math/Lround.hpp"
 #include "Zancle/Math/Nextafter.hpp"
 #include "Zancle/Math/Pow.hpp"
@@ -27,6 +23,8 @@
 #include "Zancle/Math/Sin.hpp"
 #include "Zancle/Math/Sqrt.hpp"
 #include "Zancle/Math/Tan.hpp"
+
+#include "Zancle/Base/Limits.hpp"
 
 #include "Zancle/Trait/IsSame.hpp"
 
