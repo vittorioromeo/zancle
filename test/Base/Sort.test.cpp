@@ -430,3 +430,29 @@ TEST_CASE("InsertionSort: elements already in place are not moved")
     CHECK(vec[3].value == 3);
     CHECK(vec[4].value == 4);
 }
+
+
+TEST_CASE("[Base] Algorithm/Sort.hpp - insertionSort is stable")
+{
+    struct Entry
+    {
+        int key;
+        int order; // position before sorting
+    };
+
+    Entry entries[64];
+    for (int i = 0; i < 64; ++i)
+        entries[i] = {(i * 7) % 5, i}; // many equivalent keys, interleaved
+
+    za::insertionSort(entries, entries + 64, [](const Entry& a, const Entry& b) { return a.key < b.key; });
+
+    bool stable = true;
+    for (int i = 1; i < 64; ++i)
+    {
+        stable &= entries[i - 1].key <= entries[i].key;
+        if (entries[i - 1].key == entries[i].key)
+            stable &= entries[i - 1].order < entries[i].order;
+    }
+
+    CHECK(stable);
+}

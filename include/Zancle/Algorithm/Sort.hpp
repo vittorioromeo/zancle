@@ -17,7 +17,9 @@ namespace za
 /// \brief Insertion sort using `comp` as a strict-weak less-than
 ///
 /// Elements already in place are only compared, never moved, so
-/// sorted and nearly sorted ranges are cheap.
+/// sorted and nearly sorted ranges are cheap. Stable (equivalent
+/// elements keep their relative order), but quadratic: only for small
+/// or nearly sorted ranges.
 ///
 ////////////////////////////////////////////////////////////
 template <typename RandomIt>
@@ -237,6 +239,15 @@ namespace za
 /// `comp` must be a strict weak ordering (e.g. `<`, never `<=`):
 /// otherwise the behavior is undefined, as partitioning relies on it
 /// to stay within the range.
+///
+/// Unstable: the relative order of equivalent elements is unspecified,
+/// and in general differs from `std::sort`'s (e.g. this sorts subranges
+/// of up to 16 elements by insertion, MSVC's `std::sort` up to 32), so
+/// code ported from `std::sort` may see equivalent elements reordered.
+/// When their order matters (e.g. for deterministic or reproducible
+/// results), make `comp` a total order by breaking ties (e.g. by a
+/// unique ID, or by the original index), or use the stable `insertionSort`
+/// for small ranges.
 ///
 ////////////////////////////////////////////////////////////
 template <typename RandomIt>
