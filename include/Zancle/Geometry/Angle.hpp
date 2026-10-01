@@ -142,7 +142,7 @@ public:
     {
         ZA_ASSERT(speed >= 0.f && "Angle::rotatedTowards requires a non-negative speed");
 
-        float diff = za::remainder(other.radians - radians, za::tau);
+        float diff = za::truncatedRemainder(other.radians - radians, za::tau);
 
         if (diff > za::pi)
             diff -= za::tau;

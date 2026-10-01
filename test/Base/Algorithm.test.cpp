@@ -22,6 +22,8 @@
 #include "Zancle/Algorithm/SwapAndPop.hpp"
 #include "Zancle/Algorithm/Unique.hpp"
 
+#include "Zancle/Container/AnkerlUnorderedDense.hpp"
+#include "Zancle/Container/InPlaceVector.hpp"
 #include "Zancle/Container/Vector.hpp"
 
 
@@ -29,6 +31,12 @@ namespace
 {
 namespace AlgorithmTest // for unity builds
 {
+////////////////////////////////////////////////////////////
+template <typename Container>
+concept CanVectorEraseIf = requires(Container& container) {
+    za::vectorEraseIf(container, [](const auto&) { return true; });
+};
+
 ////////////////////////////////////////////////////////////
 struct NoDefaultCtor
 {
@@ -385,6 +393,11 @@ TEST_CASE("[Base] Base/Algorithm/*.hpp")
         removedCount = za::vectorEraseIf(v, isOdd);
         CHECK(removedCount == 0);
         CHECK(v.empty());
+
+        // Contiguous sequences only: a dense map has `begin`/`end`/`erase`, but would be corrupted
+        STATIC_CHECK(AlgorithmTest::CanVectorEraseIf<za::Vector<int>>);
+        STATIC_CHECK(AlgorithmTest::CanVectorEraseIf<za::InPlaceVector<int, 4>>);
+        STATIC_CHECK(!AlgorithmTest::CanVectorEraseIf<ankerl::unordered_dense::map<int, int>>);
     }
 
     SECTION("IsSorted")

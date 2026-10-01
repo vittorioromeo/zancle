@@ -45,7 +45,7 @@ struct [[nodiscard]] Doll
     ////////////////////////////////////////////////////////////
     [[gnu::always_inline]] inline void update(const float deltaTime)
     {
-        wobbleRadians = za::remainder(wobbleRadians + deltaTime * 0.002f, za::tau);
+        wobbleRadians = za::truncatedRemainder(wobbleRadians + deltaTime * 0.002f, za::tau);
     }
 
     ////////////////////////////////////////////////////////////

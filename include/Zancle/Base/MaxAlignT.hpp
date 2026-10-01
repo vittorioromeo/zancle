@@ -17,7 +17,7 @@ struct MaxAlignT
 {
     long long   a [[gnu::aligned(alignof(long long))]];
     long double b [[gnu::aligned(alignof(long double))]];
-#if defined(__i386__)
+#if defined(__i386__) && defined(__SIZEOF_FLOAT128__) // e.g. not on 32-bit clang-cl, which lacks the type
     __float128 c [[gnu::aligned(alignof(__float128))]];
 #endif
 };

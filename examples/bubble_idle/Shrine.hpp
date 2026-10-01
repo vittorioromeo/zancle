@@ -56,7 +56,7 @@ struct [[nodiscard]] Shrine
     [[gnu::always_inline]] inline void update(const float deltaTime)
     {
         textStatusShakeEffect.update(deltaTime);
-        wobbleRadians = za::remainder(wobbleRadians + deltaTime * 0.002f + getDeathProgress() * 0.2f, za::tau);
+        wobbleRadians = za::truncatedRemainder(wobbleRadians + deltaTime * 0.002f + getDeathProgress() * 0.2f, za::tau);
     }
 
     ////////////////////////////////////////////////////////////

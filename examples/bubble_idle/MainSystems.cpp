@@ -399,7 +399,7 @@ void Main::gameLoopUpdateBubbles(const float deltaTimeMs)
             bubble.velocity = bubble.velocity.normalized() * maxVelocityMagnitude;
 
         // Keep long-lived spinning bubbles' angles small
-        bubble.rotation = za::remainder(bubble.rotation + deltaTimeMs * bubble.torque, za::tau);
+        bubble.rotation = za::truncatedRemainder(bubble.rotation + deltaTimeMs * bubble.torque, za::tau);
 
         if (bubble.type == BubbleType::Star || bubble.type == BubbleType::Nova)
             bubble.hueMod += deltaTimeMs * 0.125f;
@@ -2469,8 +2469,9 @@ void Main::gameLoopUpdateCatActions(const float deltaTimeMs)
                         continue;
 
                     if (&otherCat == &cat)
-                        cat.hue = za::sin(za::remainder(cat.cooldown.time / remap(cat.cooldown.time, 0.f, 10'000.f, 15.f, 150.f),
-                                                        za::tau)) *
+                        cat.hue = za::sin(za::truncatedRemainder(cat.cooldown.time /
+                                                                     remap(cat.cooldown.time, 0.f, 10'000.f, 15.f, 150.f),
+                                                                 za::tau)) *
                                   50.f * intensity;
 
                     const auto diff2 = otherCat.position - cat.position;
@@ -2750,7 +2751,7 @@ void Main::gameLoopUpdateCatActions(const float deltaTimeMs)
                 static float absorbSin = 0.f;
                 absorbSin += deltaTimeMs * 0.002f;
 
-                cat.hue = wrapHue(za::sin(za::remainder(absorbSin, za::tau)) * 25.f);
+                cat.hue = wrapHue(za::sin(za::truncatedRemainder(absorbSin, za::tau)) * 25.f);
 
                 if (wizardcatAbsorptionRotation < 0.15f)
                     wizardcatAbsorptionRotation += deltaTimeMs * 0.0005f;

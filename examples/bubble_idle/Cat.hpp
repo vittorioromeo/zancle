@@ -173,7 +173,7 @@ struct [[nodiscard]] Cat
     {
         textStatusShakeEffect.update(deltaTime);
         textMoneyShakeEffect.update(deltaTime);
-        wobbleRadians = za::remainder(wobbleRadians + deltaTime * 0.002f, za::tau);
+        wobbleRadians = za::truncatedRemainder(wobbleRadians + deltaTime * 0.002f, za::tau);
     }
 
     ////////////////////////////////////////////////////////////

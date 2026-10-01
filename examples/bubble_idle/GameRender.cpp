@@ -471,7 +471,7 @@ void Main::gameLoopPresentFrame(const FrameViewState& frameViews)
 
     {
         const float ratio         = frameViews.resolution.x / 1250.f;
-        const float fixedBgScroll = txFixedBg.getSize().toVec2f().x * 0.5f * za::remainder(fixedBgSlide, 3.f);
+        const float fixedBgScroll = txFixedBg.getSize().toVec2f().x * 0.5f * za::truncatedRemainder(fixedBgSlide, 3.f);
 
         window.draw(txFixedBg,
                     {.position    = {0.f, 0.f},

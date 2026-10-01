@@ -346,7 +346,7 @@ void Main::gameLoopDrawBubbles()
 
         const float magnetHueMod = (beingRepelledOrAttracted ? 180.f : 0.f);
 
-        return za::remainder(static_cast<float>(bubble.hueSeed) * 2.f - hueRange / 2.f, hueRange) + magnetHueMod;
+        return za::truncatedRemainder(static_cast<float>(bubble.hueSeed) * 2.f - hueRange / 2.f, hueRange) + magnetHueMod;
     };
 
     const za::Rect2f bubbleRects[]{atlasRects.txrBubble,
@@ -814,7 +814,7 @@ void applyWitchAnimation(CatDrawContext& ctx, float& wobblePhase, Cat& witch)
             const float frequency = remap(za::min(witch.cooldown.time, 10'000.f), 0.f, 10'000.f, 0.1f, 0.05f);
 
             wobblePhase += frequency * ctx.deltaTimeMs * 0.05f;
-            wobblePhase = za::remainder(wobblePhase, za::tau);
+            wobblePhase = za::truncatedRemainder(wobblePhase, za::tau);
         }
     }
 
@@ -1102,10 +1102,11 @@ void drawCatVisuals(const CatDrawContext& ctx)
                        .rotation    = ctx.bodyRotation(),
                        .textureRect = ctx.main.isDevilcatHellsingedActive() ? ctx.main.atlasRects.txrDevilCat2Book
                                                                             : ctx.main.atlasRects.txrDevilCat3Book,
-                       .color = hueColor(za::remainder(ctx.cat.hue * 2.f - 15.f + static_cast<float>(ctx.cat.nameIdx) * 25.f,
-                                                       60.f) -
-                                             30.f,
-                                         255u)});
+                       .color       = hueColor(za::truncatedRemainder(ctx.cat.hue * 2.f - 15.f +
+                                                                          static_cast<float>(ctx.cat.nameIdx) * 25.f,
+                                                                      60.f) -
+                                                   30.f,
+                                               255u)});
     }
 
     if (ctx.cat.type == CatType::Devil)
@@ -2112,8 +2113,8 @@ void Main::gameLoopDrawScrollArrowHint(const float deltaTimeMs)
     else
         (void)uiState.scrollArrowCountdown.tick(deltaTimeMs);
 
-    const float blinkOpacity = easeInOutSine(
-                                   za::fabs(za::sin(za::remainder(uiState.scrollArrowCountdown.time / 350.f, za::tau)))) *
+    const float blinkOpacity = easeInOutSine(za::fabs(
+                                   za::sin(za::truncatedRemainder(uiState.scrollArrowCountdown.time / 350.f, za::tau)))) *
                                255.f;
 
     const float arrowX = getLeftMostUsefulX();
