@@ -8,12 +8,17 @@
 #include "Zancle/Algorithm/Copy.hpp"
 #include "Zancle/Algorithm/Count.hpp"
 #include "Zancle/Algorithm/Erase.hpp"
+#include "Zancle/Algorithm/Fill.hpp"
 #include "Zancle/Algorithm/Find.hpp"
+#include "Zancle/Algorithm/Iota.hpp"
 #include "Zancle/Algorithm/IsSorted.hpp"
+#include "Zancle/Algorithm/LowerBound.hpp"
 #include "Zancle/Algorithm/MaxElement.hpp"
 #include "Zancle/Algorithm/Remove.hpp"
+#include "Zancle/Algorithm/Replace.hpp"
 #include "Zancle/Algorithm/Rotate.hpp"
 #include "Zancle/Algorithm/Shuffle.hpp"
+#include "Zancle/Algorithm/StablePartition.hpp"
 #include "Zancle/Algorithm/SwapAndPop.hpp"
 #include "Zancle/Algorithm/Unique.hpp"
 
@@ -43,6 +48,68 @@ struct NoDefaultCtor
 
     za::copy(values, values + 3, target);
     return target[0] + target[1] * 10 + target[2] * 100;
+}
+
+////////////////////////////////////////////////////////////
+// Key plus original position, to make the stability of partitions visible
+struct Tagged
+{
+    int key;
+    int tag;
+
+    [[nodiscard]] constexpr bool operator==(const Tagged&) const = default;
+};
+
+
+////////////////////////////////////////////////////////////
+struct MoveOnly
+{
+    int value;
+
+    explicit MoveOnly(const int v) : value{v}
+    {
+    }
+
+    MoveOnly(const MoveOnly&)            = delete;
+    MoveOnly& operator=(const MoveOnly&) = delete;
+
+    MoveOnly(MoveOnly&&) noexcept            = default;
+    MoveOnly& operator=(MoveOnly&&) noexcept = default;
+};
+
+
+////////////////////////////////////////////////////////////
+template <typename T, za::SizeT N>
+[[nodiscard]] constexpr bool rangeEquals(const T (&actual)[N], const T (&expected)[N])
+{
+    for (za::SizeT i = 0u; i < N; ++i)
+        if (!(actual[i] == expected[i]))
+            return false;
+
+    return true;
+}
+
+
+////////////////////////////////////////////////////////////
+[[nodiscard]] constexpr bool stablePartitionAtCompileTime()
+{
+    int values[]{1, 2, 3, 4, 5, 6};
+    return za::stablePartition(values, values + 6, [](const int x) { return x % 2 == 0; }) == values + 3 &&
+           rangeEquals(values, {2, 4, 6, 1, 3, 5});
+}
+
+
+////////////////////////////////////////////////////////////
+[[nodiscard]] constexpr bool otherAlgorithmsAtCompileTime()
+{
+    constexpr int sorted[]{1, 3, 3, 7};
+
+    int values[5]{};
+    za::fill(values, values + 5, 4);
+    za::iota(values + 1, values + 4, 10);
+    za::replace(values, values + 5, 4, 0);
+
+    return za::lowerBound(sorted, sorted + 4, 3) == sorted + 1 && rangeEquals(values, {0, 10, 11, 12, 0});
 }
 
 } // namespace AlgorithmTest
@@ -570,5 +637,221 @@ TEST_CASE("[Base] Base/Algorithm/*.hpp")
             CHECK(values[7] == 1);
             CHECK(values[8] == 2);
         }
+    }
+}
+
+
+TEST_CASE("[Base] Algorithm/StablePartition.hpp")
+{
+    using AlgorithmTest::rangeEquals;
+    using AlgorithmTest::Tagged;
+
+    const auto isEven = [](const int x) { return x % 2 == 0; };
+
+    SECTION("Partitions while preserving the relative order of each group")
+    {
+        int values[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+
+        CHECK(za::stablePartition(values, values + 10, isEven) == values + 5);
+        CHECK(rangeEquals(values, {2, 4, 6, 8, 10, 1, 3, 5, 7, 9}));
+    }
+
+    SECTION("Equal keys keep their order")
+    {
+        Tagged values[]{{3, 0}, {1, 1}, {4, 2}, {1, 3}, {5, 4}, {9, 5}, {2, 6}, {6, 7}, {5, 8}, {3, 9}};
+
+        CHECK(za::stablePartition(values, values + 10, [](const Tagged& t) { return t.key < 4; }) == values + 5);
+        CHECK(rangeEquals(values, {{3, 0}, {1, 1}, {1, 3}, {2, 6}, {3, 9}, {4, 2}, {5, 4}, {9, 5}, {6, 7}, {5, 8}}));
+    }
+
+    SECTION("Edge cases")
+    {
+        int values[]{1, 3, 5};
+        int empty[1]{};
+
+        CHECK(za::stablePartition(empty, empty, isEven) == empty);
+        CHECK(za::stablePartition(values, values + 1, isEven) == values);                       // one `false` element
+        CHECK(za::stablePartition(values, values + 3, isEven) == values);                       // all `false`
+        CHECK(za::stablePartition(values, values + 3, [](int) { return true; }) == values + 3); // all `true`
+        CHECK(rangeEquals(values, {1, 3, 5}));
+
+        int one[]{2};
+        CHECK(za::stablePartition(one, one + 1, isEven) == one + 1); // one `true` element
+    }
+
+    SECTION("Calls the predicate exactly once per element, left to right")
+    {
+        int values[100];
+        for (int i = 0; i < 100; ++i)
+            values[i] = i;
+
+        int  calls       = 0;
+        bool inOrder     = true;
+        int  previousArg = -1;
+
+        za::stablePartition(values,
+                            values + 100,
+                            [&](const int x)
+        {
+            ++calls;
+            inOrder &= x > previousArg;
+            previousArg = x;
+            return x % 3 == 0;
+        });
+
+        CHECK(calls == 100);
+        CHECK(inOrder);
+
+        // The 34 multiples of 3, then all the others, both ascending
+        bool correct = true;
+        int  i       = 0;
+
+        for (int expected = 0; expected < 100; expected += 3)
+            correct &= values[i++] == expected;
+
+        for (int expected = 1; expected < 100; ++expected)
+            if (expected % 3 != 0)
+                correct &= values[i++] == expected;
+
+        CHECK(i == 100);
+        CHECK(correct);
+    }
+
+    SECTION("Move-only elements")
+    {
+        za::Vector<AlgorithmTest::MoveOnly> values;
+        for (const int x : {5, 2, 8, 1, 4})
+            values.emplaceBack(x);
+
+        auto* const boundary = za::stablePartition(values.begin(), values.end(), [](const auto& m) {
+            return m.value > 3;
+        });
+
+        CHECK(boundary == values.begin() + 3);
+        CHECK(values[0].value == 5);
+        CHECK(values[1].value == 8);
+        CHECK(values[2].value == 4);
+        CHECK(values[3].value == 2);
+        CHECK(values[4].value == 1);
+    }
+
+    SECTION("Usable in constant expressions")
+    {
+        STATIC_CHECK(AlgorithmTest::stablePartitionAtCompileTime());
+    }
+}
+
+
+TEST_CASE("[Base] Algorithm/LowerBound.hpp")
+{
+    const int values[]{1, 2, 2, 2, 3, 5, 8};
+
+    SECTION("Default comparer")
+    {
+        CHECK(za::lowerBound(values, values + 7, 2) == values + 1); // first of the equal elements
+        CHECK(za::lowerBound(values, values + 7, 0) == values + 0);
+        CHECK(za::lowerBound(values, values + 7, 1) == values + 0);
+        CHECK(za::lowerBound(values, values + 7, 4) == values + 5); // between elements
+        CHECK(za::lowerBound(values, values + 7, 8) == values + 6);
+        CHECK(za::lowerBound(values, values + 7, 9) == values + 7);   // past the end
+        CHECK(za::lowerBound(values, values, 2) == values);           // empty range
+        CHECK(za::lowerBound(values, values + 7, 2.5) == values + 4); // heterogeneous value
+    }
+
+    SECTION("Custom comparer, called with the element first")
+    {
+        const int  descending[]{9, 7, 7, 4, 1};
+        const auto greater = [](const int element, const int value) { return element > value; };
+
+        CHECK(za::lowerBound(descending, descending + 5, 7, greater) == descending + 1);
+        CHECK(za::lowerBound(descending, descending + 5, 5, greater) == descending + 3);
+        CHECK(za::lowerBound(descending, descending + 5, 0, greater) == descending + 5);
+        CHECK(za::lowerBound(descending, descending + 5, 10, greater) == descending + 0);
+    }
+
+    SECTION("Logarithmic number of comparisons")
+    {
+        za::Vector<int> big;
+        for (int i = 0; i < 1000; ++i)
+            big.pushBack(i);
+
+        int comparisons = 0;
+        CHECK(za::lowerBound(big.begin(),
+                             big.end(),
+                             777,
+                             [&](const int a, const int b)
+        {
+            ++comparisons;
+            return a < b;
+        }) == big.begin() + 777);
+
+        CHECK(comparisons <= 10); // ceil(log2(1000))
+    }
+}
+
+
+TEST_CASE("[Base] Algorithm/Fill.hpp, Iota.hpp, Replace.hpp")
+{
+    using AlgorithmTest::rangeEquals;
+
+    SECTION("fill")
+    {
+        int values[]{1, 2, 3, 4, 5};
+
+        za::fill(values + 1, values + 4, 0);
+        CHECK(rangeEquals(values, {1, 0, 0, 0, 5}));
+
+        za::fill(values, values, 9); // empty range
+        CHECK(rangeEquals(values, {1, 0, 0, 0, 5}));
+
+        za::String strings[3];
+        za::fill(strings, strings + 3, za::String{"a fairly long string, likely allocated on the heap"});
+        CHECK(strings[0] == strings[2]);
+        CHECK(strings[1] == "a fairly long string, likely allocated on the heap");
+
+        double doubles[2]{};
+        za::fill(doubles, doubles + 2, 3); // `int` value, `double` elements
+        CHECK(doubles[1] == 3.0);
+    }
+
+    SECTION("iota")
+    {
+        int values[5]{};
+        za::iota(values, values + 5, -2);
+        CHECK(rangeEquals(values, {-2, -1, 0, 1, 2}));
+
+        char letters[4]{};
+        za::iota(letters, letters + 4, 'a');
+        CHECK(rangeEquals(letters, {'a', 'b', 'c', 'd'}));
+
+        double doubles[3]{};
+        za::iota(doubles, doubles + 3, 0.5);
+        CHECK(rangeEquals(doubles, {0.5, 1.5, 2.5}));
+    }
+
+    SECTION("replace")
+    {
+        int values[]{1, 2, 3, 2, 1};
+
+        za::replace(values, values + 5, 2, 7);
+        CHECK(rangeEquals(values, {1, 7, 3, 7, 1}));
+
+        za::replace(values, values + 5, 4, 0); // no match
+        CHECK(rangeEquals(values, {1, 7, 3, 7, 1}));
+    }
+
+    SECTION("replace with `oldValue` referring to an element of the range")
+    {
+        // As with `std::replace`, the values are taken by reference: once `values[0]` is
+        // replaced, later elements are compared against its new value (`1`)
+        int values[]{2, 1, 2, 1};
+
+        za::replace(values, values + 4, values[0], 1);
+        CHECK(rangeEquals(values, {1, 1, 2, 1}));
+    }
+
+    SECTION("Usable in constant expressions")
+    {
+        STATIC_CHECK(AlgorithmTest::otherAlgorithmsAtCompileTime());
     }
 }
