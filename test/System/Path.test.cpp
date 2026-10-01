@@ -10,6 +10,7 @@
 #include "Zancle/Fmt/FmtToString.hpp"
 
 #include "Zancle/IO/IO.hpp"
+#include "Zancle/IO/PathStreamOp.hpp"
 
 #include "Zancle/String/String.hpp"
 #include "Zancle/String/StringView.hpp"
@@ -23,6 +24,7 @@
 #include "Zancle/Trait/IsNothrowMoveConstructible.hpp"
 
 #include <filesystem>
+#include <sstream>
 #include <string>
 #include <string_view>
 
@@ -741,4 +743,19 @@ TEST_CASE("[System] za::Path filesystem modifications in quick succession")
         CHECK(nested.removeFromDisk());
         CHECK(directory.removeFromDisk());
     }
+}
+
+
+TEST_CASE("[System] za::Path stream insertion")
+{
+    // "é-ń-🐌.txt", in UTF-8
+    constexpr const char* utf8 = "\xc3\xa9-\xc5\x84-\xf0\x9f\x90\x8c.txt";
+
+    std::ostringstream oss;
+    oss << "path: " << za::Path{U"é-ń-🐌.txt"} << '!';
+    CHECK(oss.str() == std::string{"path: "} + utf8 + "!");
+
+    std::ostringstream empty;
+    empty << za::Path{};
+    CHECK(empty.str().empty());
 }

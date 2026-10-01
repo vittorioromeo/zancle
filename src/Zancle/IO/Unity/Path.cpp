@@ -18,8 +18,6 @@
 #include "Zancle/String/String.hpp"
 #include "Zancle/String/StringView.hpp"
 
-#include "Zancle/Chrono/StdChrono.hpp"
-
 #include "Zancle/Vocabulary/FunctionRef.hpp"
 #include "Zancle/Vocabulary/Optional.hpp"
 
@@ -30,11 +28,15 @@
 
 #include "Zancle/Trait/IsSame.hpp"
 
-#include <filesystem>
+#include <filesystem> // also provides `std::chrono::file_clock` and `duration_cast`, see `getLastWriteTime...`
 #include <string>
 #include <system_error>
 
 #include <cstdlib>
+
+#ifdef _MSVC_STL_VERSION                   // defined by `<filesystem>` above
+    #include "Zancle/Chrono/StdChrono.hpp" // `std::chrono::clock_cast`
+#endif
 
 #ifdef ZA_SYSTEM_WINDOWS
     #include "Zancle/Base/WindowsHeader.hpp"
@@ -574,8 +576,8 @@ template ZA_SYSTEM_API std::u32string Path::to<std::u32string>() const;
 template ZA_SYSTEM_API std::wstring Path::to<std::wstring>() const;
 
 
-// `operator<<(std::ostream&, const Path&)` lives in `PathStreamOp.cpp`
-// -- see the `<ostream>` comment near the top of this file.
+// `operator<<(std::ostream&, const Path&)` is a template in `PathStreamOp.hpp`, so that the library
+// itself never includes `<ostream>` (which pulls in `<format>`).
 
 
 ////////////////////////////////////////////////////////////
