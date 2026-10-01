@@ -176,7 +176,7 @@ TEST_CASE("[Base] Base/Span.hpp")
 }
 
 
-TEST_CASE("[Base] Base/Span.hpp - sizeBytes, front, back, subspan")
+TEST_CASE("[Base] Base/Span.hpp - sizeBytes, front, back, subspanByPosLen")
 {
     int values[]{1, 2, 3, 4, 5};
 
@@ -188,17 +188,17 @@ TEST_CASE("[Base] Base/Span.hpp - sizeBytes, front, back, subspan")
     span.front() = 10;
     CHECK(values[0] == 10);
 
-    const za::Span<int> middle = span.subspan(1u, 3u);
+    const za::Span<int> middle = span.subspanByPosLen(1u, 3u);
     CHECK(middle.size() == 3u);
     CHECK(middle.front() == 2);
     CHECK(middle.back() == 4);
 
-    CHECK(span.subspan(2u).size() == 3u);       // to the end
-    CHECK(span.subspan(3u, 100u).size() == 2u); // clamped to the end
-    CHECK(span.subspan(5u).empty());
+    CHECK(span.subspanByPosLen(2u).size() == 3u);       // to the end
+    CHECK(span.subspanByPosLen(3u, 100u).size() == 2u); // clamped to the end
+    CHECK(span.subspanByPosLen(5u).empty());
 
     const za::Span<const int> constSpan{values};
-    CHECK(constSpan.subspan(1u).front() == 2);
+    CHECK(constSpan.subspanByPosLen(1u).front() == 2);
 
     STATIC_CHECK(za::Span<const double>{}.sizeBytes() == 0u);
 }
