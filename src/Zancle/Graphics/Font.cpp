@@ -73,10 +73,14 @@ struct Font::Impl
     explicit Impl(FontFace&& theFontFace, TextureAtlas* theTextureAtlasPtr) :
         fontFace(ZA_MOVE(theFontFace)),
         textureAtlasPtr{theTextureAtlasPtr},
-        fallbackTextureAtlas{
-            theTextureAtlasPtr == nullptr
-                ? za::makeOptional<TextureAtlas>(Texture::create({1024u, 1024u}, {.smooth = true}).value())
-                : za::nullOpt}
+        // Not a `?:`, whose result MSVC does not construct in place (`TextureAtlas` is non-movable)
+        fallbackTextureAtlas{[&]() -> za::Optional<TextureAtlas>
+    {
+        if (theTextureAtlasPtr != nullptr)
+            return za::nullOpt;
+
+        return za::makeOptional<TextureAtlas>(Texture::create({1024u, 1024u}, {.smooth = true}).value());
+    }()}
     {
     }
 

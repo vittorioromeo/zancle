@@ -85,10 +85,20 @@
 ////////////////////////////////////////////////////////////
 // Ensure minimum C++ language standard version is met
 ////////////////////////////////////////////////////////////
+// MSVC reports the standard via `_MSVC_LANG` (`__cplusplus` needs `/Zc:__cplusplus`); clang-cl
+// defines `_MSVC_LANG` too, but with an older value, and reports the standard via `__cplusplus`
 // clang-format off
-#if (defined(_MSVC_LANG) && _MSVC_LANG < 202302L) || (!defined(_MSVC_LANG) && __cplusplus < 202302L)
+#if defined(_MSC_VER) && !defined(__clang__)
+    #define ZA_PRIV_CPLUSPLUS _MSVC_LANG
+#else
+    #define ZA_PRIV_CPLUSPLUS __cplusplus
+#endif
+
+#if ZA_PRIV_CPLUSPLUS < 202302L
     #error "Enable C++23 or newer for your compiler (e.g. -std=c++23 for GCC/Clang or /std:c++23 for MSVC)"
 #endif
+
+#undef ZA_PRIV_CPLUSPLUS
 // clang-format on
 
 

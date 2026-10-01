@@ -18,14 +18,17 @@ namespace za
 {
 ////////////////////////////////////////////////////////////
 // String-like: anything with byte `.data()` and `.size()`
+//
+// The constraint is in the template head: as a trailing requires-clause, it keeps MSVC from matching
+// the explicit instantiations of the numeric `fmtArg` templates (see `FmtNumeric.hpp`)
 template <typename T>
-[[nodiscard, gnu::always_inline]] inline constexpr FmtResult fmtArg(FmtSink&                        sink,
-                                                                    const T&                        arg,
-                                                                    [[maybe_unused]] const FmtSpec& spec) noexcept
-    requires requires {
+    requires requires(const T& arg) {
         static_cast<const char*>(arg.data());
         static_cast<SizeT>(arg.size());
     }
+[[nodiscard, gnu::always_inline]] inline constexpr FmtResult fmtArg(FmtSink&                        sink,
+                                                                    const T&                        arg,
+                                                                    [[maybe_unused]] const FmtSpec& spec) noexcept
 {
     if (spec.precision >= 0 || spec.type != '\0') [[unlikely]]
     {

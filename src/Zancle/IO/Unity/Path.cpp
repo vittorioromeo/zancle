@@ -353,7 +353,11 @@ za::Optional<za::I64> Path::getLastWriteTimeSecondsSinceEpoch() const
     if (ec)
         return za::nullOpt;
 
+#ifdef _MSVC_STL_VERSION // no `file_clock::to_sys` (also with clang-cl)
+    const auto sysTime = std::chrono::clock_cast<std::chrono::system_clock>(ftime);
+#else
     const auto sysTime = std::chrono::file_clock::to_sys(ftime);
+#endif
     const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(sysTime.time_since_epoch()).count();
     return za::makeOptional(static_cast<za::I64>(seconds));
 }

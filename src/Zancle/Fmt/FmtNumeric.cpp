@@ -120,10 +120,10 @@ FmtResult fmtArg(FmtSink& sink, const T& arg, const FmtSpec& spec)
 // dispatcher table takes the address of; pre-emitting them avoids per-TU
 // weak symbols.
 ////////////////////////////////////////////////////////////
-#define ZA_FMT_INSTANTIATE(T)                                                                     \
-    template ZA_SYSTEM_API FmtResult fmtArg<T>(FmtSink&, const T&, const FmtSpec&);               \
-    template ZA_SYSTEM_API FmtResult priv::dispatchFmtArg<T>(FmtSink&, const T&, const FmtSpec&); \
-    template ZA_SYSTEM_API FmtResult priv::dispatchFmtArgErased<T>(FmtSink&, const void*, const FmtSpec&)
+#define ZA_FMT_INSTANTIATE(T)                                                                              \
+    template ZA_SYSTEM_API FmtResult fmtArg<T>(FmtSink&, const T&, const FmtSpec&);                        \
+    template ZA_SYSTEM_API FmtResult priv::dispatchFmtArg<T>(FmtSink&, const T&, const FmtSpec&) noexcept; \
+    template ZA_SYSTEM_API FmtResult priv::dispatchFmtArgErased<T>(FmtSink&, const void*, const FmtSpec&) noexcept
 
 ZA_FMT_INSTANTIATE(bool);
 
@@ -169,7 +169,7 @@ FmtResult fmtArg(FmtSink& sink, const char& arg, const FmtSpec& spec)
 ////////////////////////////////////////////////////////////
 // Dispatcher instantiations for `char`. The `fmtArg` symbol is provided
 // by the non-template definition above, so it is NOT instantiated here.
-template ZA_SYSTEM_API FmtResult priv::dispatchFmtArg<char>(FmtSink&, const char&, const FmtSpec&);
-template ZA_SYSTEM_API FmtResult priv::dispatchFmtArgErased<char>(FmtSink&, const void*, const FmtSpec&);
+template ZA_SYSTEM_API FmtResult priv::dispatchFmtArg<char>(FmtSink&, const char&, const FmtSpec&) noexcept;
+template ZA_SYSTEM_API FmtResult priv::dispatchFmtArgErased<char>(FmtSink&, const void*, const FmtSpec&) noexcept;
 
 } // namespace za

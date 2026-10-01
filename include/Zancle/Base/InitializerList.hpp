@@ -44,6 +44,16 @@ public:
     {
     }
 
+    #if defined(_MSC_VER) && !defined(__clang__)
+    ////////////////////////////////////////////////////////////
+    // MSVC constructs braced lists through a `(first, last)` constructor (clang-cl uses the member layout)
+    [[nodiscard, gnu::always_inline]] constexpr initializer_list(const T* const first, const T* const last) noexcept :
+        m_begin(first),
+        m_size(static_cast<size_type>(last - first))
+    {
+    }
+    #endif
+
 
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T* begin() const noexcept

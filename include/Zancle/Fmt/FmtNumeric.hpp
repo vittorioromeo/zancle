@@ -86,10 +86,10 @@ template <typename T>
 // Both dispatchers are `constexpr` (thus inline), and `dllimport` is ignored on inline
 // functions, so only their explicit instantiation definitions are marked `ZA_SYSTEM_API`.
 ////////////////////////////////////////////////////////////
-#define ZA_FMT_EXTERN(T)                                                                                 \
-    extern template ZA_SYSTEM_API FmtResult fmtArg<T>(FmtSink&, const T&, const FmtSpec&);               \
-    extern template FmtResult               priv::dispatchFmtArg<T>(FmtSink&, const T&, const FmtSpec&); \
-    extern template FmtResult               priv::dispatchFmtArgErased<T>(FmtSink&, const void*, const FmtSpec&)
+#define ZA_FMT_EXTERN(T)                                                                                          \
+    extern template ZA_SYSTEM_API FmtResult fmtArg<T>(FmtSink&, const T&, const FmtSpec&);                        \
+    extern template FmtResult               priv::dispatchFmtArg<T>(FmtSink&, const T&, const FmtSpec&) noexcept; \
+    extern template FmtResult priv::dispatchFmtArgErased<T>(FmtSink&, const void*, const FmtSpec&) noexcept
 
 ZA_FMT_EXTERN(bool);
 
@@ -113,8 +113,8 @@ ZA_FMT_EXTERN(long double);
 
 // `char` has a non-template `fmtArg` (declared above), so only the
 // dispatcher instantiations are pre-emitted here.
-extern template FmtResult priv::dispatchFmtArg<char>(FmtSink&, const char&, const FmtSpec&);
-extern template FmtResult priv::dispatchFmtArgErased<char>(FmtSink&, const void*, const FmtSpec&);
+extern template FmtResult priv::dispatchFmtArg<char>(FmtSink&, const char&, const FmtSpec&) noexcept;
+extern template FmtResult priv::dispatchFmtArgErased<char>(FmtSink&, const void*, const FmtSpec&) noexcept;
 
 
 ////////////////////////////////////////////////////////////

@@ -24,6 +24,8 @@
 #include "Zancle/Math/Sqrt.hpp"
 #include "Zancle/Math/Tan.hpp"
 
+#include "Zancle/Base/BitCast.hpp"
+#include "Zancle/Base/IntTypes.hpp"
 #include "Zancle/Base/Limits.hpp"
 
 #include "Zancle/Trait/IsSame.hpp"
@@ -135,4 +137,30 @@ TEST_CASE("[Base] Math limit constants")
     STATIC_CHECK(ZA_DOUBLE_MAX == std::numeric_limits<double>::max());
     STATIC_CHECK(ZA_LONG_DOUBLE_MAX == std::numeric_limits<long double>::max());
     STATIC_CHECK(ZA_FLOAT_EPSILON == std::numeric_limits<float>::epsilon());
+}
+
+
+TEST_CASE("[Base] Math/Fabs.hpp: sign-bit fallback")
+{
+    // Used when `__builtin_fabs` is unavailable (e.g. MSVC): must be exact and usable at compile time
+    STATIC_CHECK(za::priv::fabsViaSignBit(-3.5f) == 3.5f);
+    STATIC_CHECK(za::priv::fabsViaSignBit(3.5f) == 3.5f);
+    STATIC_CHECK(za::priv::fabsViaSignBit(-3.5) == 3.5);
+    STATIC_CHECK(za::priv::fabsViaSignBit(-ZA_FLOAT_MAX) == ZA_FLOAT_MAX);
+    STATIC_CHECK(za::priv::fabsViaSignBit(-ZA_DOUBLE_TRUE_MIN) == ZA_DOUBLE_TRUE_MIN);
+
+    // `-0` becomes `+0`, which only the bits tell apart
+    STATIC_CHECK(ZA_BIT_CAST(za::U32, za::priv::fabsViaSignBit(-0.f)) == 0u);
+    STATIC_CHECK(ZA_BIT_CAST(za::U64, za::priv::fabsViaSignBit(-0.0)) == 0u);
+
+    // Infinities and NaNs only lose their sign
+    constexpr float inf = ZA_BIT_CAST(float, za::U32{0x7F'80'00'00u});
+    STATIC_CHECK(za::priv::fabsViaSignBit(-inf) == inf);
+
+    constexpr za::U32 negativeNaNBits = 0xFF'C0'00'01u;
+    STATIC_CHECK(ZA_BIT_CAST(za::U32, za::priv::fabsViaSignBit(ZA_BIT_CAST(float, negativeNaNBits))) == 0x7F'C0'00'01u);
+
+    // Agrees with the wrapper
+    CHECK(za::priv::fabsViaSignBit(-1.25f) == za::fabs(-1.25f));
+    CHECK(za::priv::fabsViaSignBit(-1.25) == za::fabs(-1.25));
 }

@@ -34,7 +34,9 @@
 // NOLINTBEGIN(readability-identifier-naming)
 
 #pragma once
-#pragma GCC system_header
+#if defined(__GNUC__)
+#    pragma GCC system_header
+#endif
 
 
 #if defined(__GNUC__)

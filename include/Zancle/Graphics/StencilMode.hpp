@@ -8,8 +8,10 @@
 ////////////////////////////////////////////////////////////
 #include "Zancle/Graphics/Export.hpp"
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wattributes"
+#if defined(__GNUC__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wattributes"
+#endif
 
 namespace za
 {
@@ -116,7 +118,9 @@ struct [[nodiscard]] ZA_GRAPHICS_API StencilMode
 
 } // namespace za
 
-#pragma GCC diagnostic pop
+#if defined(__GNUC__)
+    #pragma GCC diagnostic pop
+#endif
 
 
 ////////////////////////////////////////////////////////////

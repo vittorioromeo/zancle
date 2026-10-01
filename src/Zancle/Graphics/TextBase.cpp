@@ -222,16 +222,17 @@ za::U8 TextBase::getOutlineColorAlpha() const
 // Explicit template instantiations of the deducing-this methods
 // for the two concrete derived types. Emits the symbols once in
 // `zancle-graphics` so that downstream TUs only need the declarations
-// in `TextBase.hpp` (no heavy rendering includes).
+// in `TextBase.hpp` (no heavy rendering includes). The explicit object
+// parameters are spelled with `this`, as MSVC requires.
 ////////////////////////////////////////////////////////////
-#define ZA_PRIV_INSTANTIATE_TEXTBASE_DEDUCING_THIS(TDerived)                                                          \
-    template ZA_GRAPHICS_API za::Vec2f za::TextBase::findCharacterPos<TDerived>(const TDerived&, za::SizeT);          \
-    template ZA_GRAPHICS_API const za::Rect2f& za::TextBase::getLocalBounds<TDerived>(const TDerived&);               \
-    template ZA_GRAPHICS_API za::Rect2f za::TextBase::getGlobalBounds<TDerived>(const TDerived&);                     \
-    template ZA_GRAPHICS_API void za::TextBase::draw<TDerived>(const TDerived&, za::RenderTarget&, za::RenderStates); \
-    template ZA_GRAPHICS_API za::ConstVertexSpan za::TextBase::getVertices<TDerived>(const TDerived&);                \
-    template ZA_GRAPHICS_API za::VertexSpan za::TextBase::getVerticesMut<TDerived>(TDerived&);                        \
-    template ZA_GRAPHICS_API void           za::TextBase::ensureGeometryUpdate<TDerived>(const TDerived&)
+#define ZA_PRIV_INSTANTIATE_TEXTBASE_DEDUCING_THIS(TDerived)                                                               \
+    template ZA_GRAPHICS_API za::Vec2f za::TextBase::findCharacterPos<TDerived>(this const TDerived&, za::SizeT);          \
+    template ZA_GRAPHICS_API const za::Rect2f& za::TextBase::getLocalBounds<TDerived>(this const TDerived&);               \
+    template ZA_GRAPHICS_API za::Rect2f za::TextBase::getGlobalBounds<TDerived>(this const TDerived&);                     \
+    template ZA_GRAPHICS_API void za::TextBase::draw<TDerived>(this const TDerived&, za::RenderTarget&, za::RenderStates); \
+    template ZA_GRAPHICS_API za::ConstVertexSpan za::TextBase::getVertices<TDerived>(this const TDerived&);                \
+    template ZA_GRAPHICS_API za::VertexSpan za::TextBase::getVerticesMut<TDerived>(this TDerived&);                        \
+    template ZA_GRAPHICS_API void           za::TextBase::ensureGeometryUpdate<TDerived>(this const TDerived&)
 
 ZA_PRIV_INSTANTIATE_TEXTBASE_DEDUCING_THIS(za::Text);
 ZA_PRIV_INSTANTIATE_TEXTBASE_DEDUCING_THIS(za::GlyphMappedText);

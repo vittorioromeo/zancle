@@ -19,6 +19,20 @@
     ////////////////////////////////////////////////////////////
     #define ZA_CPU_RELAX() __asm__ __volatile__("yield" ::: "memory")
 
+#elif defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
+
+    #include <intrin.h>
+
+    ////////////////////////////////////////////////////////////
+    #define ZA_CPU_RELAX() _mm_pause()
+
+#elif defined(_MSC_VER) && (defined(_M_ARM64) || defined(_M_ARM))
+
+    #include <intrin.h>
+
+    ////////////////////////////////////////////////////////////
+    #define ZA_CPU_RELAX() __yield()
+
 #else
 
     ////////////////////////////////////////////////////////////

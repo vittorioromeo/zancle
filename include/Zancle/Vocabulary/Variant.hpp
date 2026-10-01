@@ -41,8 +41,10 @@
 
 
 ////////////////////////////////////////////////////////////
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow"
+#if defined(__GNUC__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wshadow"
+#endif
 
 
 namespace za::priv
@@ -712,4 +714,6 @@ public:
 
 } // namespace za
 
-#pragma GCC diagnostic pop
+#if defined(__GNUC__)
+    #pragma GCC diagnostic pop
+#endif

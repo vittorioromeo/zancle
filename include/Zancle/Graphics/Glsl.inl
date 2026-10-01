@@ -137,30 +137,33 @@ struct [[nodiscard]] Vec4
     /// \param color Color instance
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] constexpr Vec4(Color color)
-        requires(za::isSame<T, float> || za::isSame<T, int>);
+    [[nodiscard]] constexpr Vec4(const Color color)
+        requires(za::isSame<T, float> || za::isSame<T, int>)
+        :
+        x(fromColorComponent(color.r)),
+        y(fromColorComponent(color.g)),
+        z(fromColorComponent(color.b)),
+        w(fromColorComponent(color.a))
+    {
+    }
 
     T x{}; //!< 1st component (X) of the vec4
     T y{}; //!< 2nd component (Y) of the vec4
     T z{}; //!< 3rd component (Z) of the vec4
     T w{}; //!< 4th component (W) of the vec4
+
+private:
+    ////////////////////////////////////////////////////////////
+    // Defined in-class rather than via explicit specializations of the constrained
+    // constructor, which MSVC rejects
+    [[nodiscard, gnu::always_inline]] static constexpr T fromColorComponent(const unsigned char c)
+    {
+        if constexpr (za::isSame<T, float>)
+            return static_cast<float>(c) / 255.f; // normalized to [0, 1]
+        else
+            return static_cast<T>(c);
+    }
 };
 
-////////////////////////////////////////////////////////////
-template <>
-constexpr Vec4<float>::Vec4(Color color) :
-    x(color.r / 255.f),
-    y(color.g / 255.f),
-    z(color.b / 255.f),
-    w(color.a / 255.f)
-{
-}
-
-
-////////////////////////////////////////////////////////////
-template <>
-constexpr Vec4<int>::Vec4(Color color) : x(color.r), y(color.g), z(color.b), w(color.a)
-{
-}
 
 } // namespace za::priv

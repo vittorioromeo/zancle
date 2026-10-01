@@ -69,15 +69,20 @@ enum : SizeT
 };
 
 #else
-    #error "Zancle reflection field-name extraction is only supported on Clang and GCC"
+
+    // e.g. MSVC: its `__FUNCSIG__` omits member names, and field-reference template arguments crash it
+    #define ZA_PRIV_RFL_NO_FIELD_NAMES
+
 #endif
 
 
-////////////////////////////////////////////////////////////
-#ifdef __clang__
-    #pragma clang diagnostic push
-    #pragma clang diagnostic ignored "-Wundefined-var-template"
-#endif
+#ifndef ZA_PRIV_RFL_NO_FIELD_NAMES
+
+    ////////////////////////////////////////////////////////////
+    #ifdef __clang__
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Wundefined-var-template"
+    #endif
 
 
 ////////////////////////////////////////////////////////////
@@ -313,10 +318,12 @@ template <typename T>
 inline constexpr auto storedFieldNames = computeStoredFieldNames<T>(MakeIndexSequence<numFields<T>>{});
 
 
-////////////////////////////////////////////////////////////
-#ifdef __clang__
-    #pragma clang diagnostic pop
-#endif
+    ////////////////////////////////////////////////////////////
+    #ifdef __clang__
+        #pragma clang diagnostic pop
+    #endif
+
+#endif // ZA_PRIV_RFL_NO_FIELD_NAMES
 
 
 ////////////////////////////////////////////////////////////
@@ -332,6 +339,10 @@ namespace za::rfl
 template <typename T, SizeT I>
 constexpr StringView getFieldName() noexcept
 {
+#ifdef ZA_PRIV_RFL_NO_FIELD_NAMES
+    static_assert(sizeof(T) == 0, "field-name reflection is only supported with GCC and Clang (including clang-cl)");
+    return {};
+#else
     static_assert(!ZA_IS_UNION(T), "union reflection is forbidden");
     static_assert(!ZA_IS_ARRAY(T), "impossible to extract name from C-style array");
     static_assert(I < numFields<T>, "field index out of range");
@@ -340,6 +351,7 @@ constexpr StringView getFieldName() noexcept
 
     return StringView{packed.chars.data() + packed.offsets[I],
                       static_cast<SizeT>(packed.offsets[I + 1u] - packed.offsets[I])};
+#endif
 }
 
 
@@ -357,6 +369,8 @@ constexpr auto tieAsFieldNamesTuple() noexcept
 } // namespace za::rfl
 
 
+#ifndef ZA_PRIV_RFL_NO_FIELD_NAMES
+
 ////////////////////////////////////////////////////////////
 namespace za::rfl::priv
 {
@@ -372,6 +386,8 @@ static_assert(getFieldName<FieldNameSelfCheck, 0u>() == StringView{"alpha"});
 static_assert(getFieldName<FieldNameSelfCheck, 1u>() == StringView{"beta"});
 
 } // namespace za::rfl::priv
+
+#endif // ZA_PRIV_RFL_NO_FIELD_NAMES
 
 
 ////////////////////////////////////////////////////////////
@@ -392,6 +408,7 @@ static_assert(getFieldName<FieldNameSelfCheck, 1u>() == StringView{"beta"});
 /// - C-style arrays as the reflected type are rejected, as their
 ///   elements have no names.
 ///
-/// Only Clang and GCC are supported.
+/// Only supported with GCC and Clang (including clang-cl): elsewhere (e.g.
+/// MSVC), this header compiles, but using its functions does not.
 ///
 ////////////////////////////////////////////////////////////
