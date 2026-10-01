@@ -102,7 +102,14 @@ public:
     [[nodiscard, gnu::always_inline]] constexpr StringView(const char* const cStr) noexcept :
         theData{[cStr]
     {
-        ZA_ASSERT(cStr != nullptr); // assert before strlen to avoid UB
+        // Null checks here are runtime-only: GCC cannot constant-evaluate `pointerToGlobal != nullptr`
+        // under `-fsanitize=null` / `-fsanitize=nonnull-attribute`, and in constant evaluation any access
+        // through a null pointer is a compile error anyway
+        if !consteval
+        {
+            ZA_ASSERT(cStr != nullptr); // assert before strlen to avoid UB
+        }
+
         return cStr;
     }()},
         theSize{constexprStrLen(cStr)}
@@ -115,7 +122,10 @@ public:
         theData{cStr},
         theSize{len}
     {
-        ZA_ASSERT(cStr != nullptr || (cStr == nullptr && len == 0u));
+        if !consteval // see the null-terminated constructor
+        {
+            ZA_ASSERT(cStr != nullptr || (cStr == nullptr && len == 0u));
+        }
     }
 
 
@@ -130,7 +140,10 @@ public:
         : theData{stringLike.data()}, theSize{stringLike.size()}
     {
         // Empty containers may legitimately have no storage
-        ZA_ASSERT(theData != nullptr || theSize == 0u);
+        if !consteval // see the null-terminated constructor
+        {
+            ZA_ASSERT(theData != nullptr || theSize == 0u);
+        }
     }
 
 
@@ -533,7 +546,11 @@ public:
     ////////////////////////////////////////////////////////////
     [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const char& operator[](const SizeT i) const noexcept
     {
-        ZA_ASSERT(theData != nullptr);
+        if !consteval // see the null-terminated constructor
+        {
+            ZA_ASSERT(theData != nullptr);
+        }
+
         ZA_ASSERT(i < theSize);
 
         return theData[i];
