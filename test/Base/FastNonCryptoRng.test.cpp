@@ -2,11 +2,13 @@
 
 #include "Zancle/Random/FastNonCryptoRng.hpp"
 
-#include "Zancle/Random/Xoroshiro128PlusPlusBitGenerator.hpp"
-
 #include "Zancle/Geometry/Priv/Vec2Base.hpp"
 
+#include "Zancle/Random/Xoroshiro128PlusPlusBitGenerator.hpp"
+
 #include "Zancle/Base/IntTypes.hpp"
+
+#include "Zancle/Trait/IsSame.hpp"
 
 #include <limits>
 #include <random>
@@ -51,6 +53,11 @@ constexpr za::U64 seed42Outputs[] = {16'756'476'715'040'848'931ull,
 
     return i >= -5 && i <= 5 && f >= -1.f && f <= 1.f && rng.getI(3u, 3u) == 3u;
 }
+
+////////////////////////////////////////////////////////////
+// The `Vec2` members only accept `Vec2f` (e.g. not `Vec2<double>`)
+template <typename V>
+concept CanGetVec2 = requires(za::FastNonCryptoRng& rng, const V v) { rng.getVec2f(v, v); };
 
 } // namespace FastNonCryptoRngTest
 } // namespace
@@ -276,6 +283,12 @@ TEST_CASE("[Base] FastNonCryptoRng")
 
     SECTION("2D vectors")
     {
+        // Braced arguments use `Vec2f` (the `Vec2` members are templates, see `FastNonCryptoRng.hpp`)
+        STATIC_CHECK(ZA_IS_SAME(decltype(za::FastNonCryptoRng{}.getVec2f({0.f, 0.f}, {1.f, 1.f})), za::Vec2f));
+        STATIC_CHECK(ZA_IS_SAME(decltype(za::FastNonCryptoRng{}.getDirVec2f()), za::Vec2f));
+        STATIC_CHECK(FastNonCryptoRngTest::CanGetVec2<za::Vec2f>);
+        STATIC_CHECK(!FastNonCryptoRngTest::CanGetVec2<za::Vec2<double>>);
+
         za::FastNonCryptoRng rng{6u};
 
         for (int i = 0; i < 1000; ++i)

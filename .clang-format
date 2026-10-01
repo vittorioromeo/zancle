@@ -130,25 +130,25 @@ IncludeCategories:
     Regex: '^\"Zancle\/IO\/'
   - Priority: 15
     Regex: '^\"Zancle\/Reflection\/'
-  # Level 5: Concurrency, Mixin, Random, String
+  # Level 5: Concurrency, Mixin, String
   - Priority: 16
     Regex: '^\"Zancle\/Concurrency\/'
   - Priority: 17
     Regex: '^\"Zancle\/Mixin\/'
   - Priority: 18
-    Regex: '^\"Zancle\/Random\/'
-  - Priority: 19
     Regex: '^\"Zancle\/String\/'
   # Level 4: Algorithm, Chrono, Container, Geometry
-  - Priority: 20
+  - Priority: 19
     Regex: '^\"Zancle\/Algorithm\/'
-  - Priority: 21
+  - Priority: 20
     Regex: '^\"Zancle\/Chrono\/'
-  - Priority: 22
+  - Priority: 21
     Regex: '^\"Zancle\/Container\/'
-  - Priority: 23
+  - Priority: 22
     Regex: '^\"Zancle\/Geometry\/'
-  # Level 3: Vocabulary
+  # Level 3: Random, Vocabulary
+  - Priority: 23
+    Regex: '^\"Zancle\/Random\/'
   - Priority: 24
     Regex: '^\"Zancle\/Vocabulary\/'
   # Level 2: Math

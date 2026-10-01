@@ -312,6 +312,7 @@ set(UTILITY_MODULES
     Math
     Diagnostic
     Vocabulary
+    Random
     Container
     Algorithm
     String
@@ -324,7 +325,6 @@ set(UTILITY_MODULES
     Err
     Lifetime
     Mixin
-    Random
 )
 
 # Multimedia modules. Each is gated on ZA_BUILD_<UPPER_NAME>.
