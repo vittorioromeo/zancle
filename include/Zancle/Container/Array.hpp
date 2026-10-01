@@ -6,6 +6,8 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/Container/Priv/LexicographicLess.hpp"
+
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/LifetimeAttributes.hpp"
 #include "Zancle/Base/SizeT.hpp"
@@ -218,6 +220,37 @@ struct [[nodiscard]] ZA_GSL_OWNER(T) Array
     ///
     ////////////////////////////////////////////////////////////
     [[nodiscard]] constexpr bool operator==(const Array& rhs) const = default;
+
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Lexicographic ordering, using only the elements' `operator<` (like `std::array`'s)
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard]] constexpr bool operator<(const Array& rhs) const
+    {
+        return priv::lexicographicLess(elements, N, rhs.elements, N);
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline]] constexpr bool operator>(const Array& rhs) const
+    {
+        return rhs < *this;
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline]] constexpr bool operator<=(const Array& rhs) const
+    {
+        return !(rhs < *this);
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline]] constexpr bool operator>=(const Array& rhs) const
+    {
+        return !(*this < rhs);
+    }
 };
 
 

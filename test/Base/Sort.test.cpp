@@ -7,6 +7,10 @@
 #include "Zancle/String/String.hpp"
 
 #include "Zancle/Algorithm/IsSorted.hpp"
+#include "Zancle/Algorithm/LowerBound.hpp"
+#include "Zancle/Algorithm/NthElement.hpp"
+#include "Zancle/Algorithm/StableSort.hpp"
+#include "Zancle/Algorithm/UpperBound.hpp"
 
 #include "Zancle/Container/Vector.hpp"
 
@@ -455,4 +459,223 @@ TEST_CASE("[Base] Algorithm/Sort.hpp - insertionSort is stable")
     }
 
     CHECK(stable);
+}
+
+
+namespace
+{
+namespace SortTest // for unity builds
+{
+////////////////////////////////////////////////////////////
+struct Keyed
+{
+    int key;
+    int order; // position before sorting
+
+    [[nodiscard]] bool operator==(const Keyed&) const = default;
+};
+
+
+////////////////////////////////////////////////////////////
+const auto byKey = [](const Keyed& a, const Keyed& b) { return a.key < b.key; };
+
+
+////////////////////////////////////////////////////////////
+[[nodiscard]] constexpr bool sortsInConstantExpressions()
+{
+    int stable[]{5, 3, 9, 1, 7, 2, 8, 0, 6, 4, 5, 3, 9, 1, 7, 2, 8, 0, 6, 4};
+    za::stableSort(stable, stable + 20);
+
+    int nth[]{5, 3, 9, 1, 7, 2, 8, 0, 6, 4, 5, 3, 9, 1, 7, 2, 8, 0, 6, 4};
+    za::nthElement(nth, nth + 10, nth + 20);
+
+    const int sorted[]{0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9};
+
+    for (int i = 0; i < 20; ++i)
+        if (stable[i] != sorted[i])
+            return false;
+
+    return nth[10] == 5 && za::upperBound(sorted, sorted + 20, 5) == sorted + 12;
+}
+
+} // namespace SortTest
+} // namespace
+
+
+TEST_CASE("[Base] Algorithm/UpperBound.hpp")
+{
+    const int values[]{1, 2, 2, 2, 5, 8};
+
+    CHECK(za::upperBound(values, values + 6, 0) == values);
+    CHECK(za::upperBound(values, values + 6, 1) == values + 1);
+    CHECK(za::upperBound(values, values + 6, 2) == values + 4);
+    CHECK(za::upperBound(values, values + 6, 3) == values + 4);
+    CHECK(za::upperBound(values, values + 6, 8) == values + 6);
+    CHECK(za::upperBound(values, values + 6, 9) == values + 6);
+    CHECK(za::upperBound(values, values, 2) == values);
+
+    // `lowerBound` and `upperBound` delimit the equivalent elements
+    CHECK(za::upperBound(values, values + 6, 2) - za::lowerBound(values, values + 6, 2) == 3);
+
+    // Custom comparator (descending range), called with the value first
+    const int descending[]{9, 7, 7, 3};
+    CHECK(za::upperBound(descending, descending + 4, 7, greaterCmp) == descending + 3);
+}
+
+
+TEST_CASE("[Base] Algorithm/Sort.hpp - stableSort and nthElement")
+{
+    STATIC_CHECK(SortTest::sortsInConstantExpressions());
+
+    SortTest::Lcg rng{777u};
+
+    SECTION("stableSort matches insertionSort (both stable), equivalent elements included")
+    {
+        for (za::SizeT n = 0u; n < 600u; n += (n < 70u ? 1u : 37u))
+        {
+            for (const unsigned int distinctKeys : {2u, 10u, 1000u})
+            {
+                za::Vector<SortTest::Keyed> input;
+                for (za::SizeT i = 0u; i < n; ++i)
+                    input.pushBack({static_cast<int>(rng.next() % distinctKeys), static_cast<int>(i)});
+
+                za::Vector<SortTest::Keyed> byStable    = input;
+                za::Vector<SortTest::Keyed> byInsertion = input;
+
+                za::stableSort(byStable.begin(), byStable.end(), SortTest::byKey);
+                za::insertionSort(byInsertion.begin(), byInsertion.end(), SortTest::byKey);
+
+                CHECK(byStable == byInsertion);
+            }
+        }
+    }
+
+    SECTION("stableSort on large ranges: sorted, and stable")
+    {
+        za::Vector<SortTest::Keyed> entries;
+        for (int i = 0; i < 20'000; ++i)
+            entries.pushBack({static_cast<int>(rng.next() % 100u), i});
+
+        za::stableSort(entries.begin(), entries.end(), SortTest::byKey);
+
+        bool stable = true;
+        for (za::SizeT i = 1u; i < entries.size(); ++i)
+        {
+            stable &= entries[i - 1u].key <= entries[i].key;
+            if (entries[i - 1u].key == entries[i].key)
+                stable &= entries[i - 1u].order < entries[i].order;
+        }
+
+        CHECK(stable);
+    }
+
+    SECTION("stableSort: edge cases, custom comparator, non-trivial and move-only elements")
+    {
+        za::Vector<int> vec;
+        za::stableSort(vec.begin(), vec.end());
+        CHECK(vec.empty());
+
+        vec = {42};
+        za::stableSort(vec.begin(), vec.end());
+        CHECK(vec == za::Vector<int>{42});
+
+        vec = {3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3, 2, 3, 8, 4, 6, 2, 6, 4, 3};
+        za::stableSort(vec.begin(), vec.end(), greaterCmp);
+        CHECK(za::isSorted(vec.begin(), vec.end(), greaterCmp));
+
+        za::Vector<Person> people;
+        for (int i = 0; i < 40; ++i)
+            people.pushBack({za::String{i % 2 == 0 ? "Even" : "Odd"}, i});
+
+        za::stableSort(people.begin(), people.end());
+
+        for (int i = 0; i < 40; ++i)
+        {
+            CHECK(people[static_cast<za::SizeT>(i)].name == (i < 20 ? "Even" : "Odd"));
+            CHECK(people[static_cast<za::SizeT>(i)].age == (i < 20 ? 2 * i : 2 * (i - 20) + 1));
+        }
+
+        using SortTest::MoveCounted;
+
+        za::Vector<MoveCounted> moveOnly;
+        for (int i = 0; i < 100; ++i)
+            moveOnly.emplaceBack((i * 37) % 100);
+
+        za::stableSort(moveOnly.begin(), moveOnly.end());
+
+        for (int i = 0; i < 100; ++i)
+            CHECK(moveOnly[static_cast<za::SizeT>(i)].value == i);
+
+        // Presorted input: only compared, never moved
+        MoveCounted::moves = 0;
+        za::stableSort(moveOnly.begin(), moveOnly.end());
+        CHECK(MoveCounted::moves == 0);
+    }
+
+    SECTION("nthElement puts the right element at `nth`, and partitions around it")
+    {
+        for (za::SizeT n = 1u; n < 300u; n += (n < 50u ? 1u : 23u))
+        {
+            for (const unsigned int distinctValues : {3u, 1000u})
+            {
+                za::Vector<int> input;
+                for (za::SizeT i = 0u; i < n; ++i)
+                    input.pushBack(static_cast<int>(rng.next() % distinctValues));
+
+                za::Vector<int> sorted = input;
+                za::quickSort(sorted.begin(), sorted.end());
+
+                for (za::SizeT k = 0u; k < n; k += (n < 50u ? 1u : 7u))
+                {
+                    za::Vector<int> partitioned = input;
+                    za::nthElement(partitioned.begin(), partitioned.begin() + k, partitioned.end());
+
+                    const int nth = partitioned[k];
+                    CHECK(nth == sorted[k]);
+
+                    bool ok = true;
+                    for (za::SizeT i = 0u; i < k; ++i)
+                        ok &= !(nth < partitioned[i]);
+                    for (za::SizeT i = k + 1u; i < n; ++i)
+                        ok &= !(partitioned[i] < nth);
+
+                    CHECK(ok);
+                }
+            }
+        }
+    }
+
+    SECTION("nthElement: edge cases and custom comparator")
+    {
+        za::Vector<int> vec;
+        za::nthElement(vec.begin(), vec.end(), vec.end());
+        CHECK(vec.empty());
+
+        vec = {3, 1, 2};
+        za::nthElement(vec.begin(), vec.end(), vec.end()); // `nth == last`: no effect
+        CHECK(vec == za::Vector<int>{3, 1, 2});
+
+        vec = {5, 9, 1, 7, 3, 8, 2, 6, 4, 0, 15, 19, 11, 17, 13, 18, 12, 16, 14, 10};
+        za::nthElement(vec.begin(), vec.begin() + 2, vec.end(), greaterCmp); // third largest
+        CHECK(vec[2] == 17);
+    }
+}
+
+
+TEST_CASE("NthElement: O(n log n) comparisons against a killer adversary")
+{
+    constexpr int n = 4096;
+
+    SortTest::Adversary adversary{n};
+
+    za::Vector<int> items;
+    for (int i = 0; i < n; ++i)
+        items.pushBack(i);
+
+    za::nthElement(items.begin(), items.begin() + n / 2, items.end(), [&](const int a, const int b) {
+        return adversary.less(a, b);
+    });
+
+    constexpr long long log2n = 12;
+    CHECK(adversary.nComparisons < 8 * n * log2n);
 }
