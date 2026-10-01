@@ -324,6 +324,7 @@ set(UTILITY_MODULES
     Err
     Lifetime
     Mixin
+    Random
 )
 
 # Multimedia modules. Each is gated on ZA_BUILD_<UPPER_NAME>.
@@ -390,13 +391,13 @@ else()
 
     # Assemble the framework header set:
     #   - umbrella headers at include/Zancle/
-    #   - all 17 utility modules (always built, aggregated under System)
+    #   - all 18 utility modules (always built, aggregated under System)
     #   - each enabled multimedia module
     # BASE_DIRS = include/Zancle means relative paths preserve the
     # `<Module>/Foo.hpp` layout that consumers expect via the framework-style
     # `#include <Zancle/<Module>/Foo.hpp>` import (resolved by macOS as
     # Zancle.framework/Headers/<Module>/Foo.hpp).
-    # System (umbrella + 17 utility modules) + each enabled multimedia module.
+    # System (umbrella + 18 utility modules) + each enabled multimedia module.
     _zancle_collect_module_headers(System _zancle_framework_headers)
     foreach(_mod IN LISTS MULTIMEDIA_MODULES)
         string(TOUPPER "${_mod}" _flag)

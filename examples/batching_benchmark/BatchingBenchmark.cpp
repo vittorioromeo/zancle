@@ -1,5 +1,3 @@
-#include "ExampleUtils/RNGFast.hpp"
-
 #include "Zancle/Graphics/Color.hpp"
 #include "Zancle/Graphics/DrawableBatch.hpp"
 #include "Zancle/Graphics/Font.hpp"
@@ -21,6 +19,8 @@
 
 #include "Zancle/IO/IO.hpp"
 #include "Zancle/IO/Path.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/Chrono/Clock.hpp"
 #include "Zancle/Chrono/Time.hpp"
@@ -47,8 +47,8 @@ int main()
     //
     //
     // Set up random generator
-    RNGFast    rng(/* seed */ 1234);
-    const auto getRndFloat = [&](float min, float max) { return rng.getF(min, max); };
+    za::FastNonCryptoRng rng(/* seed */ 1234);
+    const auto           getRndFloat = [&](float min, float max) { return rng.getF(min, max); };
 
     //
     //

@@ -113,7 +113,7 @@ endfunction()
 
 
 # Collect public headers for one Zancle module into ${outvar} (PARENT_SCOPE).
-# For "System": umbrella headers + all 17 UTILITY_MODULES. Otherwise: glob
+# For "System": umbrella headers + all 18 UTILITY_MODULES. Otherwise: glob
 # include/Zancle/<Module>/. Shared by per-module install and the macOS framework.
 function(_zancle_collect_module_headers module outvar)
     if(${module} STREQUAL "System")

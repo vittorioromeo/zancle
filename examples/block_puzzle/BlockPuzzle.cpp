@@ -5,7 +5,6 @@
 #include "ExampleUtils/Easing.hpp"
 #include "ExampleUtils/HueColor.hpp"
 #include "ExampleUtils/MathUtils.hpp"
-#include "ExampleUtils/RNGFast.hpp"
 #include "ExampleUtils/Scaling.hpp"
 
 #include "Zancle/Audio/AudioContext.hpp"
@@ -44,6 +43,8 @@
 #include "Zancle/Window/Mouse.hpp"
 
 #include "Zancle/IO/Path.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/Algorithm/Erase.hpp"
 #include "Zancle/Algorithm/Sort.hpp"
@@ -636,7 +637,7 @@ private:
     za::Vector<ParticleData> m_lavaParticles;
 
     ////////////////////////////////////////////////////////////
-    RNGFast m_rngFast; // very fast, low-quality, but good enough for VFXs
+    za::FastNonCryptoRng m_rngFast; // very fast, low-quality, but good enough for VFXs
 
     ////////////////////////////////////////////////////////////
     float m_time = 0.f;

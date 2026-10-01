@@ -34,6 +34,7 @@ UTILITY_LEVELS = {
     # Level 5
     "Concurrency": 5,
     "Mixin":       5,
+    "Random":      5,
     "String":      5,
     # Level 4
     "Algorithm":   4,

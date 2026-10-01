@@ -3,7 +3,7 @@
 #include "CatType.hpp"
 #include "ExactArray.hpp"
 
-#include "ExampleUtils/RNGFast.hpp"
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/String/StringView.hpp"
 
@@ -216,4 +216,4 @@ inline constexpr EXACT_ARRAY(
 
 
 ////////////////////////////////////////////////////////////
-[[nodiscard]] za::Vector<za::StringView> getShuffledCatNames(CatType catType, RNGFast& rng);
+[[nodiscard]] za::Vector<za::StringView> getShuffledCatNames(CatType catType, za::FastNonCryptoRng& rng);

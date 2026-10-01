@@ -28,13 +28,18 @@
 #include "ExampleUtils/ControlFlow.hpp"
 #include "ExampleUtils/HueColor.hpp"
 #include "ExampleUtils/MathUtils.hpp"
-#include "ExampleUtils/RNGFast.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/Geometry/Vec2.hpp"
 
 
 ////////////////////////////////////////////////////////////
-[[nodiscard, gnu::always_inline]] inline Bubble makeRandomBubble(Playthrough& pt, RNGFast& rng, const float mapLimit, const float maxY)
+[[nodiscard, gnu::always_inline]] inline Bubble makeRandomBubble(
+    Playthrough&          pt,
+    za::FastNonCryptoRng& rng,
+    const float           mapLimit,
+    const float           maxY)
 {
     return {
         .position = rng.getVec2f({mapLimit, maxY}),

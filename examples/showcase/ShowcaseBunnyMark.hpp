@@ -2,8 +2,6 @@
 
 #include "ShowcaseExample.hpp"
 
-#include "ExampleUtils/RNGFast.hpp"
-
 #include "Zancle/Graphics/Image.hpp"
 #include "Zancle/Graphics/Shader.hpp"
 #include "Zancle/Graphics/Sprite.hpp"
@@ -11,6 +9,8 @@
 #include "Zancle/Graphics/VBOHandle.hpp"
 
 #include "Zancle/IO/Path.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/String/String.hpp"
 
@@ -83,9 +83,9 @@ private:
     za::SizeT                     m_bunnyTargetCount = 100'000u;
 
     ////////////////////////////////////////////////////////////
-    RNGFast  m_rng{/* seed */ 1234};
-    DrawMode m_drawMode{DrawMode::Normal};
-    float    m_scaleMultiplier{1.f};
+    za::FastNonCryptoRng m_rng{/* seed */ 1234};
+    DrawMode             m_drawMode{DrawMode::Normal};
+    float                m_scaleMultiplier{1.f};
 
     ////////////////////////////////////////////////////////////
     // Instanced rendering resources

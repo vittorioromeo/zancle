@@ -11,7 +11,7 @@
 
 
 ////////////////////////////////////////////////////////////
-[[nodiscard]] za::Vector<za::StringView> getShuffledCatNames(const CatType catType, RNGFast& rng)
+[[nodiscard]] za::Vector<za::StringView> getShuffledCatNames(const CatType catType, za::FastNonCryptoRng& rng)
 {
     const auto span = catNamesPerType[asIdx(catType)];
 

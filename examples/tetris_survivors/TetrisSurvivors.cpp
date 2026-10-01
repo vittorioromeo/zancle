@@ -31,7 +31,6 @@
 #include "ExampleUtils/LoadedSound.hpp"
 #include "ExampleUtils/MathUtils.hpp"
 #include "ExampleUtils/Progress.hpp"
-#include "ExampleUtils/RNGFast.hpp"
 #include "ExampleUtils/Scaling.hpp"
 #include "ExampleUtils/SoundManager.hpp"
 
@@ -79,6 +78,8 @@
 #include "Zancle/Fmt/FmtToString.hpp"
 
 #include "Zancle/IO/Path.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/String/StringView.hpp"
 #include "Zancle/String/ToString.hpp"
@@ -881,7 +882,7 @@ private:
     za::Vector<SpriteParticleData> m_fixedColorSpriteParticles;
 
     ////////////////////////////////////////////////////////////
-    RNGFast m_rngFast{static_cast<RNGFast::SeedType>(
+    za::FastNonCryptoRng m_rngFast{static_cast<za::FastNonCryptoRng::SeedType>(
         za::Clock::now().asMicroseconds())}; // very fast, low-quality, but good enough for VFXs
 
     ////////////////////////////////////////////////////////////

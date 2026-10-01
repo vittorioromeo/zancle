@@ -2,7 +2,6 @@
 #include "ExampleProfiler/ProfilerImGui.hpp"
 #include "SoAPFR.hpp"
 
-#include "ExampleUtils/RNGFast.hpp"
 #include "ExampleUtils/Sampler.hpp"
 #include "ExampleUtils/Scaling.hpp"
 
@@ -40,6 +39,8 @@
 #include "Zancle/Window/VideoModeUtils.hpp"
 
 #include "Zancle/IO/Path.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/Algorithm/SwapAndPop.hpp"
 
@@ -127,7 +128,7 @@ za::Vector<ParticleInstanceData>   instanceRenderingDataBuffer[2];
 
 
 ////////////////////////////////////////////////////////////
-RNGFast rng;
+za::FastNonCryptoRng rng;
 
 
 ////////////////////////////////////////////////////////////

@@ -23,7 +23,6 @@
 #include "TextShakeEffect.hpp"
 
 #include "ExampleUtils/Progress.hpp"
-#include "ExampleUtils/RNGFast.hpp"
 #include "ExampleUtils/Sampler.hpp"
 
 #include "Zancle/Graphics/Color.hpp"
@@ -32,6 +31,8 @@
 #include "Zancle/Window/Mouse.hpp"
 
 #include "Zancle/Concurrency/ThreadPool.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/String/String.hpp"
 #include "Zancle/String/StringView.hpp"
@@ -152,7 +153,7 @@ bool handleCatShrineCollision(float deltaTimeMs, Cat& cat, Shrine& shrine);
 
 ////////////////////////////////////////////////////////////
 // Definition in `BubbleIdleMainInline.hpp`
-[[nodiscard]] Bubble makeRandomBubble(Playthrough& pt, RNGFast& rng, float mapLimit, float maxY);
+[[nodiscard]] Bubble makeRandomBubble(Playthrough& pt, za::FastNonCryptoRng& rng, float mapLimit, float maxY);
 
 /// Main struct
 ///
@@ -480,9 +481,9 @@ struct Main
 
     ////////////////////////////////////////////////////////////
     // Random number generation
-    RNGSeedType seed;
-    RNGFast     rng{seed};
-    RNGFast     rngFast{seed}; // very fast, low-quality, but good enough for VFXs
+    RNGSeedType          seed;
+    za::FastNonCryptoRng rng{seed};
+    za::FastNonCryptoRng rngFast{seed}; // very fast, low-quality, but good enough for VFXs
 
     ////////////////////////////////////////////////////////////
     // Cat names
@@ -711,7 +712,7 @@ struct Main
     void addMoney(MoneyType reward);
 
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] static za::Vector<za::Vector<za::StringView>> makeShuffledCatNames(RNGFast& rng);
+    [[nodiscard]] static za::Vector<za::Vector<za::StringView>> makeShuffledCatNames(za::FastNonCryptoRng& rng);
 
     ////////////////////////////////////////////////////////////
     [[nodiscard]] static unsigned int getTPWorkerCount();

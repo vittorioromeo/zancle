@@ -1,6 +1,5 @@
 #include "../bubble_idle/SoA.hpp" // TODO P1: avoid the relative path...?
 
-#include "ExampleUtils/RNGFast.hpp"
 #include "ExampleUtils/Sampler.hpp"
 
 #include "Zancle/Graphics/DrawableBatch.hpp"
@@ -25,6 +24,8 @@
 #include "Zancle/IO/Path.hpp"
 
 #include "Zancle/Concurrency/ThreadPool.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/String/ToString.hpp"
 
@@ -109,7 +110,7 @@ int main()
     //
     //
     // Set up random generator
-    RNGFast rng;
+    za::FastNonCryptoRng rng;
 
     //
     //

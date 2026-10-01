@@ -3,7 +3,6 @@
 ////////////////////////////////////////////////////////////
 #include "Zancle/Graphics/Shader.hpp"
 
-#include "ExampleUtils/RNGFast.hpp"
 #include "ExampleUtils/Scaling.hpp"
 
 #include "Zancle/Graphics/Color.hpp"
@@ -25,6 +24,8 @@
 #include "Zancle/Window/Mouse.hpp"
 
 #include "Zancle/IO/Path.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/String/String.hpp"
 #include "Zancle/String/Utf8String.hpp"
@@ -53,7 +54,7 @@
 namespace
 {
 ////////////////////////////////////////////////////////////
-RNGFast rng(/* seed */ 1234);
+za::FastNonCryptoRng rng(/* seed */ 1234);
 
 
 ////////////////////////////////////////////////////////////

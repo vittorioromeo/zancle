@@ -4,7 +4,6 @@
 #include "../bubble_idle/TextEffectWiggle.cpp" // TODO P0: move to ExampleUtils
 #include "../bubble_idle/TextEffectWiggle.hpp" // TODO P1: avoid the relative path...?
 
-#include "ExampleUtils/RNGFast.hpp"
 #include "ExampleUtils/Scaling.hpp"
 
 #include "Zancle/Audio/AudioContext.hpp"
@@ -28,6 +27,8 @@
 #include "Zancle/Window/Keyboard.hpp"
 
 #include "Zancle/IO/Path.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/String/String.hpp"
 #include "Zancle/String/Utf8String.hpp"
@@ -66,7 +67,7 @@ za::Path resourcesDir()
 ////////////////////////////////////////////////////////////
 int main()
 {
-    RNGFast rng(/* seed */ 1234);
+    za::FastNonCryptoRng rng(/* seed */ 1234);
 
     // Define some constants
     constexpr za::Vec2f gameSize{800.f, 600.f};

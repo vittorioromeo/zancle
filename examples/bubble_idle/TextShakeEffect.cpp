@@ -1,9 +1,9 @@
 #include "TextShakeEffect.hpp"
 
-#include "ExampleUtils/RNGFast.hpp"
-
 #include "Zancle/Graphics/Text.hpp"
 #include "Zancle/Graphics/TextData.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/Geometry/Angle.hpp"
 
@@ -11,7 +11,7 @@
 
 
 ////////////////////////////////////////////////////////////
-void TextShakeEffect::bump(RNGFast& rng, const float strength)
+void TextShakeEffect::bump(za::FastNonCryptoRng& rng, const float strength)
 {
     grow  = strength;
     angle = rng.getF(-grow * 0.2f, grow * 0.2f);

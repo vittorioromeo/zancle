@@ -35,7 +35,6 @@
 #include "ExampleUtils/LoadedSound.hpp"
 #include "ExampleUtils/MathUtils.hpp"
 #include "ExampleUtils/Progress.hpp"
-#include "ExampleUtils/RNGFast.hpp"
 #include "ExampleUtils/SoundManager.hpp"
 
 #include "Zancle/Audio/Music.hpp"
@@ -65,6 +64,8 @@
 #include "Zancle/IO/Path.hpp"
 
 #include "Zancle/Concurrency/ThreadPool.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/Algorithm/Erase.hpp"
 
@@ -248,7 +249,7 @@ void Main::addMoney(const MoneyType reward)
 
 
 ////////////////////////////////////////////////////////////
-za::Vector<za::Vector<za::StringView>> Main::makeShuffledCatNames(RNGFast& rng)
+za::Vector<za::Vector<za::StringView>> Main::makeShuffledCatNames(za::FastNonCryptoRng& rng)
 {
     za::Vector<za::Vector<za::StringView>> result(nCatTypes);
 
@@ -1456,8 +1457,8 @@ Main::SelectorData& Main::getBackgroundSelectorData() const
 void Main::reseedRNGs(const RNGSeedType newSeed)
 {
     seed    = newSeed;
-    rng     = RNGFast{seed};
-    rngFast = RNGFast{seed};
+    rng     = za::FastNonCryptoRng{seed};
+    rngFast = za::FastNonCryptoRng{seed};
 }
 
 
