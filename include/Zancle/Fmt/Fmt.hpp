@@ -67,7 +67,7 @@ namespace za::priv
 // the format-string-literal constructor reject the bad input with the
 // diagnostic string surfacing in the compile error. At runtime the
 // assert fires in debug (stringifying `false && (msg)` keeps the literal
-// text in the log) and `[[assume(false)]]` makes the path unreachable
+// text in the log) and assuming `false` makes the path unreachable
 // in release so the optimizer drops the dead checks.
 ////////////////////////////////////////////////////////////
 #define ZA_PRIV_FMT_FAIL(msg)                 \
