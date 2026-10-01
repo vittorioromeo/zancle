@@ -33,35 +33,6 @@ void blockWorker(za::ThreadPool& pool, za::Atomic<bool>& started, za::Atomic<boo
         za::ThisThread::yield();
 }
 
-
-////////////////////////////////////////////////////////////
-// Run `parallelFor` over `count` elements, checking that every index is visited exactly once
-[[nodiscard]] bool visitsEachIndexOnce(za::ThreadPool& pool, const za::SizeT count, const za::SizeT chunkSize)
-{
-    za::Vector<za::Atomic<za::SizeT>> hits(count);
-    za::Atomic<bool>                  badChunk{false};
-
-    pool.parallelFor(count,
-                     [&](const za::SizeT begin, const za::SizeT end)
-    {
-        if (begin >= end || end > count || (chunkSize != 0u && end - begin > chunkSize))
-            badChunk.storeRelaxed(true);
-
-        for (za::SizeT i = begin; i < end; ++i)
-            hits[i].fetchAddRelaxed(1u);
-    },
-                     chunkSize);
-
-    if (badChunk.loadRelaxed())
-        return false;
-
-    for (const auto& h : hits)
-        if (h.loadRelaxed() != 1u)
-            return false;
-
-    return true;
-}
-
 } // namespace ThreadPoolTest
 } // namespace
 
@@ -197,101 +168,6 @@ TEST_CASE("[Base] ThreadPool: tryRunPendingTask")
 }
 
 
-TEST_CASE("[Base] ThreadPool: parallelFor")
-{
-    SECTION("Every index is visited exactly once")
-    {
-        for (const za::SizeT nWorkers : {1u, 3u, 8u})
-        {
-            za::ThreadPool pool(nWorkers);
-
-            for (const za::SizeT count : {0u, 1u, 2u, 7u, 100u, 1000u, 100'000u})
-                for (const za::SizeT chunkSize : {0u, 1u, 3u, 64u, 1'000'000u})
-                    CHECK(ThreadPoolTest::visitsEachIndexOnce(pool, count, chunkSize));
-        }
-    }
-
-    SECTION("Writes are visible to the caller after returning")
-    {
-        za::ThreadPool  pool(4u);
-        za::Vector<int> values(10'000u, 0);
-
-        pool.parallelFor(values.size(),
-                         [&](za::SizeT begin, const za::SizeT end)
-        {
-            for (; begin != end; ++begin)
-                values[begin] = static_cast<int>(begin);
-        });
-
-        bool allWritten = true;
-        for (za::SizeT i = 0u; i < values.size(); ++i)
-            allWritten &= values[i] == static_cast<int>(i);
-
-        CHECK(allWritten);
-    }
-
-    SECTION("The calling thread does all the work when every worker is busy")
-    {
-        // Declared before the pool, which uses them until it is destroyed
-        za::Atomic<bool> started{false};
-        za::Atomic<bool> release{false};
-        za::ThreadPool   pool(1u);
-
-        ThreadPoolTest::blockWorker(pool, started, release);
-
-        // The helper task stays queued: the caller must run it itself rather than wait for the worker
-        const za::ThreadId caller = za::ThisThread::getId();
-        za::Atomic<bool>   otherThread{false};
-
-        pool.parallelFor(1000u,
-                         [&](za::SizeT, za::SizeT)
-        {
-            if (za::ThisThread::getId() != caller)
-                otherThread.storeRelaxed(true);
-        },
-                         1u);
-
-        CHECK(!otherThread.loadRelaxed());
-        release.storeRelease(true);
-    }
-
-    SECTION("Nested calls from within a task")
-    {
-        za::ThreadPool        pool(2u);
-        za::Atomic<za::SizeT> total{0u};
-
-        pool.parallelFor(16u,
-                         [&](za::SizeT begin, const za::SizeT end)
-        {
-            for (; begin != end; ++begin)
-                pool.parallelFor(100u, [&](const za::SizeT b, const za::SizeT e) { total.fetchAddRelaxed(e - b); });
-        },
-                         1u);
-
-        CHECK(total.loadRelaxed() == 1600u);
-    }
-
-    SECTION("Concurrent calls from multiple threads")
-    {
-        za::ThreadPool        pool(4u);
-        za::Atomic<za::SizeT> total{0u};
-
-        {
-            za::Vector<za::Thread> callers;
-            for (int t = 0; t < 4; ++t)
-                callers.emplaceBack([&]
-                {
-                    for (int round = 0; round < 50; ++round)
-                        pool.parallelFor(1000u,
-                                         [&](const za::SizeT b, const za::SizeT e) { total.fetchAddRelaxed(e - b); });
-                });
-        } // joins
-
-        CHECK(total.loadRelaxed() == 4u * 50u * 1000u);
-    }
-}
-
-
 TEST_CASE("[Base] ThreadPool: posting")
 {
     SECTION("Tasks can post tasks")
@@ -412,33 +288,6 @@ TEST_CASE("[Base] ThreadPool: destruction")
         }
 
         CHECK(result.loadRelaxed() == 200);
-    }
-
-    SECTION("parallelFor from tasks running during destruction")
-    {
-        // The stop tasks are queued while `parallelFor` waits for its helpers: it must neither run
-        // them as regular tasks nor block while its own helpers are still queued behind them
-        for (int iteration = 0; iteration < 10; ++iteration)
-            for (const za::SizeT nWorkers : {1u, 2u, 4u})
-            {
-                za::Atomic<za::SizeT> total{0u};
-
-                {
-                    za::ThreadPool pool(nWorkers);
-
-                    for (za::SizeT w = 0u; w < nWorkers; ++w)
-                        pool.post([&]
-                        {
-                            za::ThisThread::sleepFor(za::milliseconds(5)); // destruction starts meanwhile
-
-                            pool.parallelFor(1000u, [&](const za::SizeT b, const za::SizeT e) {
-                                total.fetchAddRelaxed(e - b);
-                            }, 1u);
-                        });
-                }
-
-                CHECK(total.loadRelaxed() == nWorkers * 1000u);
-            }
     }
 }
 

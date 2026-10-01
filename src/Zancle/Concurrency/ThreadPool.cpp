@@ -75,7 +75,7 @@ void enqueueCopies(TaskQueue& queue, const ThreadPool::Task& task, const SizeT c
 ///   as its main loop dequeues one, so each worker consumes exactly one,
 ///   no matter how the tasks are distributed.
 /// - Stop tasks dequeued elsewhere (by `tryRunPendingTask`, e.g. from a
-///   `parallelFor` inside a task that runs during destruction) are put back.
+///   task that runs during destruction) are put back.
 /// - After joining the workers, the destructor runs any remaining task
 ///   (queued by other threads behind the stop tasks, or posted by tasks
 ///   during shutdown) on the destroying thread.

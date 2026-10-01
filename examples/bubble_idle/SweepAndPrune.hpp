@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Zancle/Concurrency/ParallelFor.hpp"
 #include "Zancle/Concurrency/ThreadPool.hpp"
 
 #include "Zancle/Algorithm/Sort.hpp"
@@ -26,7 +27,7 @@ private:
 
 public:
     ////////////////////////////////////////////////////////////
-    void forEachUniqueIndexPair(za::ThreadPool& pool, auto& func)
+    void forEachUniqueIndexPair(za::ThreadPool& pool, za::ParallelForSlots& parallelForSlots, auto& func)
     {
         const za::SizeT numObjects = m_aabbs.size();
 
@@ -56,13 +57,15 @@ public:
 
         // Dynamic scheduling, one row at a time: early rows (low `i`) have much more work than late
         // rows (high `i`) due to longer inner loops and less effective early exits.
-        pool.parallelFor(numObjects,
-                         [&](za::SizeT i, const za::SizeT end)
+        za::parallelFor(pool,
+                        parallelForSlots,
+                        numObjects,
+                        [&](za::SizeT i, const za::SizeT end)
         {
             for (; i < end; ++i)
                 processOne(i);
         },
-                         /* chunkSize */ 1u);
+                        /* chunkSize */ 1u);
     }
 
     ////////////////////////////////////////////////////////////

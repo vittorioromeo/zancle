@@ -30,9 +30,8 @@
 #include "Zancle/Window/Keyboard.hpp"
 #include "Zancle/Window/Mouse.hpp"
 
+#include "Zancle/Concurrency/ParallelFor.hpp"
 #include "Zancle/Concurrency/ThreadPool.hpp"
-
-#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/String/String.hpp"
 #include "Zancle/String/StringView.hpp"
@@ -46,6 +45,8 @@
 #include "Zancle/Geometry/Angle.hpp"
 #include "Zancle/Geometry/Rect2.hpp"
 #include "Zancle/Geometry/Vec2.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/Vocabulary/FixedFunction.hpp"
 #include "Zancle/Vocabulary/Optional.hpp"
@@ -609,7 +610,8 @@ struct Main
 
     ////////////////////////////////////////////////////////////
     // Thread pool
-    za::ThreadPool threadPool;
+    za::ThreadPool       threadPool;
+    za::ParallelForSlots parallelForSlots;
 
     ////////////////////////////////////////////////////////////
     // Cached views

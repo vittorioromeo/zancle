@@ -192,7 +192,7 @@ void Main::gameLoopUpdateCollisionsBubbleBubble(const float deltaTimeMs)
         handleBubbleCollision(deltaTimeMs, pt->bubbles[bubbleIdxI], pt->bubbles[bubbleIdxJ]);
     };
 
-    sweepAndPrune->forEachUniqueIndexPair(threadPool, func);
+    sweepAndPrune->forEachUniqueIndexPair(threadPool, parallelForSlots, func);
 }
 
 

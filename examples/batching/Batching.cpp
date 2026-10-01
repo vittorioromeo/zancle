@@ -23,9 +23,8 @@
 
 #include "Zancle/IO/Path.hpp"
 
+#include "Zancle/Concurrency/ParallelFor.hpp"
 #include "Zancle/Concurrency/ThreadPool.hpp"
-
-#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/String/ToString.hpp"
 
@@ -36,6 +35,8 @@
 #include "Zancle/Geometry/Angle.hpp"
 #include "Zancle/Geometry/Priv/Vec2Base.hpp"
 #include "Zancle/Geometry/Rect2.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/Vocabulary/Optional.hpp"
 
@@ -253,15 +254,18 @@ int main()
     //
     // Set up thread pool
     // The calling thread takes part in `parallelFor`, so `nMaxWorkers` batches can run at once
-    za::ThreadPool pool(za::ThreadPool::getHardwareWorkerCountExcludingCallingThread());
+    za::ThreadPool       pool(za::ThreadPool::getHardwareWorkerCountExcludingCallingThread());
+    za::ParallelForSlots parallelForSlots;
 
     const auto doInBatches = [&](auto&& f)
     {
         const auto      nBatches         = static_cast<za::SizeT>(nWorkers);
         const za::SizeT entitiesPerBatch = entities.size() / nBatches;
 
-        pool.parallelFor(nBatches,
-                         [&](za::SizeT i, const za::SizeT end)
+        za::parallelFor(pool,
+                        parallelForSlots,
+                        nBatches,
+                        [&](za::SizeT i, const za::SizeT end)
         {
             for (; i < end; ++i)
             {
@@ -271,7 +275,7 @@ int main()
                 f(i, batchStartIdx, batchEndIdx);
             }
         },
-                         /* chunkSize */ 1u);
+                        /* chunkSize */ 1u);
     };
 
     // Set up clock and time sampling
