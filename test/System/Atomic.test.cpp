@@ -4,6 +4,7 @@
 
 #include "Zancle/Concurrency/Thread.hpp"
 
+#include "Zancle/Chrono/Clock.hpp"
 #include "Zancle/Chrono/Time.hpp"
 
 #include "Zancle/Container/Vector.hpp"
@@ -631,4 +632,46 @@ TEST_CASE("[System] Zancle/Concurrency/Atomic.hpp - 64-bit waitUntil")
     CHECK(counter.loadRelaxed() == 0u);
 
     decrementer.join();
+}
+
+
+TEST_CASE("[System] Zancle/Concurrency/Atomic.hpp - 64-bit waits on values differing only in their upper half")
+{
+    // Regression: on platforms that only wait on 32-bit words (Linux, macOS, BSDs), 64-bit waits used to
+    // sleep on the lower half of the value, so a change of the upper half only (e.g. a `double` going from
+    // `1.0` to `2.0`) racing with the wait was a lost wakeup: a stall of seconds (Linux), or forever
+    constexpr za::U64 roundTrips = 20'000u;
+
+    za::Atomic<za::U64> value{0u};
+    za::Atomic<int>     stalls{0};
+
+    const auto handoff = [&](const za::U64 target)
+    {
+        const za::Clock clock;
+        value.waitUntilAcquire([target](const za::U64 v) { return v == target; });
+
+        if (clock.getElapsedTime() > za::milliseconds(500))
+            stalls.fetchAddRelaxed(1);
+    };
+
+    {
+        za::Thread pong{[&]
+        {
+            for (za::U64 i = 0u; i < roundTrips; ++i)
+            {
+                handoff((2u * i) << 32u);
+                value.storeRelease((2u * i + 1u) << 32u);
+                value.notifyOne();
+            }
+        }};
+
+        for (za::U64 i = 0u; i < roundTrips; ++i)
+        {
+            value.storeRelease((2u * i) << 32u);
+            value.notifyOne();
+            handoff((2u * i + 1u) << 32u);
+        }
+    } // joins
+
+    CHECK(stalls.loadRelaxed() == 0);
 }

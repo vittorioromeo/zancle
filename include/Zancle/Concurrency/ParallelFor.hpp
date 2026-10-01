@@ -166,7 +166,7 @@ private:
         const void* const address = &m_outstanding;
 
         if (m_outstanding.fetchSubAcqRel(1u) == (destroyBit | 1u))
-            priv::atomicNotifyOne(address);
+            priv::atomicNotify64(address, /* wakeAll */ false);
     }
 
 
