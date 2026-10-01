@@ -149,3 +149,57 @@ TEST_CASE("[System] za::Clock")
         CHECK(stdElapsed - nowElapsed < tolerance);
     }
 }
+
+
+TEST_CASE("[System] za::Clock - nanoseconds")
+{
+    SECTION("nowNanoseconds never goes backward, and has the same epoch as now()")
+    {
+        za::I64 previous = za::Clock::nowNanoseconds();
+
+        for (int i = 0; i < 10'000; ++i)
+        {
+            const za::I64 current = za::Clock::nowNanoseconds();
+            CHECK(current >= previous);
+            previous = current;
+        }
+
+        const za::I64 before = za::Clock::nowNanoseconds();
+        const za::I64 now    = za::Clock::now().asMicroseconds();
+        const za::I64 after  = za::Clock::nowNanoseconds();
+
+        CHECK(now >= before / 1000);
+        CHECK(now <= after / 1000);
+    }
+
+    SECTION("getElapsedNanoseconds()")
+    {
+        za::Clock clock;
+        za::ThisThread::sleepFor(za::milliseconds(2));
+
+        const za::I64 elapsed = clock.getElapsedNanoseconds();
+        CHECK(elapsed >= 2'000'000);
+
+        // Agrees with `getElapsedTime`, which truncates to whole microseconds
+        clock.stop();
+        const za::I64 stoppedNanoseconds = clock.getElapsedNanoseconds();
+        CHECK(clock.getElapsedTime().asMicroseconds() == stoppedNanoseconds / 1000);
+
+        // Stopped: no longer advances
+        za::ThisThread::sleepFor(za::milliseconds(1));
+        CHECK(clock.getElapsedNanoseconds() == stoppedNanoseconds);
+    }
+
+    SECTION("Conversions")
+    {
+        STATIC_CHECK(za::nanosecondsToSeconds(1'500'000'000) == 1.5);
+        STATIC_CHECK(za::nanosecondsToMilliseconds(2'500'000) == 2.5);
+        STATIC_CHECK(za::nanosecondsToMicroseconds(1500) == 1.5);
+        STATIC_CHECK(za::nanosecondsToMilliseconds(-1'000'000) == -1.0);
+
+        const za::I64 start = za::Clock::nowNanoseconds();
+        za::ThisThread::sleepFor(za::milliseconds(2));
+        const double elapsed = za::nanosecondsToMilliseconds(za::Clock::nowNanoseconds() - start);
+        CHECK(elapsed >= 2.0);
+    }
+}
