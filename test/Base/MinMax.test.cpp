@@ -57,3 +57,19 @@ TEST_CASE("[Base] Base/MinMax.hpp")
         CHECK(&za::max(a, c) == &a);
     }
 }
+
+
+TEST_CASE("[Base] Base/MinMax.hpp - three or more values")
+{
+    STATIC_CHECK(za::min(3, 1, 2) == 1);
+    STATIC_CHECK(za::max(3, 1, 2) == 3);
+    STATIC_CHECK(za::min(5, 4, 3, 2, 1) == 1);
+    STATIC_CHECK(za::max(1, 2, 9, 3, 4) == 9);
+    STATIC_CHECK(za::min(2.f, -1.f, 0.5f) == -1.f);
+
+    // Like `std::min({...})` and `std::max({...})`: the first of equivalent values
+    STATIC_CHECK(!ZA_SIGNBIT(za::min(1.f, 0.f, -0.f)));
+    STATIC_CHECK(ZA_SIGNBIT(za::min(1.f, -0.f, 0.f)));
+    STATIC_CHECK(!ZA_SIGNBIT(za::max(-1.f, 0.f, -0.f)));
+    STATIC_CHECK(ZA_SIGNBIT(za::max(-1.f, -0.f, 0.f)));
+}

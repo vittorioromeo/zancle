@@ -1501,3 +1501,18 @@ TEST_CASE("[Base] za::StringView construction from containers")
         STATIC_CHECK(!ZA_IS_CONSTRUCTIBLE(za::StringView, const za::Vector<float>&));
     }
 }
+
+
+TEST_CASE("[Base] StringView.hpp - front, back, positional compare")
+{
+    constexpr za::StringView view{"hello"};
+
+    STATIC_CHECK(view.front() == 'h');
+    STATIC_CHECK(view.back() == 'o');
+    STATIC_CHECK(za::StringView{"x"}.front() == za::StringView{"x"}.back());
+
+    STATIC_CHECK(view.compare(1u, 3u, "ell") == 0);
+    STATIC_CHECK(view.compare(1u, 3u, "elm") < 0);
+    STATIC_CHECK(view.compare(1u, 3u, "elk") > 0);
+    STATIC_CHECK(view.compare(5u, 0u, "") == 0);
+}

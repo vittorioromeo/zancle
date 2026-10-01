@@ -817,6 +817,13 @@ TEST_CASE("[Base] Algorithm/Fill.hpp, Iota.hpp, Replace.hpp")
         za::fill(values, values, 9); // empty range
         CHECK(rangeEquals(values, {1, 0, 0, 0, 5}));
 
+        za::fill(values, 4); // whole C-style array
+        CHECK(rangeEquals(values, {4, 4, 4, 4, 4}));
+
+        za::Vector<int> vector{1, 2, 3};
+        za::fill(vector, 8); // whole range
+        CHECK((vector == za::Vector<int>{8, 8, 8}));
+
         za::String strings[3];
         za::fill(strings, strings + 3, za::String{"a fairly long string, likely allocated on the heap"});
         CHECK(strings[0] == strings[2]);

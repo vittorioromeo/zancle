@@ -4,8 +4,11 @@
 
 #include "Zancle/Trait/IsSame.hpp"
 
+#include <limits>
+
 #include <cfloat>
 #include <climits>
+#include <cmath>
 
 
 namespace
@@ -74,4 +77,29 @@ TEST_CASE("[Base] Base/Limits.hpp")
     // All checks are compile-time (see above)
     STATIC_CHECK(ZA_UNSIGNED_INT_MAX == 4'294'967'295u);
     STATIC_CHECK(ZA_INT_MIN < 0 && ZA_INT_MAX > 0);
+}
+
+
+TEST_CASE("[Base] Base/Limits.hpp - infinities and NaNs")
+{
+    STATIC_CHECK(ZA_IS_SAME(decltype(ZA_FLOAT_INFINITY), float));
+    STATIC_CHECK(ZA_IS_SAME(decltype(ZA_DOUBLE_NAN), double));
+    STATIC_CHECK(ZA_IS_SAME(decltype(ZA_LONG_DOUBLE_NAN), long double));
+
+    // Constant expressions
+    STATIC_CHECK(ZA_FLOAT_INFINITY > ZA_FLOAT_MAX);
+    STATIC_CHECK(ZA_DOUBLE_INFINITY > ZA_DOUBLE_MAX);
+    STATIC_CHECK(ZA_LONG_DOUBLE_INFINITY > ZA_LONG_DOUBLE_MAX);
+    STATIC_CHECK(ZA_FLOAT_NAN != ZA_FLOAT_NAN);
+    STATIC_CHECK(ZA_DOUBLE_NAN != ZA_DOUBLE_NAN);
+    STATIC_CHECK(ZA_LONG_DOUBLE_NAN != ZA_LONG_DOUBLE_NAN);
+
+    CHECK(ZA_FLOAT_INFINITY == std::numeric_limits<float>::infinity());
+    CHECK(ZA_DOUBLE_INFINITY == std::numeric_limits<double>::infinity());
+    CHECK(ZA_LONG_DOUBLE_INFINITY == std::numeric_limits<long double>::infinity());
+
+    CHECK(std::isnan(ZA_FLOAT_NAN));
+    CHECK(std::isnan(ZA_DOUBLE_NAN));
+    CHECK(std::isnan(ZA_LONG_DOUBLE_NAN));
+    CHECK(!std::signbit(ZA_FLOAT_NAN)); // a positive quiet NaN, like `quiet_NaN()`
 }

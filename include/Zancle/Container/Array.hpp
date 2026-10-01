@@ -163,6 +163,57 @@ struct [[nodiscard]] ZA_GSL_OWNER(T) Array
 
 
     ////////////////////////////////////////////////////////////
+    /// \brief First element
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T& front() noexcept ZA_LIFETIMEBOUND
+    {
+        return elements[0];
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    /// \brief First element
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& front() const noexcept ZA_LIFETIMEBOUND
+    {
+        return elements[0];
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Last element
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr T& back() noexcept ZA_LIFETIMEBOUND
+    {
+        return elements[N - 1u];
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Last element
+    ///
+    ////////////////////////////////////////////////////////////
+    [[nodiscard, gnu::always_inline, gnu::pure]] constexpr const T& back() const noexcept ZA_LIFETIMEBOUND
+    {
+        return elements[N - 1u];
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Assign `value` to every element (like `std::array::fill`)
+    ///
+    ////////////////////////////////////////////////////////////
+    constexpr void fill(const T& value)
+    {
+        for (T& element : elements)
+            element = value;
+    }
+
+
+    ////////////////////////////////////////////////////////////
     /// \brief Element-wise equality comparison
     ///
     ////////////////////////////////////////////////////////////

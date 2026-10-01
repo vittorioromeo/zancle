@@ -174,3 +174,31 @@ TEST_CASE("[Base] Base/Span.hpp")
         STATIC_CHECK(!ZA_IS_CONSTRUCTIBLE(za::Span<Base>, const Base*, za::SizeT));
     }
 }
+
+
+TEST_CASE("[Base] Base/Span.hpp - sizeBytes, front, back, subspan")
+{
+    int values[]{1, 2, 3, 4, 5};
+
+    const za::Span<int> span{values};
+    CHECK(span.sizeBytes() == 5u * sizeof(int));
+    CHECK(span.front() == 1);
+    CHECK(span.back() == 5);
+
+    span.front() = 10;
+    CHECK(values[0] == 10);
+
+    const za::Span<int> middle = span.subspan(1u, 3u);
+    CHECK(middle.size() == 3u);
+    CHECK(middle.front() == 2);
+    CHECK(middle.back() == 4);
+
+    CHECK(span.subspan(2u).size() == 3u);       // to the end
+    CHECK(span.subspan(3u, 100u).size() == 2u); // clamped to the end
+    CHECK(span.subspan(5u).empty());
+
+    const za::Span<const int> constSpan{values};
+    CHECK(constSpan.subspan(1u).front() == 2);
+
+    STATIC_CHECK(za::Span<const double>{}.sizeBytes() == 0u);
+}

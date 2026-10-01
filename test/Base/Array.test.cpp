@@ -241,3 +241,22 @@ TEST_CASE("[Base] Container/Array.hpp")
         STATIC_CHECK(ZA_IS_TRIVIALLY_RELOCATABLE(za::Array<NonTrivialButRelocatable, 5>));
     }
 }
+
+
+TEST_CASE("[Base] Container/Array.hpp - front, back, fill")
+{
+    za::Array<int, 3> array{1, 2, 3};
+    CHECK(array.front() == 1);
+    CHECK(array.back() == 3);
+
+    array.fill(7);
+    CHECK(array == za::Array<int, 3>{7, 7, 7});
+
+    array.front() = 1;
+    array.back()  = 9;
+    CHECK(array == za::Array<int, 3>{1, 7, 9});
+
+    constexpr za::Array<int, 2> constant{4, 5};
+    STATIC_CHECK(constant.front() == 4);
+    STATIC_CHECK(constant.back() == 5);
+}

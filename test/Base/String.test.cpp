@@ -1736,3 +1736,48 @@ TEST_CASE("[Base] za::String assignment from a view of itself, resize, and inser
         CHECK(s == "abc -- a long insertion that does not fit in the SSO buffer -- >abcdef");
     }
 }
+
+
+TEST_CASE("[Base] String.hpp - repeated characters, member swap, positional compare")
+{
+    SECTION("(count, char) constructor and append")
+    {
+        CHECK(za::String(3u, 'x') == "xxx");
+        CHECK(za::String(0u, 'x').empty());
+
+        const za::String onHeap(100u, 'a');
+        CHECK(onHeap.size() == 100u);
+        CHECK(onHeap.front() == 'a');
+        CHECK(onHeap.back() == 'a');
+
+        za::String s{"ab"};
+        CHECK(s.append(3u, '-') == "ab---");
+        CHECK(s.append(0u, '!') == "ab---");
+        CHECK(s.append(50u, '=').size() == 55u);
+    }
+
+    SECTION("Member swap")
+    {
+        za::String small{"short"};
+        za::String large{"a much longer string, which certainly lives on the heap"};
+
+        small.swap(large);
+        CHECK(small == "a much longer string, which certainly lives on the heap");
+        CHECK(large == "short");
+
+        swap(small, large); // the free function still works
+        CHECK(small == "short");
+    }
+
+    SECTION("Positional compare")
+    {
+        const za::String s{"hello world"};
+
+        CHECK(s.compare(6u, 5u, "world") == 0);
+        CHECK(s.compare(0u, 5u, "hello") == 0);
+        CHECK(s.compare(0u, 5u, "help") < 0);
+        CHECK(s.compare(6u, za::StringView::nPos, "world") == 0);
+        CHECK(s.compare(6u, 100u, "worlds") < 0);
+        CHECK(s.compare("hello world") == 0);
+    }
+}

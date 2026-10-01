@@ -21,6 +21,21 @@ namespace
 namespace UniquePtrTest // for unity builds
 {
 ////////////////////////////////////////////////////////////
+// Value-initializable with `{}` only if `UniquePtr`'s default constructor is not `explicit`
+struct WithUniquePtrMember
+{
+    za::UniquePtr<int> ptr;
+    int                value;
+};
+
+
+////////////////////////////////////////////////////////////
+[[nodiscard]] WithUniquePtrMember makeEmpty()
+{
+    return {};
+}
+
+////////////////////////////////////////////////////////////
 // Stateful deleter that records which instance deleted the last object
 struct TaggedDeleter
 {
@@ -93,6 +108,18 @@ struct NonRelocatableDeleter
 
 TEST_CASE("[Base] Base/UniquePtr.hpp")
 {
+    SECTION("Implicit default construction")
+    {
+        za::UniquePtr<int> fromBraces = {};
+        CHECK(fromBraces.get() == nullptr);
+
+        const UniquePtrTest::WithUniquePtrMember aggregate{};
+        CHECK(aggregate.ptr.get() == nullptr);
+        CHECK(aggregate.value == 0);
+
+        CHECK(UniquePtrTest::makeEmpty().ptr.get() == nullptr);
+    }
+
     using namespace UniquePtrTest;
 
     SECTION("Type traits")

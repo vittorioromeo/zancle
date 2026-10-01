@@ -52,6 +52,37 @@ TEST_CASE("[System] Zancle/Concurrency/Thread.hpp - spawn + join round-trip")
     CHECK(ran.loadAcquire() == 42);
 }
 
+namespace
+{
+namespace ThreadTest // for unity builds
+{
+////////////////////////////////////////////////////////////
+za::Atomic<int> plainFunctionRuns{0};
+
+
+////////////////////////////////////////////////////////////
+void plainFunction()
+{
+    plainFunctionRuns.fetchAddRelaxed(1);
+}
+
+} // namespace ThreadTest
+} // namespace
+
+
+TEST_CASE("[System] Zancle/Concurrency/Thread.hpp - plain functions and function pointers")
+{
+    ThreadTest::plainFunctionRuns.storeRelaxed(0);
+
+    za::Thread byName{ThreadTest::plainFunction}; // deduced as a reference to a function type
+    za::Thread byPointer{&ThreadTest::plainFunction};
+
+    byName.join();
+    byPointer.join();
+
+    CHECK(ThreadTest::plainFunctionRuns.loadRelaxed() == 2);
+}
+
 TEST_CASE("[System] Zancle/Concurrency/Thread.hpp - getId is non-zero for a running thread")
 {
     za::Atomic<za::U64> observedId{0u};
