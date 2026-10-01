@@ -4,7 +4,13 @@
 
 
 ////////////////////////////////////////////////////////////
-#if !__has_builtin(__builtin_source_location)
+// Headers
+////////////////////////////////////////////////////////////
+#include "Zancle/HasBuiltin.hpp"
+
+
+////////////////////////////////////////////////////////////
+#if !ZA_HAS_BUILTIN(__builtin_source_location)
     #error "Compiler does not support __builtin_source_location, which is required by za::SourceLocation"
 #endif
 

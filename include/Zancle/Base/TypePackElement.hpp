@@ -6,10 +6,12 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/HasBuiltin.hpp"
+
 #include "Zancle/Base/SizeT.hpp"
 
 
-#if __has_builtin(__type_pack_element)
+#if ZA_HAS_BUILTIN(__type_pack_element)
 
     ////////////////////////////////////////////////////////////
     #define ZA_TYPE_PACK_ELEMENT(N, ...) __type_pack_element<N, __VA_ARGS__>

@@ -119,6 +119,7 @@ function(_zancle_collect_module_headers module outvar)
     if(${module} STREQUAL "System")
         set(_headers
             "${PROJECT_SOURCE_DIR}/include/Zancle/Config.hpp"
+            "${PROJECT_SOURCE_DIR}/include/Zancle/HasBuiltin.hpp"
             "${PROJECT_SOURCE_DIR}/include/Zancle/OpenGL.hpp"
             "${PROJECT_SOURCE_DIR}/include/Zancle/GpuPreference.hpp"
             "${PROJECT_SOURCE_DIR}/include/Zancle/Main.hpp")

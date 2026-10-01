@@ -6,6 +6,8 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/HasBuiltin.hpp"
+
 #include "Zancle/Config.hpp" // IWYU pragma: keep
 
 
@@ -16,12 +18,12 @@
     ////////////////////////////////////////////////////////////
     #define ZA_UNREACHABLE() ::za::priv::assertFailure("false /* ZA_UNREACHABLE() */", __FILE__, __LINE__)
 
-#elif __has_builtin(__builtin_unreachable)
+#elif ZA_HAS_BUILTIN(__builtin_unreachable)
 
     ////////////////////////////////////////////////////////////
     #define ZA_UNREACHABLE() __builtin_unreachable()
 
-#elif __has_builtin(__assume)
+#elif ZA_HAS_BUILTIN(__assume)
 
     ////////////////////////////////////////////////////////////
     #define ZA_UNREACHABLE() __assume(false)

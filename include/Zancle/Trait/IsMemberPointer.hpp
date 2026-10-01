@@ -3,7 +3,13 @@
 // https://github.com/vittorioromeo/Zancle/blob/master/license.md
 
 
-#if __has_builtin(__is_member_pointer)
+////////////////////////////////////////////////////////////
+// Headers
+////////////////////////////////////////////////////////////
+#include "Zancle/HasBuiltin.hpp"
+
+
+#if ZA_HAS_BUILTIN(__is_member_pointer)
 
     ////////////////////////////////////////////////////////////
     #define ZA_IS_MEMBER_POINTER(...) __is_member_pointer(__VA_ARGS__)

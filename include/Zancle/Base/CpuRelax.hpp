@@ -3,7 +3,13 @@
 // https://github.com/vittorioromeo/Zancle/blob/master/license.md
 
 
-#if (defined(__x86_64__) || defined(__i386__)) && __has_builtin(__builtin_ia32_pause)
+////////////////////////////////////////////////////////////
+// Headers
+////////////////////////////////////////////////////////////
+#include "Zancle/HasBuiltin.hpp"
+
+
+#if (defined(__x86_64__) || defined(__i386__)) && ZA_HAS_BUILTIN(__builtin_ia32_pause)
 
     ////////////////////////////////////////////////////////////
     #define ZA_CPU_RELAX() __builtin_ia32_pause()

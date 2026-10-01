@@ -6,11 +6,13 @@
 ////////////////////////////////////////////////////////////
 // Headers
 ////////////////////////////////////////////////////////////
+#include "Zancle/HasBuiltin.hpp"
+
 #include "Zancle/Base/IndexSequence.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
 
-#if __has_builtin(__integer_pack)
+#if ZA_HAS_BUILTIN(__integer_pack)
 
     ////////////////////////////////////////////////////////////
     #define ZA_MAKE_INDEX_SEQUENCE(N) ::za::IndexSequence<__integer_pack(N)...>
@@ -23,7 +25,7 @@ using MakeIndexSequence = ZA_MAKE_INDEX_SEQUENCE(N);
 
 } // namespace za
 
-#elif __has_builtin(__make_integer_seq)
+#elif ZA_HAS_BUILTIN(__make_integer_seq)
 
 namespace za::priv
 {

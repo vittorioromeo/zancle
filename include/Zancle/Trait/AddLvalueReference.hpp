@@ -3,7 +3,13 @@
 // https://github.com/vittorioromeo/Zancle/blob/master/license.md
 
 
-#if __has_builtin(__add_lvalue_reference)
+////////////////////////////////////////////////////////////
+// Headers
+////////////////////////////////////////////////////////////
+#include "Zancle/HasBuiltin.hpp"
+
+
+#if ZA_HAS_BUILTIN(__add_lvalue_reference)
 
     ////////////////////////////////////////////////////////////
     #define ZA_ADD_LVALUE_REFERENCE(...) __add_lvalue_reference(__VA_ARGS__)

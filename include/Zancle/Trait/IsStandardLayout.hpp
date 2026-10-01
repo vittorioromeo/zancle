@@ -3,7 +3,13 @@
 // https://github.com/vittorioromeo/Zancle/blob/master/license.md
 
 
-#if __has_builtin(__is_standard_layout)
+////////////////////////////////////////////////////////////
+// Headers
+////////////////////////////////////////////////////////////
+#include "Zancle/HasBuiltin.hpp"
+
+
+#if ZA_HAS_BUILTIN(__is_standard_layout)
 
     ////////////////////////////////////////////////////////////
     #define ZA_IS_STANDARD_LAYOUT(...) __is_standard_layout(__VA_ARGS__)
