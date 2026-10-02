@@ -431,3 +431,135 @@ TEST_CASE("[Base] ParallelFor.hpp - stress")
 
     CHECK(failures.loadRelaxed() == 0);
 }
+
+
+namespace
+{
+namespace ParallelForWakeTest // for unity builds
+{
+////////////////////////////////////////////////////////////
+// Every index visited exactly once, waking helpers with the given strategy
+template <bool TreeWake>
+[[nodiscard]] bool visitsEachIndexOnce(za::ThreadPool& pool, za::ParallelForSlots& slots, const za::SizeT count, const za::SizeT chunkSize)
+{
+    za::Vector<za::Atomic<za::SizeT>> hits(count);
+
+    za::priv::parallelForImpl<TreeWake>(pool,
+                                        slots,
+                                        count,
+                                        [&](const za::SizeT begin, const za::SizeT end)
+    {
+        for (za::SizeT i = begin; i < end; ++i)
+            hits[i].fetchAddRelaxed(1u);
+    },
+                                        chunkSize);
+
+    for (const auto& h : hits)
+        if (h.loadRelaxed() != 1u)
+            return false;
+
+    return true;
+}
+
+
+////////////////////////////////////////////////////////////
+template <bool TreeWake>
+void checkWakeStrategy()
+{
+    SECTION("Every index is visited exactly once")
+    {
+        for (const za::SizeT nWorkers : {1u, 2u, 3u, 7u, 16u})
+        {
+            za::ThreadPool       pool(nWorkers);
+            za::ParallelForSlots slots;
+
+            for (const za::SizeT count : {1u, 2u, 3u, 5u, 17u, 1000u, 50'000u})
+                for (const za::SizeT chunkSize : {0u, 1u, 7u})
+                    CHECK(visitsEachIndexOnce<TreeWake>(pool, slots, count, chunkSize));
+        }
+    }
+
+    SECTION("Nested calls")
+    {
+        za::ThreadPool        pool(5u);
+        za::ParallelForSlots  slots;
+        za::Atomic<za::SizeT> total{0u};
+
+        za::priv::parallelForImpl<TreeWake>(pool,
+                                            slots,
+                                            32u,
+                                            [&](za::SizeT begin, const za::SizeT end)
+        {
+            for (; begin != end; ++begin)
+                za::priv::parallelForImpl<TreeWake>(pool, slots, 200u, [&](const za::SizeT b, const za::SizeT e) {
+                    total.fetchAddRelaxed(e - b);
+                }, 1u);
+        },
+                                            1u);
+
+        CHECK(total.loadRelaxed() == 32u * 200u);
+    }
+
+    SECTION("Late helpers, with their gates reused")
+    {
+        za::Atomic<bool>     started{false};
+        za::Atomic<bool>     release{false};
+        za::ThreadPool       pool(4u);
+        za::ParallelForSlots slots;
+
+        ParallelForTest::blockWorker(pool, started, release);
+
+        bool allCorrect = true;
+        for (int call = 0; call < 5000; ++call)
+        {
+            za::Atomic<za::SizeT> visited{0u};
+            za::priv::parallelForImpl<TreeWake>(pool, slots, 64u, [&](const za::SizeT b, const za::SizeT e) {
+                visited.fetchAddRelaxed(e - b);
+            }, 1u);
+            allCorrect &= visited.loadRelaxed() == 64u;
+        }
+
+        CHECK(allCorrect);
+        release.storeRelease(true);
+    }
+
+    SECTION("Calls from tasks running during the pool's destruction")
+    {
+        for (const za::SizeT nWorkers : {1u, 4u})
+        {
+            za::ParallelForSlots  slots;
+            za::Atomic<za::SizeT> total{0u};
+
+            {
+                za::ThreadPool pool(nWorkers);
+
+                for (za::SizeT w = 0u; w < nWorkers; ++w)
+                    pool.post([&]
+                    {
+                        za::ThisThread::sleepFor(za::milliseconds(5)); // destruction starts meanwhile
+
+                        za::priv::parallelForImpl<TreeWake>(pool, slots, 1000u, [&](const za::SizeT b, const za::SizeT e) {
+                            total.fetchAddRelaxed(e - b);
+                        }, 1u);
+                    });
+            }
+
+            CHECK(total.loadRelaxed() == nWorkers * 1000u);
+        }
+    }
+}
+
+} // namespace ParallelForWakeTest
+} // namespace
+
+
+TEST_CASE("[Base] ParallelFor.hpp - tree wake (helpers wake helpers)")
+{
+    ParallelForWakeTest::checkWakeStrategy</* TreeWake */ true>();
+}
+
+
+TEST_CASE("[Base] ParallelFor.hpp - flat wake (the caller wakes every helper)")
+{
+    ParallelForWakeTest::checkWakeStrategy</* TreeWake */ false>();
+}

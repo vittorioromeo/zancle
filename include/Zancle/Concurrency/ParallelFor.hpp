@@ -16,6 +16,8 @@
 #include "Zancle/Base/InterferenceSize.hpp"
 #include "Zancle/Base/SizeT.hpp"
 
+#include "Zancle/Trait/RemoveReference.hpp"
+
 
 ////////////////////////////////////////////////////////////
 // Forward declarations
@@ -23,10 +25,34 @@
 namespace za
 {
 class ParallelForSlots;
-
-template <typename F>
-void parallelFor(ThreadPool& pool, ParallelForSlots& slots, SizeT count, F&& f, SizeT chunkSize = 0u) noexcept;
 } // namespace za
+
+
+namespace za::priv
+{
+////////////////////////////////////////////////////////////
+/// \brief How `parallelFor` wakes its helpers, depending on the cost of waking sleeping workers
+///
+/// `ThreadPool` wakes workers through a semaphore: on Windows, waking any
+/// number of them is a single call, so the caller posts every helper at
+/// once (flat). Elsewhere, waking each worker is a syscall of its own
+/// (e.g. ~8us on Linux, ~240us for 31 workers), so the caller only wakes
+/// two helpers, and each helper that starts wakes two more (tree): the
+/// caller starts working right away, and the wakeups proceed in parallel.
+///
+////////////////////////////////////////////////////////////
+#ifdef ZA_SYSTEM_WINDOWS
+inline constexpr bool parallelForTreeWake = false;
+#else
+inline constexpr bool parallelForTreeWake = true;
+#endif
+
+
+////////////////////////////////////////////////////////////
+template <bool TreeWake, typename F>
+void parallelForImpl(ThreadPool& pool, ParallelForSlots& slots, SizeT count, F&& f, SizeT chunkSize) noexcept;
+
+} // namespace za::priv
 
 
 namespace za
@@ -75,8 +101,8 @@ public:
 
 private:
     ////////////////////////////////////////////////////////////
-    template <typename F>
-    friend void parallelFor(ThreadPool& pool, ParallelForSlots& slots, SizeT count, F&& f, SizeT chunkSize) noexcept;
+    template <bool TreeWake, typename F>
+    friend void priv::parallelForImpl(ThreadPool& pool, ParallelForSlots& slots, SizeT count, F&& f, SizeT chunkSize) noexcept;
 
 
     ////////////////////////////////////////////////////////////
@@ -197,6 +223,60 @@ private:
     ////////////////////////////////////////////////////////////
     void waitForHelpersInside(SizeT slot) noexcept;
 
+    ////////////////////////////////////////////////////////////
+    /// \brief Post helpers `[first, first + count)` of a call (`count` is 1 or 2), as part of a tree wake
+    ///
+    /// The caller posts helpers 0 and 1, and helper `i` posts helpers `2i + 2`
+    /// and `2i + 3` (see `priv::parallelForTreeWake`).
+    ///
+    ////////////////////////////////////////////////////////////
+    template <typename Frame>
+    static void postHelpers(ParallelForSlots& slots,
+                            const SizeT       slot,
+                            const U32         generation,
+                            Frame* const      frame,
+                            const SizeT       first,
+                            const SizeT       count) noexcept
+    {
+        slots.m_outstanding.fetchAddRelaxed(count);
+
+        ThreadPool::Task tasks[2];
+        for (SizeT i = 0u; i < count; ++i)
+            tasks[i] = ThreadPool::Task{[&slots, slot, generation, frame, index = first + i]
+            { runHelper(slots, slot, generation, frame, index); }};
+
+        frame->pool->postBulk(tasks, count);
+    }
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Body of helper `index`: enter the gate, wake its own children, process chunks
+    ///
+    /// The frame (on the caller's stack) is only touched after entering the gate.
+    ///
+    ////////////////////////////////////////////////////////////
+    template <typename Frame>
+    static void runHelper(ParallelForSlots& slots, const SizeT slot, const U32 generation, Frame* const frame, const SizeT index) noexcept
+    {
+        if (slots.tryEnter(slot, generation))
+        {
+            // Wake the children first, but only if there may be work left for them
+            const SizeT firstChild = index * 2u + 2u;
+
+            if (firstChild < frame->nHelpers && frame->hasChunksLeft())
+                postHelpers(slots,
+                            slot,
+                            generation,
+                            frame,
+                            firstChild,
+                            frame->nHelpers - firstChild < 2u ? frame->nHelpers - firstChild : 2u);
+
+            frame->processChunks();
+            slots.leave(slot);
+        }
+
+        slots.finishHelper();
+    }
+
 
     ////////////////////////////////////////////////////////////
     // Member data
@@ -239,7 +319,19 @@ private:
 ///
 ////////////////////////////////////////////////////////////
 template <typename F>
-void parallelFor(ThreadPool& pool, ParallelForSlots& slots, const SizeT count, F&& f, SizeT chunkSize) noexcept
+void parallelFor(ThreadPool& pool, ParallelForSlots& slots, const SizeT count, F&& f, const SizeT chunkSize = 0u) noexcept
+{
+    priv::parallelForImpl<priv::parallelForTreeWake>(pool, slots, count, static_cast<F&&>(f), chunkSize);
+}
+
+} // namespace za
+
+
+namespace za::priv
+{
+////////////////////////////////////////////////////////////
+template <bool TreeWake, typename F>
+void parallelForImpl(ThreadPool& pool, ParallelForSlots& slots, const SizeT count, F&& f, SizeT chunkSize) noexcept
 {
     if (count == 0u)
         return;
@@ -252,47 +344,64 @@ void parallelFor(ThreadPool& pool, ParallelForSlots& slots, const SizeT count, F
     const SizeT nChunks  = (count - 1u) / chunkSize + 1u;
     const SizeT nHelpers = nChunks - 1u < nThreads - 1u ? nChunks - 1u : nThreads - 1u;
 
-    alignas(hardwareDestructiveInterferenceSize) Atomic<SizeT> nextChunk{0u};
-
-    const auto processChunks = [&]
+    // The call's state, shared with the helpers (which only touch it after entering the gate)
+    struct Frame
     {
-        for (SizeT chunk = nextChunk.fetchAddRelaxed(1u); chunk < nChunks; chunk = nextChunk.fetchAddRelaxed(1u))
+        alignas(hardwareDestructiveInterferenceSize) Atomic<SizeT> nextChunk{0u};
+
+        ThreadPool*         pool;
+        RemoveReference<F>* f;
+        SizeT               count;
+        SizeT               chunkSize;
+        SizeT               nChunks;
+        SizeT               nHelpers;
+
+        [[nodiscard, gnu::always_inline]] bool hasChunksLeft() const noexcept
         {
-            const SizeT begin = chunk * chunkSize;
-            f(begin, count - begin > chunkSize ? begin + chunkSize : count);
+            return nextChunk.loadRelaxed() < nChunks;
+        }
+
+        void processChunks() noexcept
+        {
+            for (SizeT chunk = nextChunk.fetchAddRelaxed(1u); chunk < nChunks; chunk = nextChunk.fetchAddRelaxed(1u))
+            {
+                const SizeT begin = chunk * chunkSize;
+                (*f)(begin, count - begin > chunkSize ? begin + chunkSize : count);
+            }
         }
     };
+
+    Frame frame{.pool = &pool, .f = &f, .count = count, .chunkSize = chunkSize, .nChunks = nChunks, .nHelpers = nHelpers};
 
     // No helpers needed, or every gate in use: do everything on the calling thread
     const SizeT slot = nHelpers > 0u ? slots.acquireSlot() : ParallelForSlots::slotCount;
 
     if (slot == ParallelForSlots::slotCount)
     {
-        processChunks();
+        frame.processChunks();
         return;
     }
 
-    // Helpers only touch this stack frame after entering the gate, which the caller closes and drains before returning
+    // Helpers only touch the frame after entering the gate, which the caller closes and drains before returning
     const U32 generation = slots.getGeneration(slot);
-    slots.m_outstanding.fetchAddRelaxed(nHelpers);
 
-    pool.postCopies(
-        [&slots, slot, generation, work = &processChunks]
+    if constexpr (TreeWake)
     {
-        if (slots.tryEnter(slot, generation))
-        {
-            (*work)();
-            slots.leave(slot);
-        }
+        ParallelForSlots::postHelpers(slots, slot, generation, &frame, 0u, nHelpers < 2u ? nHelpers : 2u);
+    }
+    else
+    {
+        // Every helper at once, with an index that has no children
+        slots.m_outstanding.fetchAddRelaxed(nHelpers);
+        pool.postCopies(ThreadPool::Task{[&slots, slot, generation, framePtr = &frame, nHelpers]
+        { ParallelForSlots::runHelper(slots, slot, generation, framePtr, nHelpers); }},
+                        nHelpers);
+    }
 
-        slots.finishHelper();
-    },
-        nHelpers);
-
-    processChunks();
+    frame.processChunks();
 
     slots.closeAndWait(slot); // every chunk is claimed: only wait for the helpers still finishing one
     slots.releaseSlot(slot);
 }
 
-} // namespace za
+} // namespace za::priv
