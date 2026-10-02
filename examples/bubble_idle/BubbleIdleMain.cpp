@@ -263,7 +263,7 @@ za::Vector<za::Vector<za::StringView>> Main::makeShuffledCatNames(za::FastNonCry
 ////////////////////////////////////////////////////////////
 unsigned int Main::getTPWorkerCount()
 {
-    return static_cast<unsigned int>(za::ThreadPool::getHardwareWorkerCountExcludingCallingThread());
+    return static_cast<unsigned int>(za::ThreadPool::getOptimalWorkerCount());
 }
 
 

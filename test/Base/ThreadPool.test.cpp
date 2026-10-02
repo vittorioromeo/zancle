@@ -114,6 +114,17 @@ TEST_CASE("[Base] Base/ThreadPool.hpp")
 }
 
 
+TEST_CASE("[Base] ThreadPool: optimal thread and worker counts")
+{
+    const za::SizeT threads = za::ThreadPool::getOptimalThreadCount();
+    const za::SizeT workers = za::ThreadPool::getOptimalWorkerCount();
+
+    CHECK(threads >= 1u);
+    CHECK(threads == za::Thread::usableHardwareConcurrency());
+    CHECK(workers == (threads > 1u ? threads - 1u : 1u)); // a pool needs a worker
+}
+
+
 TEST_CASE("[Base] ThreadPool: postBulk and postCopies")
 {
     za::Atomic<int> result{0};

@@ -196,7 +196,7 @@ int main()
     //
     //
     // Get hardware constants
-    const auto     nMaxWorkers   = za::ThreadPool::getHardwareWorkerCount();
+    const auto     nMaxWorkers   = za::ThreadPool::getOptimalThreadCount();
     constexpr auto cacheLineSize = static_cast<za::SizeT>(za::hardwareDestructiveInterferenceSize);
 
     //
@@ -254,7 +254,7 @@ int main()
     //
     // Set up thread pool
     // The calling thread takes part in `parallelFor`, so `nMaxWorkers` batches can run at once
-    za::ThreadPool       pool(za::ThreadPool::getHardwareWorkerCountExcludingCallingThread());
+    za::ThreadPool       pool(za::ThreadPool::getOptimalWorkerCount());
     za::ParallelForSlots parallelForSlots;
 
     const auto doInBatches = [&](auto&& f)

@@ -214,17 +214,18 @@ SizeT ThreadPool::getWorkerCount() const noexcept
 
 
 ////////////////////////////////////////////////////////////
-SizeT ThreadPool::getHardwareWorkerCount() noexcept
+SizeT ThreadPool::getOptimalThreadCount() noexcept
 {
-    return static_cast<SizeT>(za::Thread::hardwareConcurrency());
+    const SizeT hardwareThreads = za::Thread::usableHardwareConcurrency(); // `0` if unknown
+    return hardwareThreads > 0u ? hardwareThreads : 1u;
 }
 
 
 ////////////////////////////////////////////////////////////
-SizeT ThreadPool::getHardwareWorkerCountExcludingCallingThread() noexcept
+SizeT ThreadPool::getOptimalWorkerCount() noexcept
 {
-    const SizeT hardwareThreads = getHardwareWorkerCount(); // `0` if unknown
-    return hardwareThreads > 1u ? hardwareThreads - 1u : 1u;
+    const SizeT threads = getOptimalThreadCount();
+    return threads > 1u ? threads - 1u : 1u;
 }
 
 } // namespace za

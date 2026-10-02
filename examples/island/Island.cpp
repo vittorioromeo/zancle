@@ -424,7 +424,7 @@ int main()
     za::Vector<za::Vertex> terrainStagingBuffer;
 
     // Create a thread pool
-    za::ThreadPool threadPool{za::ThreadPool::getHardwareWorkerCount()};
+    za::ThreadPool threadPool{za::ThreadPool::getOptimalWorkerCount()}; // the main thread keeps rendering
 
     // Create our VertexBuffer with enough space to hold all the terrain geometry
     if (!terrain.create(resolution.x * resolution.y * 6))

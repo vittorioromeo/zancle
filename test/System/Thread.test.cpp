@@ -16,6 +16,10 @@
 #include "Zancle/Trait/IsMoveAssignable.hpp"
 #include "Zancle/Trait/IsMoveConstructible.hpp"
 
+#if defined(__linux__)
+    #include <sched.h>
+#endif
+
 
 ////////////////////////////////////////////////////////////
 // `Thread` is move-only -- copy operations must be deleted.
@@ -38,6 +42,20 @@ TEST_CASE("[System] Zancle/Concurrency/Thread.hpp - hardwareConcurrency returns 
 {
     const unsigned int n = za::Thread::hardwareConcurrency();
     CHECK(n >= 1u); // every reasonable test target has at least one core
+}
+
+TEST_CASE("[System] Zancle/Concurrency/Thread.hpp - usableHardwareConcurrency")
+{
+    const unsigned int usable = za::Thread::usableHardwareConcurrency();
+    CHECK(usable >= 1u);
+    CHECK(usable <= za::Thread::hardwareConcurrency());
+
+#if defined(__linux__) && defined(CPU_COUNT)
+    // The processors the process may run on (e.g. `taskset -c 0-3` gives 4), not every online processor
+    cpu_set_t set;
+    REQUIRE(sched_getaffinity(0, sizeof(set), &set) == 0);
+    CHECK(usable == static_cast<unsigned int>(CPU_COUNT(&set)));
+#endif
 }
 
 TEST_CASE("[System] Zancle/Concurrency/Thread.hpp - spawn + join round-trip")

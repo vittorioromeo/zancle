@@ -96,21 +96,26 @@ public:
     [[nodiscard]] SizeT getWorkerCount() const noexcept;
 
     ////////////////////////////////////////////////////////////
-    /// \brief Hint at the optimal number of threads for CPU-bound tasks (equivalent to `za::Thread::hardwareConcurrency`)
+    /// \brief Number of threads that can run CPU-bound work at once, the calling thread included (at least one)
+    ///
+    /// `za::Thread::usableHardwareConcurrency`, or `1` if undetermined.
+    /// E.g. the number of per-thread buffers to allocate for `za::parallelFor`,
+    /// which runs on the workers and on the calling thread.
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] static SizeT getHardwareWorkerCount() noexcept;
+    [[nodiscard]] static SizeT getOptimalThreadCount() noexcept;
 
     ////////////////////////////////////////////////////////////
-    /// \brief Hardware thread count minus one (at least one): the worker count to use when the calling thread also works
+    /// \brief Number of workers to create for CPU-bound work (at least one)
     ///
-    /// Leaves a hardware thread for the thread that owns the pool (e.g.
-    /// the main thread, which also takes part in `za::parallelFor`), so that
-    /// the workers and that thread together do not oversubscribe the CPU.
-    /// Returns `1` on single-threaded systems, as a pool needs a worker.
+    /// `getOptimalThreadCount() - 1`: leaves a hardware thread for the
+    /// thread that owns the pool (e.g. the main thread, which renders or
+    /// takes part in `za::parallelFor`), so that the workers and that
+    /// thread together do not oversubscribe the CPU. Returns `1` on
+    /// single-threaded systems, as a pool needs a worker.
     ///
     ////////////////////////////////////////////////////////////
-    [[nodiscard]] static SizeT getHardwareWorkerCountExcludingCallingThread() noexcept;
+    [[nodiscard]] static SizeT getOptimalWorkerCount() noexcept;
 
 private:
     ////////////////////////////////////////////////////////////

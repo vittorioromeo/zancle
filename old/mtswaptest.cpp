@@ -3,7 +3,7 @@
 //
 //
 // Get hardware constants
-inline const auto     nMaxWorkers   = static_cast<za::U64>(za::ThreadPool::getHardwareWorkerCount());
+inline const auto     nMaxWorkers   = static_cast<za::U64>(za::ThreadPool::getOptimalThreadCount());
 inline constexpr auto cacheLineSize = static_cast<za::SizeT>(za::hardwareDestructiveInterferenceSize);
 
 za::U64 nWorkers = nMaxWorkers;
