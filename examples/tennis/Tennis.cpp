@@ -28,8 +28,6 @@
 
 #include "Zancle/IO/Path.hpp"
 
-#include "Zancle/Random/FastNonCryptoRng.hpp"
-
 #include "Zancle/String/String.hpp"
 #include "Zancle/String/Utf8String.hpp"
 
@@ -38,6 +36,8 @@
 
 #include "Zancle/Geometry/Angle.hpp"
 #include "Zancle/Geometry/Vec2.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/Vocabulary/Optional.hpp"
 

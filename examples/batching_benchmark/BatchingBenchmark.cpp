@@ -20,8 +20,6 @@
 #include "Zancle/IO/IO.hpp"
 #include "Zancle/IO/Path.hpp"
 
-#include "Zancle/Random/FastNonCryptoRng.hpp"
-
 #include "Zancle/Chrono/Clock.hpp"
 #include "Zancle/Chrono/Time.hpp"
 
@@ -30,6 +28,8 @@
 #include "Zancle/Geometry/Angle.hpp"
 #include "Zancle/Geometry/Priv/Vec2Base.hpp"
 #include "Zancle/Geometry/Rect2.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/Vocabulary/Optional.hpp"
 

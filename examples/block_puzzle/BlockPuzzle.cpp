@@ -44,8 +44,6 @@
 
 #include "Zancle/IO/Path.hpp"
 
-#include "Zancle/Random/FastNonCryptoRng.hpp"
-
 #include "Zancle/Algorithm/Erase.hpp"
 #include "Zancle/Algorithm/Sort.hpp"
 #include "Zancle/Algorithm/Unique.hpp"
@@ -57,6 +55,8 @@
 #include "Zancle/Geometry/Angle.hpp"
 #include "Zancle/Geometry/Rect2.hpp"
 #include "Zancle/Geometry/Vec2.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/Vocabulary/Optional.hpp"
 #include "Zancle/Vocabulary/Variant.hpp"

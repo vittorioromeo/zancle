@@ -29,9 +29,9 @@
 #include "ExampleUtils/HueColor.hpp"
 #include "ExampleUtils/MathUtils.hpp"
 
-#include "Zancle/Random/FastNonCryptoRng.hpp"
-
 #include "Zancle/Geometry/Vec2.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 
 ////////////////////////////////////////////////////////////

@@ -3,11 +3,11 @@
 #include "CatType.hpp"
 #include "ExactArray.hpp"
 
-#include "Zancle/Random/FastNonCryptoRng.hpp"
-
 #include "Zancle/String/StringView.hpp"
 
 #include "Zancle/Container/Vector.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/Vocabulary/Span.hpp"
 

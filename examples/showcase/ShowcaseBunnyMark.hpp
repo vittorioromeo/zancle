@@ -10,8 +10,6 @@
 
 #include "Zancle/IO/Path.hpp"
 
-#include "Zancle/Random/FastNonCryptoRng.hpp"
-
 #include "Zancle/String/String.hpp"
 
 #include "Zancle/Container/Vector.hpp"
@@ -19,6 +17,8 @@
 #include "Zancle/Geometry/Angle.hpp"
 #include "Zancle/Geometry/Priv/Vec2Base.hpp"
 #include "Zancle/Geometry/Rect2.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/Vocabulary/Optional.hpp"
 

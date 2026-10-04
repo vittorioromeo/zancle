@@ -3,9 +3,9 @@
 #include "Zancle/Graphics/Text.hpp"
 #include "Zancle/Graphics/TextData.hpp"
 
-#include "Zancle/Random/FastNonCryptoRng.hpp"
-
 #include "Zancle/Geometry/Angle.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/Math/ClampMacro.hpp"
 

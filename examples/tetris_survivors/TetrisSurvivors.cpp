@@ -79,8 +79,6 @@
 
 #include "Zancle/IO/Path.hpp"
 
-#include "Zancle/Random/FastNonCryptoRng.hpp"
-
 #include "Zancle/String/StringView.hpp"
 #include "Zancle/String/ToString.hpp"
 
@@ -99,6 +97,8 @@
 #include "Zancle/Geometry/Angle.hpp"
 #include "Zancle/Geometry/Rect2.hpp"
 #include "Zancle/Geometry/Vec2.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/Vocabulary/Optional.hpp"
 #include "Zancle/Vocabulary/OverloadSet.hpp"

@@ -65,8 +65,6 @@
 
 #include "Zancle/Concurrency/ThreadPool.hpp"
 
-#include "Zancle/Random/FastNonCryptoRng.hpp"
-
 #include "Zancle/Algorithm/Erase.hpp"
 
 #include "Zancle/Chrono/Clock.hpp"
@@ -76,6 +74,8 @@
 #include "Zancle/Geometry/Angle.hpp"
 #include "Zancle/Geometry/Priv/Vec2Base.hpp"
 #include "Zancle/Geometry/Rect2.hpp"
+
+#include "Zancle/Random/FastNonCryptoRng.hpp"
 
 #include "Zancle/Vocabulary/Optional.hpp"
 
