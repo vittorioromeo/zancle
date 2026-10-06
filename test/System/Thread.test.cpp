@@ -1,3 +1,4 @@
+#include "AlignedAllocationUtil.hpp"
 #include "SystemUtil.hpp"
 #include "Tst/Tst.hpp"
 
@@ -100,6 +101,83 @@ TEST_CASE("[System] Zancle/Concurrency/Thread.hpp - plain functions and function
 
     CHECK(ThreadTest::plainFunctionRuns.loadRelaxed() == 2);
 }
+
+#ifdef __cpp_exceptions
+
+TEST_CASE("[System] Zancle/Concurrency/Thread.hpp - a callable throwing while stored starts and leaks nothing")
+{
+    struct ThrowsOnCopy
+    {
+        bool* ran;
+
+        explicit ThrowsOnCopy(bool& r) : ran{&r}
+        {
+        }
+
+        ThrowsOnCopy(const ThrowsOnCopy&) : ran{nullptr}
+        {
+            throw 42;
+        }
+
+        ThrowsOnCopy& operator=(const ThrowsOnCopy&) = delete;
+
+        void operator()() const
+        {
+            *ran = true;
+        }
+    };
+
+    bool               ran = false;
+    const ThrowsOnCopy callable{ran};
+
+    #ifdef ALIGNED_ALLOCATION_UTIL_AVAILABLE
+    const za::I64 balanceBefore = getAlignedAllocationBalance();
+    #endif
+
+    bool threw = false;
+
+    try
+    {
+        const za::Thread t{callable}; // copies `callable` into the thread's entry block
+    } catch (const int)
+    {
+        threw = true;
+    }
+
+    CHECK(threw);
+    CHECK(!ran);
+
+    #ifdef ALIGNED_ALLOCATION_UTIL_AVAILABLE
+    CHECK(getAlignedAllocationBalance() == balanceBefore); // the entry block was freed
+    #endif
+}
+
+#endif
+
+#ifdef ALIGNED_ALLOCATION_UTIL_AVAILABLE
+
+TEST_CASE("[System] Zancle/Concurrency/Thread.hpp - entry allocation failure throws, starts nothing")
+{
+    bool ran = false;
+
+    failAlignedAllocationAfter(0u);
+
+    bool threw = false;
+
+    try
+    {
+        const za::Thread t{[&ran] { ran = true; }};
+    } catch (const std::bad_alloc&)
+    {
+        threw = true;
+    }
+
+    CHECK(stopFailingAlignedAllocations());
+    CHECK(threw);
+    CHECK(!ran);
+}
+
+#endif
 
 TEST_CASE("[System] Zancle/Concurrency/Thread.hpp - getId is non-zero for a running thread")
 {
