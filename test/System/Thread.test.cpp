@@ -191,6 +191,7 @@ TEST_CASE("[System] Zancle/Concurrency/Thread.hpp - getId is non-zero for a runn
     t.join();
 
     CHECK(observedId.loadAcquire() == outsideId.value());
+    CHECK(t.getId().value() == 0u); // `{}` when not joinable
 }
 
 TEST_CASE("[System] Zancle/Concurrency/Thread.hpp - move construction transfers ownership")
@@ -284,8 +285,10 @@ TEST_CASE("[System] Zancle/Concurrency/Thread.hpp - detach releases joinability"
             za::ThisThread::sleepFor(za::milliseconds(5));
             done.storeRelease(1);
         }};
+        CHECK(t.getId().value() != 0u);
         t.detach();
         CHECK(!t.joinable());
+        CHECK(t.getId().value() == 0u); // `{}` when not joinable
     }
 
     // Wait for the detached thread to finish before we leave the test
