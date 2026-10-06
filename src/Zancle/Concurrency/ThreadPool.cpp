@@ -12,6 +12,7 @@
 #include "Zancle/Base/Abort.hpp"
 #include "Zancle/Base/Assert.hpp"
 #include "Zancle/Base/Macros.hpp"
+#include "Zancle/Base/ScopeGuard.hpp"
 #include "Zancle/Base/SizeT.hpp"
 #include "Zancle/Base/StackTrace.hpp"
 
@@ -101,7 +102,9 @@ void enqueueCopies(TaskQueue& queue, const ThreadPool::Task& task, const SizeT c
 /// Shutdown protocol:
 ///
 /// - An empty task is a "stop task". Users cannot post one (asserted).
-/// - The destructor posts one stop task per worker. A worker exits as soon
+/// - The destructor posts one stop task per worker (and so does a
+///   constructor that fails to start them all, for the workers it started,
+///   before rethrowing). A worker exits as soon
 ///   as its main loop dequeues one, so each worker consumes exactly one,
 ///   no matter how the tasks are distributed.
 /// - Stop tasks dequeued elsewhere (by `tryRunPendingTask`, e.g. from a
@@ -115,6 +118,18 @@ struct ThreadPool::Impl
 {
     TaskQueue              queue;
     za::Vector<za::Thread> workers;
+
+    ////////////////////////////////////////////////////////////
+    /// \brief Post one stop task per worker, and join them all
+    ///
+    ////////////////////////////////////////////////////////////
+    void stopAndJoinWorkers()
+    {
+        enqueueCopies(queue, Task{}, workers.size());
+
+        for (za::Thread& worker : workers)
+            worker.join();
+    }
 };
 
 
@@ -122,6 +137,19 @@ struct ThreadPool::Impl
 ThreadPool::ThreadPool(const SizeT workerCount)
 {
     ZA_ASSERT(workerCount > 0u);
+
+    // If starting a worker throws (e.g. `std::bad_alloc` from its thread
+    // entry, with exceptions enabled), stop and join the workers already
+    // started before the exception leaves: the destructor does not run for
+    // a failed construction, and destroying a worker joins it, which would
+    // wait forever for a worker blocked on the empty queue. (If queuing the
+    // stop tasks fails as well, `checkEnqueued` aborts instead of hanging.)
+    bool allStarted = false;
+
+    ZA_SCOPE_GUARD({
+        if (!allStarted) [[unlikely]]
+            m_impl->stopAndJoinWorkers();
+    });
 
     m_impl->workers.reserve(workerCount);
 
@@ -142,16 +170,15 @@ ThreadPool::ThreadPool(const SizeT workerCount)
                 task();
             }
         });
+
+    allStarted = true;
 }
 
 
 ////////////////////////////////////////////////////////////
 ThreadPool::~ThreadPool()
 {
-    enqueueCopies(m_impl->queue, Task{}, m_impl->workers.size());
-
-    for (za::Thread& worker : m_impl->workers)
-        worker.join();
+    m_impl->stopAndJoinWorkers();
 
     while (tryRunPendingTask())
         ;

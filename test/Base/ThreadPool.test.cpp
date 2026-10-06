@@ -1,3 +1,4 @@
+#include "AlignedAllocationUtil.hpp"
 #include "Tst/Tst.hpp"
 
 #include "Zancle/Concurrency/ThreadPool.hpp"
@@ -11,6 +12,10 @@
 #include "Zancle/Container/Vector.hpp"
 
 #include "Zancle/Base/SizeT.hpp"
+
+#ifdef ALIGNED_ALLOCATION_UTIL_AVAILABLE
+    #include <new>
+#endif
 
 
 namespace
@@ -301,6 +306,47 @@ TEST_CASE("[Base] ThreadPool: destruction")
         CHECK(result.loadRelaxed() == 200);
     }
 }
+
+
+#ifdef ALIGNED_ALLOCATION_UTIL_AVAILABLE
+
+TEST_CASE("[Base] ThreadPool: a failed construction stops the workers it started")
+{
+    // Fail each aligned allocation of the constructor in turn (the workers' thread entries): the constructor
+    // must stop and join the workers it already started, which would otherwise wait forever on the empty queue
+    za::SizeT failures = 0u;
+
+    for (za::SizeT successes = 0u; successes < 64u; ++successes)
+    {
+        bool threw    = false;
+        bool injected = false;
+
+        failAlignedAllocationAfter(successes);
+
+        try
+        {
+            const za::ThreadPool pool(4u);
+            injected = stopFailingAlignedAllocations();
+        } catch (const std::bad_alloc&)
+        {
+            threw    = true;
+            injected = stopFailingAlignedAllocations();
+        }
+
+        CHECK(threw == injected);
+
+        if (!injected) // every allocation of the constructor succeeded
+            break;
+
+        ++failures;
+    }
+
+    #if defined(ZA_STATIC) || !defined(_WIN32)
+    CHECK(failures >= 1u); // at least one thread entry (a Windows DLL keeps its own `operator new`)
+    #endif
+}
+
+#endif
 
 
 TEST_CASE("[Base] ThreadPool: a task's captured state is released right after it runs")
