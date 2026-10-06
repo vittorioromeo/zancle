@@ -523,6 +523,41 @@ void checkWakeStrategy()
         release.storeRelease(true);
     }
 
+    SECTION("Helpers queued behind busy workers stay bounded")
+    {
+        constexpr za::SizeT nWorkers = 2u;
+
+        za::Atomic<bool>     started[nWorkers]{};
+        za::Atomic<bool>     release{false};
+        za::ThreadPool       pool(nWorkers);
+        za::ParallelForSlots slots;
+
+        for (auto& s : started)
+            ParallelForTest::blockWorker(pool, s, release);
+
+        // Every call runs on the caller, leaving its helpers queued behind the busy workers
+        bool allCorrect = true;
+        for (int call = 0; call < 5000; ++call)
+        {
+            za::Atomic<za::SizeT> visited{0u};
+            za::priv::parallelForImpl<TreeWake>(pool, slots, 32u, [&](const za::SizeT b, const za::SizeT e) {
+                visited.fetchAddRelaxed(e - b);
+            }, 1u);
+            allCorrect &= visited.loadRelaxed() == 32u;
+        }
+
+        // Only helpers are queued: run them here, counting them
+        za::SizeT queuedHelpers = 0u;
+        while (pool.tryRunPendingTask())
+            ++queuedHelpers;
+
+        CHECK(allCorrect);
+        CHECK(queuedHelpers > 0u);
+        CHECK(queuedHelpers <= za::ParallelForSlots::outstandingHelpersPerWorker * nWorkers); // 10,000 without a bound
+
+        release.storeRelease(true);
+    }
+
     SECTION("Calls from tasks running during the pool's destruction")
     {
         for (const za::SizeT nWorkers : {1u, 4u})
