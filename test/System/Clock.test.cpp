@@ -172,6 +172,29 @@ TEST_CASE("[System] za::Clock - nanoseconds")
         CHECK(now <= after / 1000);
     }
 
+    SECTION("nowUnixNanoseconds agrees with std::chrono::system_clock")
+    {
+        using namespace std::chrono;
+
+        // The wall clock can be moved between the readings (a time sync): allow a second
+        const auto    stdBefore = duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count();
+        const za::I64 unixNow   = za::Clock::nowUnixNanoseconds();
+        const auto    stdAfter  = duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count();
+
+        CHECK(unixNow >= static_cast<za::I64>(stdBefore) - 1'000'000'000);
+        CHECK(unixNow <= static_cast<za::I64>(stdAfter) + 1'000'000'000);
+
+        // After 2020-01-01 (1'577'836'800 s), before 2200-01-01 (7'258'118'400 s)
+        CHECK(unixNow > 1'577'836'800LL * 1'000'000'000);
+        CHECK(unixNow < 7'258'118'400LL * 1'000'000'000);
+
+        // In milliseconds, as `duration_cast<milliseconds>` truncates (positive values: toward zero)
+        const za::I64 unixMs = za::Clock::nowUnixNanoseconds() / 1'000'000;
+        const auto    stdMs  = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+        CHECK(unixMs <= static_cast<za::I64>(stdMs) + 1000);
+        CHECK(unixMs >= static_cast<za::I64>(stdMs) - 1000);
+    }
+
     SECTION("getElapsedNanoseconds()")
     {
         za::Clock clock;
